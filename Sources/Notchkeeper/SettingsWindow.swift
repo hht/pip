@@ -6,6 +6,9 @@ import SwiftUI
 /// 不透明时顶部的渐隐和模糊交给系统的滚动边缘效果（macOS 26 起滚动视图默认就有），和系统设置一样；工具栏里还得有按钮（见 SettingsView 的侧栏）
 /// @see https://developer.apple.com/documentation/swiftui/view/scrolledgeeffectstyle(_:for:)
 /// 第一次打开居中，之后记住位置；关掉窗口不退出 App。
+/// 开着时 App 是普通 App（Dock 图标、⌘Tab、菜单栏），关掉后回到只有刘海的 accessory：accessory App 不在 Dock 和 ⌘Tab 里，
+/// 设置窗口一被别的 App 盖住就没处切回来；有窗口的时候就该像普通 App 一样能切。
+/// @see https://developer.apple.com/documentation/appkit/nsapplication/activationpolicy-swift.enum
 @MainActor
 final class SettingsWindowController: NSObject, NSWindowDelegate {
     static let size = NSSize(width: 715, height: 560)
@@ -28,6 +31,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             window.contentViewController = hostingController()
             window.setFrame(frame, display: false)  // 换内容控制器会按内容尺寸改窗口大小，保持原位置和大小
         }
+        NSApp.setActivationPolicy(.regular)
         NSApp.activate()
         window.makeKeyAndOrderFront(nil)
     }
@@ -35,6 +39,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     /// 关掉后卸载 SwiftUI 视图，隐藏的窗口不留任何刷新；选中页和输入框草稿在 model 里，重新打开不丢
     func windowWillClose(_ notification: Notification) {
         window.contentViewController = nil
+        NSApp.setActivationPolicy(.accessory)
     }
 
     private func hostingController() -> NSViewController {

@@ -35,7 +35,7 @@ Haitao 本机自用的刘海应用（SwiftPM，macOS 14+），没有菜单栏图
 ## 运行
 
 ```bash
-./scripts/run.sh            # release 编译，打包 build/Pip.app，ad-hoc 签名，结束旧实例后启动
+./scripts/run.sh            # release 编译，打包 Pip.app 并 ad-hoc 签名，结束旧实例，装进 /Applications 后启动
 CONFIG=debug ./scripts/run.sh   # debug 构建：只有它听 demo.sh
 ./scripts/demo.sh done      # 演示：完成卡（还有 failed、question、approval），挂在最近的 Claude Code 会话上，点了跳 Ghostty
 ./scripts/demo.sh alert     # 演示：红卡（还有 blocks：五种内容块；settings：打开设置，会抢焦点）

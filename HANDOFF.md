@@ -1,6 +1,6 @@
 # HANDOFF
 
-最后更新：2026-10-31 深夜（nk 改名 pipctl、插件装卸、App 里装卸防火墙、用户文档 `docs/user-guide.md`，都没实机点过；之后按复审修了插件装符号链接、`--progress nan`、试运行出问题时禁用「保留」、卸插件撤排队卡，App 装防火墙去掉 dry-run 页，注释去掉日期和开发备注）。只放接下来要做的和没解决的；做完的看 `git log`，规则看 `CLAUDE.md` 和 `docs/*`。开工前 `git log --oneline -5` 核对。实机验证的技巧见 `docs/dev-notes.md`。
+最后更新：2026-11-07（App 图标；`run.sh` 装进 /Applications；开着设置时出现在 Dock）。只放接下来要做的和没解决的；做完的看 `git log`，规则看 `CLAUDE.md` 和 `docs/*`。开工前 `git log --oneline -5` 核对。实机验证的技巧见 `docs/dev-notes.md`。
 
 ## 接下来
 
@@ -44,7 +44,8 @@
 
 - **插件和 pipctl**（10-31 晚 agent 实测过命令行这边：装、坏图标被拒、升级进备份、自己换自己被拒、`terminal` 被拒、卸载进备份、卸后的卡被丢、`notify` / `send` / `activity` 都收下、参数错和超大退出 64；往收件箱塞随机字节、超长消息、FIFO、符号链接，往插件目录塞乱码 manifest，App 都没崩、逐条记日志）。还要用户自己点、自己看：设置 › 插件的「新建插件…」「安装插件…」、拖文件夹（虚线框）、「卸载…」、「命令行」一段的链接按钮；刘海上卡片和活动长什么样（这个会话没有录屏权限，截不了图）。sheet 和确认框挂在 Form 里的 Section 上，弹不出来就挪到 Form 上（推断）。卸掉一个还有卡排着的插件（红卡挂着时发几张再卸），红卡撤后那些卡不该再弹。旧的 `bin/nk` 10-31 晚已删：删之前开着的终端要重开，终端插件才调得到 `bin/pipctl`。
 - **防火墙**（10-31 晚 agent 用 App 的提权路径实测过装、开、保留、关、卸，记在 `docs/firewall.md` §7；现在装着正式规则、关着）。还要用户自己点：设置 › 防火墙的开关、确认框、倒计时、「保留」（试运行出问题时应当灰着）、「卸载…」、「安装…」的确认框；密码框点取消应当什么都不报（取消靠 osascript 报 -128 认，没测过）。正式规则（整机拦截）一次都没开过：第一次开在 Clash 正常时由用户点，网断了什么都别做，等 2 分钟回滚。
-- **改名 Pip**：`./scripts/run.sh` 后看设置页标题、关于页、「退出 Pip」、Ghostty 权限弹窗里的名字；`run.sh` 会删掉旧的 `build/Notchkeeper.app`；**之后在设置里把「开机启动」关掉再打开一次**（登记的还是旧路径）；Claude Code 里已装的 mod 说明要重装或下次刷新才变成 Pip。
+- **改名 Pip**：`./scripts/run.sh` 后看设置页标题、关于页、「退出 Pip」、Ghostty 权限弹窗里的名字；Claude Code 里已装的 mod 说明要重装或下次刷新才变成 Pip。
+- **装进 /Applications、图标、Dock**（11-07 agent 实测过：`run.sh` 装进 `/Applications/Pip.app`、仓库里不留包、聚焦搜索只找到这一份）。还要用户自己看：启动台和访达里的图标（finished 造型）；打开设置时 Dock 出现图标、⌘Tab 切得到、菜单栏有 Pip / 编辑 / 窗口，关掉设置后 Dock 图标消失、键盘输入不卡在 Pip 上；之前设置窗口「忽然跑到别的窗口后面」还会不会出现（推断是 accessory App 在密码框、文件选择框这类别的进程的窗口关掉后拿不回焦点，没复现过；再遇到时记下刚点了什么）。**在设置里把「开机启动」关掉再打开一次**：登记的还是 `build/` 下的旧路径。
 - **Ghostty 跳转**：同目录开两个 Claude；Claude 套在 tmux 里（应退回按目录认）；工作中的会话多点几次，看转圈字符会不会盖掉标记（推断）。有一次脚本连点两行第二下没切过去、没复现：用户再遇到时记下哪一行、面板开着没有。
 - **mod**：开着的会话装上后 `/reload-plugins` 应该开始写（没实测）；后台 agent 崩溃时会不会发带 `agentId` 的 `turn.complete`（不发的话该会话的完成卡被压住到 `/clear`）；后台 agent 在跑时 `/reload-plugins` 可能提前弹完成卡（推断）。`Funk` 出错音没人耳听过。
 - **Claude Code 升级后**：重跑 `ClaudeMod/plugins/notchkeeper` 的 `claude plugin test`，在 tmux 里按 `docs/agent-integration.md`「实测」8 重测。

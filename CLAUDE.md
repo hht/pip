@@ -2,7 +2,7 @@
 
 > 本轮用户输入优先于任何文档。通用 MUST NOT 与收工分档见全局 Contract（`~/.agents/AGENTS.md`）。
 
-面向普通用户的 macOS 刘海应用（SwiftPM，SwiftUI + AppKit，macOS 14+，简体中文和 English，没有菜单栏图标）。四件事：**出口守卫**（用户级 LaunchAgent `guardd` 只监测流量是否全走 Clash，App 画在刘海上）、**防火墙**（一键开关）、**提醒卡片**（Claude Code 顶层回合结束、需要你介入）、**Pip**（原创吉祥物，用表情说状态）。
+面向普通用户的 macOS 刘海应用（SwiftPM，SwiftUI + AppKit，macOS 14+，简体中文和 English，没有菜单栏图标，开着设置窗口时才出现在 Dock）。四件事：**出口守卫**（用户级 LaunchAgent `guardd` 只监测流量是否全走 Clash，App 画在刘海上）、**防火墙**（一键开关）、**提醒卡片**（Claude Code 顶层回合结束、需要你介入）、**Pip**（原创吉祥物，用表情说状态）。
 
 开工前读 `HANDOFF.md`（接下来做什么）；运行与安装见 `README.md`；每个 target 的职责见 `Package.swift` 的注释。
 
@@ -50,7 +50,7 @@
 ## 命令
 
 - **验收**：`swift build` 零警告，并且 `swift test` 全绿；改了界面文案再加 `scripts/strings.sh --check` 通过。
-- `./scripts/run.sh`：打包并启动 App（先结束旧实例）；`./scripts/demo.sh done|failed|question|approval|alert|blocks|settings`：实机弹卡、打开设置。它靠分布式通知，本机任何进程都能发，所以只有 DEBUG 构建听（`CONFIG=debug ./scripts/run.sh`）。
+- `./scripts/run.sh`：打包、装进 `/Applications` 并启动 App（先结束旧实例）；`./scripts/demo.sh done|failed|question|approval|alert|blocks|settings`：实机弹卡、打开设置。它靠分布式通知，本机任何进程都能发，所以只有 DEBUG 构建听（`CONFIG=debug ./scripts/run.sh`）。
 - 新增 lint / format 工具或依赖要用户明示同意。
 
 ## 提交与汇报

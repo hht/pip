@@ -219,7 +219,3 @@ class MascotLayerView: NSView {
         l.sublayers?.forEach(removeAnimations)
     }
 }
-
-extension RGB {
-    var cg: CGColor { CGColor(srgbRed: r, green: g, blue: b, alpha: 1) }
-}

@@ -136,7 +136,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         sigterm = source
     }
 
-    /// 再次打开 App（Finder 双击、`open -a`）时没有菜单栏图标可点，直接打开设置
+    /// 已经在运行时再打开（启动台、访达双击、`open -a`、设置开着时点 Dock 图标）：没有菜单栏图标可点，直接打开设置
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         openSettings()
         return false
@@ -152,7 +152,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return m
     }
 
-    /// 主菜单不显示（accessory App），只为 App 激活后 ⌘, / ⌘Q / ⌘W 和输入框的编辑快捷键生效
+    /// 设置窗口开着时显示在菜单栏（那时是普通 App），也让 ⌘, / ⌘Q / ⌘W 和输入框的编辑快捷键生效
     func buildMainMenu() -> NSMenu {
         let app = NSMenu()
         app.addItem(item(String(localized: "设置…"), #selector(openSettings), ","))
@@ -173,7 +173,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let main = NSMenu()
         for sub in [app, edit, window] {
-            let root = NSMenuItem()
+            let root = NSMenuItem(title: sub.title, action: nil, keyEquivalent: "")
             root.submenu = sub
             main.addItem(root)
         }

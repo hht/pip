@@ -81,6 +81,7 @@ public struct RGB: Hashable, Sendable {
     public var r: Double { Double((hex >> 16) & 0xFF) / 255 }
     public var g: Double { Double((hex >> 8) & 0xFF) / 255 }
     public var b: Double { Double(hex & 0xFF) / 255 }
+    public var cg: CGColor { CGColor(srgbRed: r, green: g, blue: b, alpha: 1) }
 
     /// 眼睛、▲ 里的 !、气泡里的 ?、锁孔
     public static let ink = RGB(0x16171A)

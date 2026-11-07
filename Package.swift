@@ -7,24 +7,19 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "Notchkeeper",
-            dependencies: ["AgentCore", "FirewallCore", "GuardCore", "GuardWatch", "MascotCore", "NotchCore", "PluginCore", "PluginStore"],
+            dependencies: ["AgentCore", "FirewallCore", "GuardCore", "GuardProbes", "MascotCore", "NotchCore", "PluginCore", "PluginStore"],
             path: "Sources/Notchkeeper",
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         // App 外壳里离不开 AppKit、SwiftUI 或真文件的部分（config.json 读写、Ghostty 跳转、mod 安装、视图量高度等）
         .testTarget(name: "NotchkeeperTests", dependencies: ["Notchkeeper"]),
-        // 出口守卫的纯逻辑：不 import SwiftUI / AppKit，不做 I/O
+        // 出口守卫的纯逻辑（判定、每轮结果的格式）：不 import SwiftUI / AppKit，不做 I/O
         .target(name: "GuardCore"),
         .testTarget(name: "GuardCoreTests", dependencies: ["GuardCore"]),
-        // 出口守卫的三路观测（路由、Clash 进程、出口 IP），只做 I/O 和边界解析，不做判定
+        // 出口守卫在 App 里的检查：各路观测（路由、Clash 进程、出口 IP、网络路径）的 I/O 和边界解析，
+        // 以及每 5 秒一轮的编排（`GuardMonitor`）。判定交给 GuardCore
         .target(name: "GuardProbes", dependencies: ["GuardCore"]),
         .testTarget(name: "GuardProbesTests", dependencies: ["GuardProbes"]),
-        // App 侧监听 guard-state.json 所在目录，变了就交给 GuardStateReader；GuardCore 管什么时候读，这里只做 I/O
-        .target(name: "GuardWatch", dependencies: ["GuardCore"]),
-        .testTarget(name: "GuardWatchTests", dependencies: ["GuardWatch"]),
-        // 出口守卫后台进程：轮询三路探针、写 guard-state.json（App 用 GuardWatch 监听这个文件）
-        .executableTarget(name: "guardd", dependencies: ["GuardCore", "GuardProbes"]),
-        .testTarget(name: "guarddTests", dependencies: ["guardd"]),
         // 防火墙的纯逻辑（docs/firewall.md）：开启 / 保留 / 关闭怎么改状态、每一轮该对 pf 做什么、规则长什么样、核对结果、root 状态文件和状态摘要的格式，
         // 以及放行表从 Clash 配置和 GeoIP 库里怎么算。
         // 纯值类型，不调 pfctl、不读文件、不取时钟

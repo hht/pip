@@ -1,7 +1,6 @@
 /// 回答：一轮判成 unknown 时，是因为本机根本没网（灰），还是网通着但探针没拿到结果。
 /// 只给 unknown 用：healthy、egressMismatch、violated 永远没有原因。UI 的颜色不看它（所有 unknown 同一个灰色空心环），
 /// 只用它选文字，见 docs/egress-guard.md「怎么画」一节。
-/// 新增取值要升 `GuardState.currentSchemaVersion`。
 public enum UnknownReason: String, Codable, Sendable, Equatable {
     /// 没有满足的非 utun 物理网卡，或没有默认路由
     case offline

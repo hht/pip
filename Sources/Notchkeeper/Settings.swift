@@ -264,14 +264,13 @@ private struct ExitGuardPane: View {
                         Text(p.title)
                     }
                 }
-                // 和刘海展开后的出口是同一个值（GuardStateReader 的 egressIP），完整显示，可选中拷贝
+                // 和刘海展开后的出口是同一个值（GuardDisplay 的 egressIP），完整显示，可选中拷贝
                 LabeledContent("当前出口") {
                     Text(state.display.egressIP ?? "—")
                         .monospacedDigit()
                         .foregroundStyle(p.tone == .mismatch ? AnyShapeStyle(p.color) : AnyShapeStyle(.secondary))
                         .textSelection(.enabled)
                 }
-                // guardd 最后一次写文件的时间；守卫不响应时它会停在过去，正好说明问题
                 LabeledContent("上次检查") {
                     if let d = state.display.checkedAt {
                         TimelineView(.periodic(from: .now, by: 1)) { _ in Text(AgoText.string(d)) }
@@ -303,7 +302,6 @@ private struct ExitGuardPane: View {
                 if invalid {
                     Text("不是有效的 IPv4 地址，或已在列表里。").foregroundStyle(.red)
                 } else if store.fileUnreadable {
-                    // guardd 只解 allowlist，别的键坏了它照样读到真实列表，这里却是默认值
                     Text("配置文件读不了，这里显示的是默认值，不是文件里的列表。")
                 } else if store.config.allowlist.isEmpty {
                     Text("列表为空时，守卫判断不了出口 IP 对不对，只能显示「暂时判断不了出口」；有流量没走代理仍然会报。")
@@ -473,7 +471,7 @@ private struct PluginsPane: View {
 
     /// 违规中关守卫要确认
     private func setGuard(_ on: Bool) {
-        if !on, state.presentation.holdsViolation {
+        if !on, state.presentation.status == .violated {
             confirmGuardOff = true
         } else {
             store.config.setEnabled(on, for: PluginID.exitGuard)

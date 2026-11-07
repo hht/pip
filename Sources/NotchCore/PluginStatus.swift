@@ -24,12 +24,12 @@ public struct PluginStatus: Equatable, Sendable {
         self.indicator = indicator
     }
 
-    /// 违规（含关掉红卡后确认不了恢复）严重；不一致、断网、守卫没响应要你看；健康和探针没结果平静（探针没结果只在右耳画灰环）
+    /// 违规严重；不一致、断网要你看；健康、第一轮还没查完、探针没结果平静（探针没结果只在右耳画灰环）
     public init(guard p: GuardPresentation) {
         let urgency: Urgency = switch p.status {
-        case .healthy, .probeFailed: .calm
-        case .mismatch, .offline, .unresponsive: .attention
-        case .violated, .violationUnconfirmed: .critical
+        case .checking, .healthy, .probeFailed: .calm
+        case .mismatch, .offline: .attention
+        case .violated: .critical
         }
         self.init(plugin: PluginID.exitGuard, urgency: urgency, look: p.look, indicator: .for(p.look, probeFailed: p.status == .probeFailed))
     }

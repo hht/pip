@@ -102,13 +102,6 @@ public struct Card: Identifiable, Equatable, Sendable {
         self.buttons = buttons.prefix(Self.maxButtons).map { Button(title: Self.capped($0.title, to: Self.maxValue), action: $0.action) }
     }
 
-    /// 守卫的红卡挂着时换副标题：同一张卡（id 不变），不重弹
-    public func replacingSubtitle(_ subtitle: String) -> Card {
-        var c = self
-        c.subtitle = Self.capped(subtitle)
-        return c
-    }
-
     /// 外部插件的 id，内置插件的卡是 nil：外部的卡红卡挂着时排着，不盖它
     public var externalPluginID: String? {
         if case .plugin(let id, _, _) = source { return id }

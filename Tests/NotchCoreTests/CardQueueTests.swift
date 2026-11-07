@@ -92,7 +92,7 @@ private let silent = Queue.Change()
         var q = Queue()
         _ = q.post(notice("a"), now: t0)
         _ = q.setHovering(true, now: at(1))
-        _ = q.raiseAlert(persistent: true, sound: true, seconds: 6, now: at(2))
+        _ = q.raiseAlert(persistent: true, seconds: 6, now: at(2))
         #expect(q.deadline(now: at(2)) == at(8))
     }
 }
@@ -154,7 +154,7 @@ private let silent = Queue.Change()
     @Test func violationPreemptsAndInterruptedNoticeReplaysSilently() {
         var q = Queue()
         _ = q.post(notice("a"), now: t0)
-        #expect(q.raiseAlert(persistent: true, sound: true, seconds: 6, now: at(1)) == sound)
+        #expect(q.raiseAlert(persistent: true, seconds: 6, now: at(1)) == sound)
         #expect(q.showing == .alert(persistent: true))
         #expect(q.tick(now: at(7)) == silent)
         #expect(q.showing == .notice("a"))
@@ -167,7 +167,7 @@ private let silent = Queue.Change()
 
     @Test func noticeWaitsDuringAlertsFirstShowing() {
         var q = Queue()
-        _ = q.raiseAlert(persistent: true, sound: true, seconds: 6, now: t0)
+        _ = q.raiseAlert(persistent: true, seconds: 6, now: t0)
         #expect(q.post(notice("a"), now: at(1)) == silent)
         #expect(q.showing == .alert(persistent: true))
         #expect(q.tick(now: at(6)) == sound)
@@ -176,7 +176,7 @@ private let silent = Queue.Change()
 
     @Test func noticeCoversHeldAlertAfterItsFirstShowing() {
         var q = Queue()
-        _ = q.raiseAlert(persistent: true, sound: true, seconds: 6, now: t0)
+        _ = q.raiseAlert(persistent: true, seconds: 6, now: t0)
         _ = q.tick(now: at(6))
         #expect(q.showing == .alert(persistent: true))
         #expect(q.post(notice("a"), now: at(20)) == sound)
@@ -188,7 +188,7 @@ private let silent = Queue.Change()
     /// 不常驻的红卡放满一次停留就收起，算用户关掉了这一次
     @Test func nonPersistentAlertTimesOutAsDismissed() {
         var q = Queue()
-        _ = q.raiseAlert(persistent: false, sound: true, seconds: 6, now: t0)
+        _ = q.raiseAlert(persistent: false, seconds: 6, now: t0)
         _ = q.post(notice("a"), now: at(1))
         #expect(q.tick(now: at(6)) == Queue.Change(sound: true, alertDismissed: true))
         #expect(q.showing == .notice("a"))
@@ -198,7 +198,7 @@ private let silent = Queue.Change()
 
     @Test func dismissingAlertReportsIt() {
         var q = Queue()
-        _ = q.raiseAlert(persistent: true, sound: true, seconds: 6, now: t0)
+        _ = q.raiseAlert(persistent: true, seconds: 6, now: t0)
         #expect(q.dismiss(now: at(1)) == Queue.Change(alertDismissed: true))
         #expect(q.showing == nil)
     }
@@ -206,7 +206,7 @@ private let silent = Queue.Change()
     /// 回到 healthy（或别处记下关掉了）：红卡撤掉；盖在上面的卡放完不再回到红卡
     @Test func clearedAlertDoesNotComeBack() {
         var q = Queue()
-        _ = q.raiseAlert(persistent: true, sound: true, seconds: 6, now: t0)
+        _ = q.raiseAlert(persistent: true, seconds: 6, now: t0)
         _ = q.tick(now: at(6))
         _ = q.post(notice("a"), now: at(10))
         #expect(q.clearAlert(now: at(11)) == silent)
@@ -217,7 +217,7 @@ private let silent = Queue.Change()
 
     @Test func clearingShownAlertShowsNext() {
         var q = Queue()
-        _ = q.raiseAlert(persistent: true, sound: true, seconds: 6, now: t0)
+        _ = q.raiseAlert(persistent: true, seconds: 6, now: t0)
         _ = q.post(notice("a"), now: at(1))
         #expect(q.clearAlert(now: at(2)) == sound)
         #expect(q.showing == .notice("a"))
@@ -226,18 +226,11 @@ private let silent = Queue.Change()
     /// 红卡已经挂着：不重弹、不重响
     @Test func raisingHeldAlertAgainChangesNothing() {
         var q = Queue()
-        _ = q.raiseAlert(persistent: true, sound: true, seconds: 6, now: t0)
+        _ = q.raiseAlert(persistent: true, seconds: 6, now: t0)
         _ = q.tick(now: at(6))
         _ = q.post(notice("a"), now: at(10))
-        #expect(q.raiseAlert(persistent: true, sound: true, seconds: 6, now: at(11)) == silent)
+        #expect(q.raiseAlert(persistent: true, seconds: 6, now: at(11)) == silent)
         #expect(q.showing == .notice("a"))
-    }
-
-    /// 守卫不响应时保留的红卡不响 Basso（docs/egress-guard.md）
-    @Test func silentAlert() {
-        var q = Queue()
-        #expect(q.raiseAlert(persistent: true, sound: false, seconds: 6, now: t0) == silent)
-        #expect(q.showing == .alert(persistent: true))
     }
 
     /// 恢复卡说的是上一次违规：新违规一开始就作废，不论排着还是正在放
@@ -246,7 +239,7 @@ private let silent = Queue.Change()
         var q = Queue()
         _ = q.post(notice("a"), now: t0)
         _ = q.post(Queue.Notice(card: "recovered", key: .recovered, seconds: 4), now: t0)
-        _ = q.raiseAlert(persistent: persistent, sound: true, seconds: 6, now: at(1))
+        _ = q.raiseAlert(persistent: persistent, seconds: 6, now: at(1))
         _ = q.tick(now: at(7))
         #expect(q.showing == .notice("a"))
         _ = q.tick(now: at(13))
@@ -256,7 +249,7 @@ private let silent = Queue.Change()
     @Test func newViolationDropsShowingRecoveredCard() {
         var q = Queue()
         _ = q.post(Queue.Notice(card: "recovered", key: .recovered, seconds: 4), now: t0)
-        _ = q.raiseAlert(persistent: true, sound: true, seconds: 6, now: at(1))
+        _ = q.raiseAlert(persistent: true, seconds: 6, now: at(1))
         _ = q.tick(now: at(7))
         #expect(q.showing == .alert(persistent: true))
     }
@@ -266,7 +259,7 @@ private let silent = Queue.Change()
         var q = Queue()
         _ = q.post(notice("a"), now: t0)
         _ = q.setHovering(true, now: at(5))
-        _ = q.raiseAlert(persistent: true, sound: true, seconds: 6, now: at(10))
+        _ = q.raiseAlert(persistent: true, seconds: 6, now: at(10))
         _ = q.setHovering(false, now: at(10))
         _ = q.tick(now: at(16))
         #expect(q.showing == .notice("a"))
@@ -327,7 +320,7 @@ private let silent = Queue.Change()
 
     @Test func withdrawingNoticeOverHeldAlertReturnsToAlert() {
         var q = Queue()
-        _ = q.raiseAlert(persistent: true, sound: true, seconds: 6, now: t0)
+        _ = q.raiseAlert(persistent: true, seconds: 6, now: t0)
         _ = q.tick(now: at(6))
         _ = q.post(notice("approval", session: 1, lapses: true), now: at(10))
         _ = q.withdraw(.session(1), now: at(11))
@@ -364,7 +357,7 @@ private let silent = Queue.Change()
     @Test func alertRaisedWhileAwaySoundsOnReturn() {
         var q = Queue()
         _ = q.setAway(true, now: t0)
-        #expect(q.raiseAlert(persistent: true, sound: true, seconds: 6, now: at(1)) == silent)
+        #expect(q.raiseAlert(persistent: true, seconds: 6, now: at(1)) == silent)
         #expect(q.showing == .alert(persistent: true))
         #expect(q.setAway(false, now: at(30)) == sound)
         #expect(q.deadline(now: at(30)) == at(36))
@@ -374,7 +367,7 @@ private let silent = Queue.Change()
     @Test func alertClearedWhileAwayNeverSounds() {
         var q = Queue()
         _ = q.setAway(true, now: t0)
-        _ = q.raiseAlert(persistent: true, sound: true, seconds: 6, now: at(1))
+        _ = q.raiseAlert(persistent: true, seconds: 6, now: at(1))
         _ = q.clearAlert(now: at(2))
         #expect(q.setAway(false, now: at(30)) == silent)
         #expect(q.showing == nil)
@@ -394,7 +387,7 @@ private let silent = Queue.Change()
     /// 常驻红卡放完第一次后锁屏，锁屏期间来的卡解锁后马上盖上去、响
     @Test func noticePostedOverHeldAlertWhileAwayShowsOnReturn() {
         var q = Queue()
-        _ = q.raiseAlert(persistent: true, sound: true, seconds: 6, now: t0)
+        _ = q.raiseAlert(persistent: true, seconds: 6, now: t0)
         _ = q.tick(now: at(6))
         _ = q.setAway(true, now: at(10))
         _ = q.post(notice("a"), now: at(11))
@@ -414,7 +407,7 @@ private let silent = Queue.Change()
 
     @Test func waitsBehindHangingAlert() {
         var q = Queue()
-        _ = q.raiseAlert(persistent: true, sound: true, seconds: 6, now: t0)
+        _ = q.raiseAlert(persistent: true, seconds: 6, now: t0)
         _ = q.tick(now: at(6))
         #expect(q.post(external("ext"), now: at(7)) == silent)
         #expect(q.showing == .alert(persistent: true))
@@ -433,7 +426,7 @@ private let silent = Queue.Change()
     @Test func interruptedByViolationKeepsWaiting() {
         var q = Queue()
         _ = q.post(external("ext"), now: t0)
-        _ = q.raiseAlert(persistent: true, sound: true, seconds: 6, now: at(1))
+        _ = q.raiseAlert(persistent: true, seconds: 6, now: at(1))
         _ = q.tick(now: at(7))
         #expect(q.showing == .alert(persistent: true))
         _ = q.dismiss(now: at(8))
@@ -443,7 +436,7 @@ private let silent = Queue.Change()
     /// 排着时过了插件说的过期时刻：轮到它时不放、不响，放下一张
     @Test func staleWhileWaitingIsDropped() {
         var q = Queue()
-        _ = q.raiseAlert(persistent: true, sound: true, seconds: 6, now: t0)
+        _ = q.raiseAlert(persistent: true, seconds: 6, now: t0)
         _ = q.post(Queue.Notice(card: "old", key: nil, seconds: 6, externalPluginID: "ext", staleAt: at(60)), now: at(1))
         _ = q.post(Queue.Notice(card: "new", key: nil, seconds: 6, externalPluginID: "ext", staleAt: at(600)), now: at(2))
         #expect(q.clearAlert(now: at(60)) == sound)
@@ -457,7 +450,7 @@ private let silent = Queue.Change()
 @Suite struct RecoveredBeforeExternal {
     @Test func recoveredJumpsAheadOfExternal() {
         var q = Queue()
-        _ = q.raiseAlert(persistent: true, sound: true, seconds: 6, now: t0)
+        _ = q.raiseAlert(persistent: true, seconds: 6, now: t0)
         _ = q.post(Queue.Notice(card: "ext", key: nil, seconds: 6, externalPluginID: "ext"), now: at(1))
         _ = q.post(Queue.Notice(card: "恢复", key: .recovered, seconds: 4), now: at(2))
         _ = q.clearAlert(now: at(2))
@@ -475,7 +468,7 @@ private let silent = Queue.Change()
 
     @Test func keepsNewestThreePerPlugin() {
         var q = Queue()
-        _ = q.raiseAlert(persistent: true, sound: true, seconds: 6, now: t0)
+        _ = q.raiseAlert(persistent: true, seconds: 6, now: t0)
         for i in 1...5 { _ = q.post(external("b\(i)"), now: at(1)) }
         _ = q.post(external("t1", "terminal"), now: at(1))
         _ = q.clearAlert(now: at(2))

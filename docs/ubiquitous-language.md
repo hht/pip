@@ -6,8 +6,9 @@
 |---|---|---|
 | egress | 出口 | 本机访问公网时对方看到的 IPv4 |
 | verdict | 结论 | 守卫一轮的判定：`healthy` / `egressMismatch` / `unknown` / `violated` |
-| unknown reason | 未知原因 | guardd 写的：offline 断网、probeFailed 探针没结果 |
-| stale | 守卫没响应 | App 读状态文件时判的：不存在、读不了、过期或时钟跳变 |
+| unknown reason | 未知原因 | 守卫一轮判成 unknown 的原因：offline 断网、probeFailed 探针没结果 |
+| stale | 守卫没响应 | Pip 的一个造型（沙漏），暂不接线 |
+| checking | 正在检查 | App 启动后守卫还没查完第一轮 |
 | session | 会话 | 一个 Claude Code 进程，对应 `~/.claude/sessions/<pid>.json` |
 | agent state | agent 状态 | working 工作中 / stopped 已停止 / needsYou 需要你介入 |
 | need | 介入类型 | question 等你回答 / approval 等你批准 |
@@ -41,7 +42,7 @@
 | meteor | 流星 | 卡片弹出时沿边扫一趟的两道光。不叫「流光」「进度条」 |
 | firewall mode | 防火墙模式 | off 关闭 / trial 试运行 / on 开启。不叫「保护模式」 |
 | trial / keep | 试运行 / 保留 | 开启后先试运行 2 分钟，点「保留」才转 on，没点到时回滚到 off |
-| firewall state | 防火墙状态文件 | root 0600 的 `firewall.state`，守护进程照它办事。不是状态摘要，也不是守卫的状态文件 `guard-state.json` |
+| firewall state | 防火墙状态文件 | root 0600 的 `firewall.state`，守护进程照它办事。不是状态摘要 |
 | firewall status | 状态摘要 | root 0644 的 `firewall-status.json`，守护进程每轮写给 App 看 |
 | check | 核对 | 开着时每轮验证规则真的在拦（pf 开着、anchor 点在、有规则、计数在涨、隧道网卡在） |
 | pf reference | 启用引用 | `pfctl -E` 拿到的那一份，凭 token 用 `pfctl -X` 释放。不叫「锁」「句柄」 |

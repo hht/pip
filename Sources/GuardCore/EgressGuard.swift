@@ -10,7 +10,7 @@ import Foundation
 /// 3. Clash 在、路由走 utun、IP 都在允许列表，三者都成立才 healthy；其余（Clash 不在、读不到路由、
 ///    探针全超时）→ unknown。Clash 不在但路由和 IP 正常时流量并没有漏出去。
 /// 4. violated 是粘性的：只有一轮完整的 healthy 才能解除。断网时探针全失败，不能因此撤掉红卡。
-///    粘性跨进程：guardd 重启时用 `init(resuming:)` 从上一份 violated 状态文件接续（见 docs/egress-guard.md「guardd」一节）。
+///    粘性只在 App 这次运行之内：App 重启后从 unknown 开始，路由还不走 utun 的话下一轮照样 violated。
 
 /// 一轮观测。`nil` 表示这一路没拿到结果，即「未知」，不是「正常」。
 public struct Observation: Sendable {
@@ -34,7 +34,7 @@ public struct Observation: Sendable {
         return egressIPs.allSatisfy(allowlist.contains)
     }
 
-    /// 这一轮报给 App 显示的出口 IP（状态文件的 `egressIP`）；没拿到 IP 是 `nil`，绝不拿上一轮的补。
+    /// 这一轮报给 App 显示的出口 IP（`GuardDisplay.egressIP`）；没拿到 IP 是 `nil`，绝不拿上一轮的补。
     /// 有不在允许列表的就只从这些里挑（出口不符时显示的是不符的那个）；回显服务说法不一时取出现次数最多的，
     /// 一样多取数值最小的，和探针返回的先后无关。只用于显示，不参与判定。
     public func shownEgressIP(allowlist: Set<IPv4>) -> IPv4? {
@@ -62,15 +62,6 @@ public struct EgressGuard: Sendable {
     public private(set) var violatedSince: Date?
 
     public init() {}
-
-    /// 重启接续：上一份状态是 violated 时从 violated 开始，`violatedSince` 沿用原值（文件缺这个键就用那份的 `checkedAt`）。
-    /// 不看新旧：只有一轮 healthy 能解除，停了多久都一样。其他 verdict、`nil`（没有可信的上一份）都从头开始。
-    /// 只取 verdict 和 `violatedSince`；`egressIP` 等观测值不接续，下一轮按自己的观测重写。
-    public init(resuming previous: GuardState?) {
-        guard let previous, previous.verdict == .violated else { return }
-        verdict = .violated
-        violatedSince = previous.violatedSince ?? previous.checkedAt
-    }
 
     /// `now` 只用来记 `violatedSince`，不影响判定。
     public mutating func observe(_ o: Observation, allowlist: Set<IPv4>, at now: Date = Date()) -> Verdict {

@@ -41,7 +41,7 @@ public enum RouteProbe {
     }
 
     /// 跑一个子进程，正常退出且状态码 0 时返回 stdout，否则 `nil`。
-    /// 调用方的任务被取消（guardd 一轮超时）时 `terminate` 子进程；已取消时不再启动。
+    /// 调用方的任务被取消（一轮超时）时 `terminate` 子进程；已取消时不再启动。
     /// 启动和结束放在同一把锁里，避免对还没启动的 `Process` 调 `terminate`（会抛 ObjC 异常）。
     /// @see https://developer.apple.com/documentation/foundation/process/terminate()
     static func output(of executable: URL, arguments: [String]) async -> String? {

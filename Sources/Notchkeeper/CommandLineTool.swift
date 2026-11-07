@@ -2,7 +2,7 @@ import Foundation
 import GuardCore
 
 /// 回答：命令行工具 pipctl 装在哪、在不在 PATH 上。
-/// App 每次启动把包里的 pipctl 换进 `bin/`（和 guardd 同目录），终端插件和用户的脚本都调它；
+/// App 每次启动把包里的 pipctl 换进 `bin/`，终端插件和用户的脚本都调它；
 /// `~/.local/bin` 里的链接只在用户点了才建，占了的名字不碰。不改 `~/.zshrc`、不读 PATH（CLAUDE.md 硬规则）
 enum CommandLineTool {
     static let installed = GuardPaths.directory.appendingPathComponent("bin/pipctl")

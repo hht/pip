@@ -7,13 +7,12 @@ import NotchCore
 extension GuardPresentation {
     var title: String {
         switch status {
+        case .checking: return String(localized: "正在检查出口")
         case .healthy: return String(localized: "出口正常")
         case .mismatch: return String(localized: "出口 IP 不在允许列表里")
         case .offline: return String(localized: "没有网络，暂时检查不了出口")
         case .probeFailed: return String(localized: "暂时判断不了出口")
-        case .unresponsive: return String(localized: "出口守卫没响应")
         case .violated: return Self.violatedTitle
-        case .violationUnconfirmed: return Alert.unresponsive.detail
         }
     }
 
@@ -42,16 +41,6 @@ extension GuardPresentation {
 
     /// 出口 IP 的字色：只有 mismatch 用琥珀（IP 本身就是问题），其余浅灰
     var ipColor: Color { tone == .mismatch ? color : .white.opacity(0.6) }
-}
-
-extension GuardPresentation.Alert {
-    /// 红卡的副标题
-    var detail: String {
-        switch self {
-        case .violated: return String(localized: "去公网的路由没走 Clash 的隧道")
-        case .unresponsive: return String(localized: "守卫没响应，还不能确认恢复")
-        }
-    }
 }
 
 /// 状态点：unknown 是灰色空心环，其余是实心点

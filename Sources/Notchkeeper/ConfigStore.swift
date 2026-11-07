@@ -39,7 +39,7 @@ final class ConfigStore: ObservableObject {
         }
         lastMTime = mtime()
         // 热加载：目录的监听收原子替换（大多数编辑器），文件的监听收原地改写。不轮询：没人改时不该每秒醒一次。
-        // 目录里别的文件（guardd 每轮写的 guard-state.json）也会叫醒它，比一次修改时间就回去
+        // 目录里别的文件变了也会叫醒它，比一次修改时间就回去
         let name = url.lastPathComponent
         directory = WatchedDirectory(url.deletingLastPathComponent(), matching: { $0 == name }, queue: .main) { [weak self] in
             MainActor.assumeIsolated { self?.fileChanged() }
@@ -50,6 +50,10 @@ final class ConfigStore: ObservableObject {
             log("配置目录打不开，外部改了配置文件要重启 App 才载入")
         }
     }
+
+    /// 守卫每轮取的允许列表。不是合法 IPv4 的条目丢掉：只有手改 config.json 才会有，设置页加的都校验过、列表里也看得见它们。
+    /// 启动时文件就解不开，`config` 是默认值（空列表），守卫最多判到 unknown，设置页有横幅；运行中改坏了沿用改坏前的
+    var allowlistIPs: Set<IPv4> { Set(config.allowlist.compactMap(IPv4.init)) }
 
     private func fileChanged() {
         watchFile()

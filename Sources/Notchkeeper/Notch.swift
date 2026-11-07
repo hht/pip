@@ -8,8 +8,8 @@ import PluginCore
 /// 卡片的样子和声音：写什么在 NotchCore 的 `Card`，这里按 `outcome` 取流星颜色、Pip 造型、提示音（docs/ui.md「卡片」）。
 /// 什么时候放由 `CardQueue` 决定
 extension Card {
-    static func exitAlert(detail: String) -> Card {
-        Card(source: .exitGuard, title: GuardPresentation.violatedTitle, subtitle: detail, outcome: .violation)
+    static var exitAlert: Card {
+        Card(source: .exitGuard, title: GuardPresentation.violatedTitle, subtitle: String(localized: "去公网的路由没走 Clash 的隧道"), outcome: .violation)
     }
     static var recovered: Card {
         Card(source: .exitGuard, title: String(localized: "出口已恢复"), subtitle: String(localized: "流量又全部走代理了"), outcome: .recovered)
@@ -287,13 +287,6 @@ final class NotchController {
         }
     }
 
-    /// 新的一次违规：红卡插到最前。sound 为 false 时不响（守卫不响应时保留的红卡不再响 Basso）
-    private func raiseAlert(_ card: Card, sound: Bool) {
-        alertCard = card
-        let cfg = ConfigStore.shared.config
-        apply(queue.raiseAlert(persistent: cfg.alertPersistent, sound: sound, seconds: cfg.cardAutoDismissSeconds, now: Date()))
-    }
-
     /// 台面跟着队列走：换卡或收起、响这张卡的声音、定下一次到点
     private func apply(_ change: CardQueue<Card>.Change) {
         let card: Card?
@@ -362,16 +355,15 @@ final class NotchController {
         apply(queue.setHovering(over, now: Date()))
     }
 
-    /// 守卫读完一次，红卡要做的事（判定在 `ViolationAlert`）
+    /// 守卫查完一轮，红卡要做的事（判定在 `ViolationAlert`）
     func alertAction(_ action: ViolationAlert.Action) {
         switch action {
         case .none: return
-        case .raise(let alert): raiseAlert(.exitAlert(detail: alert.detail), sound: alert.sounds)
-        case .replaceDetail(let alert):
-            guard var shown = alertCard else { preconditionFailure("换副标题时红卡一定挂着") }
-            shown = shown.replacingSubtitle(alert.detail)
-            alertCard = shown
-            if model.card?.id == shown.id { model.card = shown }
+        case .raise:
+            // 新的一次违规：红卡插到最前，响 Basso
+            alertCard = .exitAlert
+            let cfg = ConfigStore.shared.config
+            apply(queue.raiseAlert(persistent: cfg.alertPersistent, seconds: cfg.cardAutoDismissSeconds, now: Date()))
         case .clear(let recovered):
             // 恢复卡先排上，红卡撤了马上轮到它，不排在违规期间攒下的外部卡后面
             if recovered { post(.recovered, key: .recovered, seconds: Card.recoveredSeconds) }

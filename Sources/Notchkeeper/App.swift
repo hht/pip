@@ -28,6 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var inbox: InboxWatcher?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        DispatchQueue.global(qos: .utility).async { LegacyGuardd.remove() }
         ClaudeMod.refreshIfInstalled()
         CommandLineTool.install()
         TerminalPlugin.refreshIfInstalled()

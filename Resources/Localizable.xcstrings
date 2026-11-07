@@ -512,16 +512,6 @@
         }
       }
     },
-    "出口守卫没响应": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Egress guard not responding"
-          }
-        }
-      }
-    },
     "出口已恢复": {
       "localizations": {
         "en": {
@@ -918,16 +908,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Guard Not Responding"
-          }
-        }
-      }
-    },
-    "守卫没响应，还不能确认恢复": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Guard silent, can't confirm recovery"
           }
         }
       }
@@ -1820,6 +1800,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Checking…"
+          }
+        }
+      }
+    },
+    "正在检查出口": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking egress"
           }
         }
       }

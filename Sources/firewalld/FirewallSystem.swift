@@ -104,7 +104,7 @@ struct FirewallSystem: Sendable {
 }
 
 /// 回答：怎么写文件，让读的一方永远只看到完整的一份、从第一个字节起就是该有的权限。
-/// 同 guardd 的 `StateFile`：同目录临时文件 `O_CREAT | O_EXCL` 按 `mode` 新建，再 `rename(2)`。
+/// 同目录临时文件 `O_CREAT | O_EXCL` 按 `mode` 新建，再 `rename(2)`。
 /// 调用方拿着锁，同一时刻只有一个写的，所以临时文件用固定名字：上次崩在半路留下的下次就被清掉，不越积越多
 enum AtomicFile {
     static func write(_ data: Data, to url: URL, mode: mode_t) throws {

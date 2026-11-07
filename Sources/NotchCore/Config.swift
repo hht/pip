@@ -9,7 +9,7 @@ public struct Config: Codable, Equatable, Sendable {
     /// Pip 的眼睛和身体跟着鼠标走、鼠标到刘海上时探头（docs/mascot.md §5）
     public var mascotFollowsMouse = true
     // 出口守卫
-    // 不内置任何真实出口：空列表时 guardd 判不了出口（unknown），设置页会提示
+    // 不内置任何真实出口：空列表时守卫判不了出口（unknown），设置页会提示
     public var allowlist: [String] = []
     public var autoAlert = true
     public var alertPersistent = true

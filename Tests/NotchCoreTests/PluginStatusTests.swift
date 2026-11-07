@@ -14,6 +14,7 @@ private func guardStatus(_ verdict: Verdict, unknown: UnknownReason? = nil) -> P
     @Test func guardUrgencies() {
         #expect(guardStatus(.healthy).urgency == .calm)
         #expect(guardStatus(.unknown, unknown: .probeFailed).urgency == .calm)
+        #expect(PluginStatus(guard: GuardPresentation(.checking, dismissedViolationSince: nil)).urgency == .calm)
         #expect(guardStatus(.egressMismatch).urgency == .attention)
         #expect(guardStatus(.unknown, unknown: .offline).urgency == .attention)
         #expect(guardStatus(.violated).urgency == .critical)

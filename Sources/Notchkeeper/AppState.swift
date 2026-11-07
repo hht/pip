@@ -3,15 +3,13 @@ import AppKit
 import MascotCore
 // 只取用到的：GuardCore 有个叫 `Observation` 的类型（守卫一轮的观测），整个导入会盖住 @Observable 展开时用的 Observation 模块
 import struct GuardCore.GuardDisplay
-import enum GuardCore.GuardPaths
-import enum GuardCore.GuardStateReader
 import struct GuardCore.IPv4
-import GuardWatch
+import GuardProbes
 import NotchCore
 import Observation
 import PluginCore
 
-/// 视图按属性订阅（Observation）：只有读了 `display` 的视图（展开的面板、设置页）才随 guardd 每轮写盘重算，
+/// 视图按属性订阅（Observation）：只有读了 `display` 的视图（展开的面板、设置页）才随守卫每轮重算，
 /// 收起的刘海只跟着 `presentation` 等真正变了的东西走
 /// @see https://developer.apple.com/documentation/observation
 @MainActor
@@ -21,8 +19,8 @@ final class AppState {
 
     let store = ConfigStore.shared
 
-    /// 最近一次读到的 guard-state.json（guardd 写，App 只读）
-    private(set) var display: GuardDisplay
+    /// 守卫最近一轮的结果（`GuardMonitor`）
+    private(set) var display = GuardDisplay.checking
     /// 由 display 和用户关掉的是哪一次算出来（`ViolationAlert`），界面只看它
     private(set) var presentation: GuardPresentation
     /// 面板列的会话（AgentCore 判定的、活着的终端 claude）
@@ -37,26 +35,25 @@ final class AppState {
 
     @ObservationIgnored private var violationAlert: ViolationAlert
 
-    /// 每次读完都调用（不论有没有变化），参数是红卡要做的事
+    /// 守卫每查完一轮都调用（不论有没有变化），参数是红卡要做的事
     @ObservationIgnored var onAlertAction: ((ViolationAlert.Action) -> Void)?
     /// AgentCore 判定的事件，连同同一次更新的会话列表
     @ObservationIgnored var onAgentEvents: (([AgentEvent], [Session]) -> Void)?
     /// 外部插件被卸掉（设置页、`pipctl plugin uninstall`、手动删目录都算）：App 撤掉它排着的卡
     @ObservationIgnored var onPluginsRemoved: ((Set<String>) -> Void)?
-    /// 订阅 guard-state 显示流的长任务；`stopWatchingGuard()` / deinit 取消，流随之结束、监听关掉
+    /// 订阅守卫每轮结果的长任务；`stopWatchingGuard()` / deinit 取消，流随之结束、探针停下
     @ObservationIgnored private var guardTask: Task<Void, Never>?
     @ObservationIgnored private var agentWatcher: AgentWatcher?
 
     init() {
-        let d = GuardStateReader.display(data: nil, now: Date())
-        display = d
-        violationAlert = ViolationAlert(d)
+        violationAlert = ViolationAlert(.checking)
         presentation = violationAlert.presentation
     }
 
     func start() {
-        // 不轮询：GuardStateWatcher 监听目录，guardd 写文件后马上读；checkedAt 过期也由它到点重读（docs/egress-guard.md）
-        watchGuard(GuardStateWatcher(directory: GuardPaths.directory).displays())
+        // 只在 App 运行时检查（docs/egress-guard.md「什么时候查」）；允许列表每轮从内存里的配置取
+        let store = store
+        watchGuard(GuardMonitor(probes: .live(), allowlist: { await store.allowlistIPs }).displays())
         let watcher = AgentWatcher { update in
             DispatchQueue.main.async { AppState.shared.applyAgent(update) }
         }
@@ -196,7 +193,7 @@ final class AppState {
         DispatchQueue.main.asyncAfter(wallDeadline: .now() + max(0, at.timeIntervalSinceNow), execute: work)
     }
 
-    /// 开关出口守卫插件（关的是提醒，不是判定）：关掉撤红卡，打开按最近一份状态读一次
+    /// 开关出口守卫插件（关的是提醒，不是判定）：关掉撤红卡，打开按最近一轮的结果再判一次
     func setGuardEnabled(_ on: Bool) {
         onAlertAction?(violationAlert.setEnabled(on, autoAlert: store.config.autoAlert))
         Log.write("出口守卫插件：\(on ? "打开" : "关掉")")
@@ -213,7 +210,7 @@ final class AppState {
     func demoAlert() { onAlertAction?(violationAlert.demo()) }
     #endif
 
-    /// 允许列表用 GuardCore 的 IPv4 校验，和 guardd 解析 config.json 的规则一致
+    /// 允许列表用 GuardCore 的 IPv4 校验，和守卫每轮取列表时的规则一致（`ConfigStore.allowlistIPs`）
     @discardableResult
     func addAllowed(_ raw: String) -> Bool {
         let ip = raw.trimmingCharacters(in: .whitespacesAndNewlines)

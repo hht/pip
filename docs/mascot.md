@@ -57,8 +57,8 @@ pose 放造型的静止朝向；yaw / pitch 给跟随鼠标；动作叠加（add
 | dizzy 晕 | 点一下面板里的 Pip，1.6s | 正 | 无 | 无 |
 | offline 断网 | 守卫 unknown，原因是断网 | 正 | sign：Wi-Fi 加斜杠 | 告示图标 |
 | mismatch 出口不符 | 出口 IP 不在允许列表 | 正 | sign：▲! | 告示图标 |
-| stale 守卫没响应 | 状态文件不存在、读不了、过期或时钟跳变，且上次不是 violated | 没精神 | sign：沙漏 | 告示图标 |
-| danger 危险 | 出口 violated；或守卫没响应但上次是 violated（和红卡保留的规则一致） | 正 | sign：!! | 告示图标 |
+| stale 守卫没响应 | 暂不接线（守卫并进 App 之后没有「守卫没响应」） | 没精神 | sign：沙漏 | 告示图标 |
+| danger 危险 | 出口 violated | 正 | sign：!! | 告示图标 |
 | shielded 防火墙守住 | 出口 violated，但防火墙拦住了（`docs/egress-guard.md`「怎么画」；第 5 步接上） | 镇定 | sign：锁 | 告示图标 |
 
 「暂不接线」的造型照样实现，状态测试页可以手动切过去，有来源再接（用户定）。
@@ -75,7 +75,7 @@ pose 放造型的静止朝向；yaw / pitch 给跟随鼠标；动作叠加（add
 
 几个状态同时成立时，画最高的那个；多个会话取最高的会话（用户定）。
 
-1. 守卫：danger / shielded（互斥）> mismatch > stale > offline
+1. 守卫：danger / shielded（互斥）> mismatch > offline
 2. 晕
 3. agent：approval > question > longTurn > working > finished
 4. 睡着

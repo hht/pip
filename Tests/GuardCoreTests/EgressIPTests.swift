@@ -16,19 +16,18 @@ private func obs(iface: String? = "utun4", ips: [IPv4]) -> Observation {
     Observation(clashRunning: true, routeInterface: iface, egressIPs: ips)
 }
 
-private func state(_ o: Observation, guard g: inout EgressGuard, path: NetworkPath? = up, at t: Date = t0) -> GuardState {
+private func state(_ o: Observation, guard g: inout EgressGuard, path: NetworkPath? = up, at t: Date = t0) -> GuardDisplay {
     let v = g.observe(o, allowlist: allowlist, at: t)
-    return GuardState(verdict: v, observation: o, allowlist: allowlist, egressFailures: [:], networkPath: path,
-                      violatedSince: g.violatedSince, checkedAt: t)
+    return GuardDisplay(verdict: v, observation: o, allowlist: allowlist, networkPath: path, violatedSince: g.violatedSince, checkedAt: t)
 }
 
-private func state(_ o: Observation, path: NetworkPath? = up) -> GuardState {
+private func state(_ o: Observation, path: NetworkPath? = up) -> GuardDisplay {
     var g = EgressGuard()
     return state(o, guard: &g, path: path)
 }
 
-/// 面板显示的出口 IP 和判定同源：guardd 把这一轮观测到的出口 IP 写进状态文件的 `egressIP`（完整地址，打不打码是 App 的事）
-@Suite struct EgressIPInStateFile {
+/// 面板显示的出口 IP 和判定同源：这一轮观测到的出口 IP 放进 `GuardDisplay.egressIP`（完整地址，界面完整显示）
+@Suite struct EgressIPInDisplay {
     @Test func healthyRoundWritesTheObservedIP() {
         let s = state(obs(ips: [allowedA, allowedA]))
         #expect(s.verdict == .healthy)
@@ -58,14 +57,12 @@ private func state(_ o: Observation, path: NetworkPath? = up) -> GuardState {
         #expect(obs(ips: [outsideX]).shownEgressIP(allowlist: []) == outsideX)
     }
 
-    /// 这一轮没观测到出口（断网、探针全失败或超时）就是 nil，键不写进文件
+    /// 这一轮没观测到出口（断网、探针全失败或超时）就是 nil，界面显示「—」
     @Test(arguments: [up, down, nil] as [NetworkPath?])
-    func noObservedEgressWritesNil(_ path: NetworkPath?) throws {
+    func noObservedEgressIsNil(_ path: NetworkPath?) {
         let s = state(obs(ips: []), path: path)
         #expect(s.verdict == .unknown)
         #expect(s.egressIP == nil)
-        let json = try #require(String(data: s.encoded(), encoding: .utf8))
-        #expect(!json.contains("egressIP"))
     }
 
     /// 绝不沿用上一轮的 IP：上一轮拿到了，这一轮探针失败，就写 nil
@@ -84,77 +81,5 @@ private func state(_ o: Observation, path: NetworkPath? = up) -> GuardState {
         #expect(sticky.verdict == .violated && sticky.egressIP == "198.51.100.200")
         let blind = state(obs(ips: []), guard: &g, at: t0.addingTimeInterval(10))
         #expect(blind.verdict == .violated && blind.egressIP == nil)
-    }
-
-    @Test func roundTrips() throws {
-        for s in [state(obs(ips: [outsideX])), state(obs(ips: []))] {
-            #expect(try GuardState.decode(s.encoded()) == s)
-        }
-    }
-
-    /// 只有 `egressIP` 这一个字段可以出现 IP；其余任何字段都不得出现点分四段
-    @Test(arguments: [[allowedA, outsideX], [outsideY], []])
-    func onlyEgressIPCarriesAnIP(_ ips: [IPv4]) throws {
-        let s = state(obs(iface: "en0", ips: ips))
-        var object = try #require(JSONSerialization.jsonObject(with: s.encoded()) as? [String: Any])
-        let ip = object.removeValue(forKey: "egressIP") as? String
-        #expect(ip.flatMap(IPv4.init)?.description == ip) // 有的话一定是合法的完整 IPv4
-        #expect((ip == nil) == ips.isEmpty)
-        let rest = try #require(String(data: JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]), encoding: .utf8))
-        #expect(rest.firstMatch(of: /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/) == nil)
-        #expect(!rest.contains("198.51.100"))
-    }
-}
-
-/// App 只在文件新鲜时显示 IP；过期、时钟跳变、读不了一律 nil（界面显示「—」），绝不显示旧 IP
-@Suite struct EgressIPInDisplay {
-    private let now = t0
-
-    private func file(_ ips: [IPv4], iface: String = "utun4", age: TimeInterval = 0, schema: Int = 1) throws -> Data {
-        var g = EgressGuard()
-        var s = state(obs(iface: iface, ips: ips), guard: &g, at: now.addingTimeInterval(-age))
-        s.schemaVersion = schema
-        return try s.encoded()
-    }
-
-    private func read(_ data: Data?) -> GuardDisplay { GuardStateReader.display(data: data, now: now) }
-
-    @Test func freshFileShowsTheIP() throws {
-        let d = read(try file([allowedA]))
-        #expect(d.reason == .fresh && d.verdict == .healthy)
-        #expect(d.egressIP == "198.51.100.10")
-        #expect(read(try file([outsideX], iface: "en0")).egressIP == "198.51.100.9")
-    }
-
-    @Test func freshFileWithoutIPShowsNil() throws {
-        #expect(read(try file([])).egressIP == nil)
-    }
-
-    /// guardd 不响应时红卡可以靠 lastVerdict 保留，但 IP 不保留
-    @Test func staleFileHidesTheIPButKeepsLastVerdict() throws {
-        let d = read(try file([outsideX], iface: "en0", age: 16))
-        #expect(d.reason == .stale && d.lastVerdict == .violated)
-        #expect(d.egressIP == nil)
-    }
-
-    @Test func clockSkewHidesTheIP() throws {
-        let d = read(try file([outsideX], iface: "en0", age: -6))
-        #expect(d.reason == .clockSkew && d.lastVerdict == .violated)
-        #expect(d.egressIP == nil)
-    }
-
-    @Test func otherSchemaMissingAndUnreadableHaveNoIP() throws {
-        #expect(read(try file([allowedA], schema: 2)).egressIP == nil)
-        #expect(read(nil).egressIP == nil)
-        #expect(read(Data("{not json".utf8)).egressIP == nil)
-    }
-
-    /// 文件是外部数据：`egressIP` 不是合法 IPv4 就当没有，不把乱码交给界面；其余照常显示
-    @Test func malformedIPIsDropped() throws {
-        let json = #"{"schemaVersion":1,"verdict":"healthy","checkedAt":"2027-01-15T08:00:00Z","egressFailures":{},"egressIP":"not-an-ip"}"#
-        let checkedAt = try #require(ISO8601DateFormatter().date(from: "2027-01-15T08:00:00Z"))
-        let d = GuardStateReader.display(data: Data(json.utf8), now: checkedAt)
-        #expect(d.reason == .fresh && d.verdict == .healthy)
-        #expect(d.egressIP == nil)
     }
 }

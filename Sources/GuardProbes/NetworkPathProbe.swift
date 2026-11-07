@@ -3,7 +3,7 @@ import GuardCore
 import Network
 import os
 
-/// 回答：本机此刻的网络路径快照（有没有不经过 TUN 的物理网络）。guardd 每轮取一次，测试换成桩。
+/// 回答：本机此刻的网络路径快照（有没有不经过 TUN 的物理网络）。守卫每轮取一次，测试换成桩。
 public protocol NetworkPathSource: Sendable {
     /// 还没拿到快照时返回 `nil`（不是「断网」）
     func current() async -> NetworkPath?
@@ -44,7 +44,7 @@ public final class LiveNetworkPath: NetworkPathSource, @unchecked Sendable {
             let snapshot = NetworkPathProbe.snapshot(of: path)
             latest.withLock { $0 = snapshot }
         }
-        monitor.start(queue: DispatchQueue(label: "com.notchkeeper.guardd.network-path", qos: .utility))
+        monitor.start(queue: DispatchQueue(label: "com.notchkeeper.guard.network-path", qos: .utility))
     }
 
     deinit { monitor.cancel() }

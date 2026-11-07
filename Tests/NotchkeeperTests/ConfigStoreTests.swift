@@ -85,7 +85,7 @@ private final class Lines { var all: [String] = [] }
         #expect(store(url).config.urlSchemes == ["raycast"])
     }
 
-    /// 改坏后又原样改回：坏着时在内存里的改动要被文件内容取代，界面和 guardd 读的是同一份
+    /// 改坏后又原样改回：坏着时在内存里的改动要被文件内容取代，界面和守卫读的是同一份
     @Test func restoringOriginalBytesReloadsThem() throws {
         let original = #"{"allowlist":["198.51.100.8"]}"#
         let url = try tempConfig(original)

@@ -138,17 +138,17 @@ public struct CardQueue<Item: Equatable & Sendable>: Sendable {
         }
     }
 
-    /// 新的一次违规开始：正在放的临时卡回到队首，红卡插上来先放满一次 `seconds`。
+    /// 新的一次违规开始：正在放的临时卡回到队首，红卡插上来先放满一次 `seconds`，响 Basso（看不见时等看得见再响）。
     /// 恢复卡说的是上一次违规，不论排着还是正在放都作废
-    public mutating func raiseAlert(persistent: Bool, sound: Bool, seconds: TimeInterval, now: Date) -> Change {
+    public mutating func raiseAlert(persistent: Bool, seconds: TimeInterval, now: Date) -> Change {
         guard alert == nil else { return Change() }
         alert = persistent
         if case .notice(let e) = stage { waiting.insert(e, at: 0) }
         waiting.removeAll { $0.notice.key == .recovered }
         stage = .alert
         start(seconds, now: now)
-        alertSoundDue = sound && away
-        return Change(sound: sound && !away)
+        alertSoundDue = away
+        return Change(sound: !away)
     }
 
     /// 红卡不该挂了（回到 healthy，或别处记下关掉了这一次）

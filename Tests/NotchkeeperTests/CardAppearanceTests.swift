@@ -5,7 +5,7 @@ import MascotCore
 import NotchCore
 @testable import Notchkeeper
 
-/// 每种结果的 Pip 造型和提示音（docs/ui.md「卡片」7、docs/agent-integration.md「提醒」）
+/// Pip look and alert sound for each outcome (docs/ui.md "Card" 7, docs/agent-integration.md "Alerts").
 @Suite struct CardAppearance {
     @Test(arguments: [
         (Card.Outcome.done, Look.finished, "Glass" as String?),
@@ -22,9 +22,9 @@ import NotchCore
         #expect(card.look == look && card.sound.map { $0 as String } == sound)
     }
 
-    /// 正文只认行内格式：链接和图片都去掉（动作只走点卡片和按钮；不收图片路径）
+    /// Body text only recognizes inline formatting: links and images are stripped (actions only via clicking cards and buttons; image paths not accepted).
     @Test @MainActor func markdownDropsLinksAndImages() {
-        let s = CardBlockView.markdown("**粗** [链接](https://example.com) ![图](file:///etc/hosts)")
+        let s = CardBlockView.markdown("**bold** [link](https://example.com) ![image](file:///etc/hosts)")
         #expect(s.runs.allSatisfy { $0.link == nil && $0.imageURL == nil })
         #expect(s.runs.contains { $0.inlinePresentationIntent == .stronglyEmphasized })
     }

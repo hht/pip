@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import Notchkeeper
 
-/// 临时目录里装一份旧的 guardd：LaunchAgent plist、二进制、状态文件，外加同目录的 pipctl（不该被碰）
+/// Install a legacy guardd sandbox in a temporary directory: LaunchAgent plist, binary, state file, plus pipctl in the same directory (should remain untouched).
 private struct Sandbox {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent("legacy-guardd-\(UUID().uuidString)")
     var files: LegacyGuardd.Files {
@@ -23,7 +23,7 @@ private struct Sandbox {
     func exists(_ url: URL) -> Bool { FileManager.default.fileExists(atPath: url.path) }
 }
 
-/// 一个假的 launchctl：记下 bootout 了几次，`loadedAfterBootout` 决定卸完还在不在
+/// Fake launchctl: records bootout count; `loadedAfterBootout` determines if it remains loaded after unloading.
 private final class FakeLaunchd: @unchecked Sendable {
     var bootouts = 0
     var loadedAfterBootout = false
@@ -33,7 +33,7 @@ private final class FakeLaunchd: @unchecked Sendable {
 }
 
 @Suite struct LegacyGuarddTests {
-    /// 没装过（没有 plist）：什么都不做，连 launchctl 都不调
+    /// Not installed (no plist): does nothing, does not even invoke launchctl.
     @Test func notInstalledDoesNothing() throws {
         let s = Sandbox()
         try s.install(plist: false)
@@ -43,7 +43,7 @@ private final class FakeLaunchd: @unchecked Sendable {
         #expect(s.exists(s.files.binary) && s.exists(s.files.state))
     }
 
-    /// 装过：先卸下 LaunchAgent，再删 plist、二进制、状态文件；同目录的 pipctl 不碰
+    /// Installed: unloads LaunchAgent first, then deletes plist, binary, and state files; leaves pipctl untouched.
     @Test func removesAgentAndItsFiles() throws {
         let s = Sandbox()
         try s.install()
@@ -56,7 +56,7 @@ private final class FakeLaunchd: @unchecked Sendable {
         #expect(!lines.isEmpty)
     }
 
-    /// 卸不下来（一直还在 launchd 里）：文件一个都不删，下次启动再试
+    /// Cannot unload (remains in launchd): deletes no files, retries on next launch.
     @Test func keepsFilesWhenAgentWontUnload() throws {
         let s = Sandbox()
         try s.install()

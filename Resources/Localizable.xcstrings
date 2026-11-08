@@ -1,12 +1,12 @@
 {
-  "sourceLanguage": "zh-Hans",
+  "sourceLanguage": "en",
   "strings": {
-    "%@ 已经是别的文件，不覆盖": {
+    "%@ is already another file; not overwriting it": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ is already another file; not overwriting it"
+            "value": "%@ 已经是别的文件，不覆盖"
           }
         }
       }
@@ -14,12 +14,332 @@
     "%@://": {
       "shouldTranslate": false
     },
-    "%lld 秒": {
+    "%lld s": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld s"
+            "value": "%lld 秒"
+          }
+        }
+      }
+    },
+    "A pf step failed and will be retried next round; rules may still be loaded even while off": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有 pf 动作没做成，下一轮重做；关着时规则也可能还在"
+          }
+        }
+      }
+    },
+    "A plugin is a folder containing manifest.json; you can also drag one onto this page to install it. Pip never runs any file in a plugin. Uninstalled plugins move to ~/Library/Application Support/Notchkeeper/backup/plugins/ and aren’t deleted (except the built-in terminal plugin).": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "插件是一个含 manifest.json 的文件夹，也可以直接拖到这一页上安装。Pip 不运行插件里的任何文件；卸掉的插件挪进 ~/Library/Application Support/Notchkeeper/backup/plugins/，不会删除（自带的终端插件除外）。"
+          }
+        }
+      }
+    },
+    "A plugin with the same id is installed: the old version moves to the backup folder and isn’t deleted.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已经装着同 id 的插件：旧版挪进备份，不会删除。"
+          }
+        }
+      }
+    },
+    "A plugin with this id is already installed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同 id 的插件已经装着"
+          }
+        }
+      }
+    },
+    "About": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关于"
+          }
+        }
+      }
+    },
+    "Add": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新增"
+          }
+        }
+      }
+    },
+    "Alert card when traffic bypasses the proxy; egress shown at top of panel": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有流量没走代理时弹红卡，面板顶上显示出口"
+          }
+        }
+      }
+    },
+    "Alert cards are suppressed, and Pip and the panel will not show egress; background checks continue": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不弹红卡，Pip 和面板也不显示出口；后台照常检查"
+          }
+        }
+      }
+    },
+    "Alert when a command finishes": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "命令跑完时弹卡"
+          }
+        }
+      }
+    },
+    "Alerts": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "提示"
+          }
+        }
+      }
+    },
+    "Alerts when a command that ran in zsh for over 10 seconds finishes; clicking the card switches back to that terminal. Suppressed when you are already looking at that terminal (other tabs or splits in the same window do not count). The command line reveals only the command name, without arguments; full-screen or interactive commands like vim, ssh, and top do not alert.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "zsh 里跑了 10 秒以上的命令结束时弹卡，点卡片跳回那个终端。你正看着那个终端时不弹（同一窗口的其他标签、分屏不算）。命令行只交出命令名，不带参数；vim、ssh、top 这类全屏或交互的命令不弹。"
+          }
+        }
+      }
+    },
+    "All traffic is going through the proxy again": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "流量又全部走代理了"
+          }
+        }
+      }
+    },
+    "Allowed Egress IPs (IPv4)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "允许的出口 IP（IPv4）"
+          }
+        }
+      }
+    },
+    "Always Closed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "固定收起"
+          }
+        }
+      }
+    },
+    "Always Open": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "固定展开"
+          }
+        }
+      }
+    },
+    "Approve in System Settings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在系统设置中批准"
+          }
+        }
+      }
+    },
+    "Asleep": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "睡着"
+          }
+        }
+      }
+    },
+    "Auto": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动"
+          }
+        }
+      }
+    },
+    "Blink": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "眨眼"
+          }
+        }
+      }
+    },
+    "Can't find claude": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找不到 claude"
+          }
+        }
+      }
+    },
+    "Can't find the app; it may have been moved. Turn this off and on again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找不到 App，可能被移动过。关掉再打开这个开关即可。"
+          }
+        }
+      }
+    },
+    "Can't verify the egress": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂时判断不了出口"
+          }
+        }
+      }
+    },
+    "Cancel": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取消"
+          }
+        }
+      }
+    },
+    "Cannot verify installation: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法确认是否已安装：%@"
+          }
+        }
+      }
+    },
+    "Can’t find Clash Verge’s config folder: turning on reads the proxy nodes and China IP ranges from it": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找不到 Clash Verge 的配置目录：开启时要从那里读节点和国内 IP 段"
+          }
+        }
+      }
+    },
+    "Can’t find claude (checked ~/.local/bin, /opt/homebrew/bin, /usr/local/bin)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找不到 claude（找过 ~/.local/bin、/opt/homebrew/bin、/usr/local/bin）"
+          }
+        }
+      }
+    },
+    "Can’t keep while there’s a problem: do nothing and it turns off when time’s up": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "出了问题不能保留：什么都不用做，到时自动关掉"
+          }
+        }
+      }
+    },
+    "Card Duration": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "卡片停留"
+          }
+        }
+      }
+    },
+    "Cards are suppressed, and the panel will not show sessions": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不弹卡，面板里也不显示会话"
+          }
+        }
+      }
+    },
+    "Change Language in System Settings…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在系统设置中更改语言…"
+          }
+        }
+      }
+    },
+    "Checking egress": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在检查出口"
+          }
+        }
+      }
+    },
+    "Checking…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在检查…"
           }
         }
       }
@@ -27,52 +347,1182 @@
     "Claude Code": {
       "shouldTranslate": false
     },
-    "Claude Code 做完了": {
+    "Claude Code hit an error": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude Code is done"
+            "value": "Claude Code 出错了"
           }
         }
       }
     },
-    "Claude Code 出错了": {
+    "Claude Code is done": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude Code hit an error"
+            "value": "Claude Code 做完了"
           }
         }
       }
     },
-    "Claude Code 在等你回答": {
+    "Claude Code is waiting for your answer": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude Code is waiting for your answer"
+            "value": "Claude Code 在等你回答"
           }
         }
       }
     },
-    "Claude Code 在等你批准": {
+    "Claude Code is waiting for your approval": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude Code is waiting for your approval"
+            "value": "Claude Code 在等你批准"
           }
         }
       }
     },
-    "Claude Code 没在运行": {
+    "Claude Code isn't running": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Claude Code isn't running"
+            "value": "Claude Code 没在运行"
+          }
+        }
+      }
+    },
+    "Close": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭"
+          }
+        }
+      }
+    },
+    "Command Line": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "命令行"
+          }
+        }
+      }
+    },
+    "Completed and Error Cards": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完成卡和出错卡"
+          }
+        }
+      }
+    },
+    "Config File": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "配置文件"
+          }
+        }
+      }
+    },
+    "Copy": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拷贝"
+          }
+        }
+      }
+    },
+    "Copy Egress IP": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拷贝出口 IP"
+          }
+        }
+      }
+    },
+    "Couldn’t open this folder: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打不开这个文件夹：%@"
+          }
+        }
+      }
+    },
+    "Create": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新建"
+          }
+        }
+      }
+    },
+    "Created “%@”": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已新建「%@」"
+          }
+        }
+      }
+    },
+    "Curious Tilt": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "好奇歪看"
+          }
+        }
+      }
+    },
+    "Current Egress": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前出口"
+          }
+        }
+      }
+    },
+    "Current Status": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前状态"
+          }
+        }
+      }
+    },
+    "Cut": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "剪切"
+          }
+        }
+      }
+    },
+    "Danger": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "危险"
+          }
+        }
+      }
+    },
+    "Deletes the terminal plugin’s script; the line in ~/.zshrc can stay without errors. Cards from the terminal will be dropped after this.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删掉终端插件的脚本，~/.zshrc 里那一行留着也不报错。之后终端发来的卡片都会丢掉。"
+          }
+        }
+      }
+    },
+    "Disabling a plugin only turns off its alerts; Egress Guard continues checking in the background. When an external plugin is disabled, cards and activities it sends are dropped.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关掉插件只关提醒，出口守卫照常在后台检查。外部插件关掉后，它发来的卡片和活动都会丢掉。"
+          }
+        }
+      }
+    },
+    "Dizzy": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "晕"
+          }
+        }
+      }
+    },
+    "Done": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完成"
+          }
+        }
+      }
+    },
+    "Done: Glass - Error: Funk - Waiting: Ping - Bypassing proxy: Basso": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完成 Glass · 出错 Funk · 等你 Ping · 有流量没走代理 Basso"
+          }
+        }
+      }
+    },
+    "Edit": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "编辑"
+          }
+        }
+      }
+    },
+    "Egress Guard": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "出口守卫"
+          }
+        }
+      }
+    },
+    "Egress Guard is pinned to the top. All sections combined show up to %lld rows, allocated to earlier sections first; excess rows scroll within their section.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "出口守卫固定在最上面。各段合起来最多显示 %lld 行，排在前面的先占；多出来的在段里滚动。"
+          }
+        }
+      }
+    },
+    "Egress Mismatch": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "出口不符"
+          }
+        }
+      }
+    },
+    "Egress OK": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "出口正常"
+          }
+        }
+      }
+    },
+    "Egress recovered": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "出口已恢复"
+          }
+        }
+      }
+    },
+    "Enable Plugin": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开插件"
+          }
+        }
+      }
+    },
+    "Error": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "出错"
+          }
+        }
+      }
+    },
+    "Every visible Pip plays it once; with Reduce Motion on, only blinking. Nothing is written to disk.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "看得见的 Pip 各播放一次；开启「减弱动态效果」时只有眨眼。不写入任何文件。"
+          }
+        }
+      }
+    },
+    "Exit code %d": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "退出码 %d"
+          }
+        }
+      }
+    },
+    "Expand on Hover": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "鼠标悬停时展开"
+          }
+        }
+      }
+    },
+    "Expands the panel to view egress status and plugins": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "展开面板，查看出口状态和各插件"
+          }
+        }
+      }
+    },
+    "External plugin - %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "外部插件 · %@"
+          }
+        }
+      }
+    },
+    "Eyes track the mouse and the body turns toward it; peeks when the mouse moves onto the notch. When off, Pip always looks forward.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "眼睛跟着鼠标，身体也往那边转；鼠标移到刘海上时探头。关掉后一直看正前方"
+          }
+        }
+      }
+    },
+    "Failed: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "操作失败：%@"
+          }
+        }
+      }
+    },
+    "Files": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文件"
+          }
+        }
+      }
+    },
+    "Firewall": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "防火墙"
+          }
+        }
+      }
+    },
+    "Flip": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上下翻圈"
+          }
+        }
+      }
+    },
+    "Follow Mouse": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跟随鼠标"
+          }
+        }
+      }
+    },
+    "Follows the system language by default; you can also choose a language for Pip under Language & Region": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "默认跟随系统；也可以在「语言与地区」里单独给 Pip 选"
+          }
+        }
+      }
+    },
+    "Force Display": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "强制显示"
+          }
+        }
+      }
+    },
+    "Forced: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "强制：%@"
+          }
+        }
+      }
+    },
+    "General": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通用"
+          }
+        }
+      }
+    },
+    "Guard Not Responding": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "守卫没响应"
+          }
+        }
+      }
+    },
+    "Icon": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "图标"
+          }
+        }
+      }
+    },
+    "Idle": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "空闲"
+          }
+        }
+      }
+    },
+    "If your connection works, click Keep: it stays on, even after a restart": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "网络正常就点「保留」，之后一直开着，重启也开着"
+          }
+        }
+      }
+    },
+    "In Progress": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "进行中"
+          }
+        }
+      }
+    },
+    "In trial, %lld:%@ left; turns off automatically": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "试运行中，还剩 %lld:%@，到时自动关掉"
+          }
+        }
+      }
+    },
+    "In trial; turns off automatically when it ends": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "试运行中，到时自动关掉"
+          }
+        }
+      }
+    },
+    "Install": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安装"
+          }
+        }
+      }
+    },
+    "Install Plugin…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安装插件…"
+          }
+        }
+      }
+    },
+    "Install the firewall?": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安装防火墙？"
+          }
+        }
+      }
+    },
+    "Install “%@”": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安装「%@」？"
+          }
+        }
+      }
+    },
+    "Installed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已安装"
+          }
+        }
+      }
+    },
+    "Installed, but disabled in Claude Code (enable with /plugin)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已安装，但在 Claude Code 里关掉了（/plugin 里打开）"
+          }
+        }
+      }
+    },
+    "Installed. It’s off and blocks nothing": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已安装，现在是关着的，什么都不拦"
+          }
+        }
+      }
+    },
+    "Installed: add the line below to ~/.zshrc; takes effect in new terminals": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已安装：把下面这行加进 ~/.zshrc，新开的终端生效"
+          }
+        }
+      }
+    },
+    "Installed: alerts when a turn finishes or errors": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已安装：回合做完或出错时弹卡"
+          }
+        }
+      }
+    },
+    "Installing needs an administrator password; the firewall starts off and blocks nothing. Enter Clash’s TUN interface name — utun followed by digits (Clash Verge defaults to utun1024): a wrong name blocks all internet traffic once the firewall is on.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安装要管理员密码，装完是关着的，什么都不拦。隧道网卡填 Clash 的 TUN 网卡名，只收 utun 加数字（Clash Verge 默认 utun1024）：填错了开启后会把外网全拦掉。"
+          }
+        }
+      }
+    },
+    "Installs Pip’s bundled mod into Claude Code: records only how each turn finishes, never conversation contents. Installation adds a plugin entry to ~/.claude/settings.json, removed upon uninstallation. Open sessions must be restarted or run /reload-plugins to take effect.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "给 Claude Code 装上 Pip 自带的 mod：只记录每个回合怎么结束，不记录对话内容。安装会在 ~/.claude/settings.json 里加一项插件，卸载时去掉。已经开着的会话要重开或运行 /reload-plugins 才生效。"
+          }
+        }
+      }
+    },
+    "Install…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安装…"
+          }
+        }
+      }
+    },
+    "Internet traffic is routed outside Clash's tunnel": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "去公网的路由没走 Clash 的隧道"
+          }
+        }
+      }
+    },
+    "Interrupted": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "被打断"
+          }
+        }
+      }
+    },
+    "It’s off after installing and blocks nothing; turn it on when you need it. Requires an administrator password.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "装完是关着的，什么都不拦，要用时再打开。要管理员密码。"
+          }
+        }
+      }
+    },
+    "Keep": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保留"
+          }
+        }
+      }
+    },
+    "Keep the alert card up until recovered": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "红卡一直保留，直到恢复"
+          }
+        }
+      }
+    },
+    "Language": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语言"
+          }
+        }
+      }
+    },
+    "Last Checked": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上次检查"
+          }
+        }
+      }
+    },
+    "Link to ~/.local/bin": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "链接到 ~/.local/bin"
+          }
+        }
+      }
+    },
+    "Linked: you can run pipctl directly in Terminal": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已链接：终端里可以直接用 pipctl"
+          }
+        }
+      }
+    },
+    "Links in cards and the panel open https by default. Schemes added here are also allowed: they can trigger actions in other apps, so add only ones you trust.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "卡片和面板里的链接默认只打开 https。这里加的 scheme 也放行：它们能让别的 App 执行动作，只加你信得过的。"
+          }
+        }
+      }
+    },
+    "Lists sessions; alerts when finished, errored, or waiting for you": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "列出会话；做完、出错、等你时弹卡"
+          }
+        }
+      }
+    },
+    "Log": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "日志"
+          }
+        }
+      }
+    },
+    "Long Turn": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "干了很久"
+          }
+        }
+      }
+    },
+    "Look Around": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "东张西望"
+          }
+        }
+      }
+    },
+    "Look Down": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "低头看脚"
+          }
+        }
+      }
+    },
+    "Look Up": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "抬头看天"
+          }
+        }
+      }
+    },
+    "Move Down": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下移"
+          }
+        }
+      }
+    },
+    "Move Up": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上移"
+          }
+        }
+      }
+    },
+    "Name": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "名字"
+          }
+        }
+      }
+    },
+    "Name (name) and icon (symbol) can’t be empty": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "名字（name）和图标（symbol）不能是空的"
+          }
+        }
+      }
+    },
+    "Name can be at most %lld characters, icon name at most %lld": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "名字至多 %lld 个字，图标名至多 %lld 个字符"
+          }
+        }
+      }
+    },
+    "Needs You": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "要你看"
+          }
+        }
+      }
+    },
+    "Needs approval in System Settings › General › Login Items": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要在「系统设置 › 通用 › 登录项」里允许"
+          }
+        }
+      }
+    },
+    "New Plugin…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新建插件…"
+          }
+        }
+      }
+    },
+    "No plugins turned on": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有开启的插件"
+          }
+        }
+      }
+    },
+    "No sessions or activities in progress": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有进行中的会话或活动"
+          }
+        }
+      }
+    },
+    "No status yet: just installed or halfway through uninstalling; wait a few seconds. If it stays like this, uninstall and reinstall": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "还没有状态：刚装上或刚卸到一半，稍等几秒；一直这样就卸载重装"
+          }
+        }
+      }
+    },
+    "No such icon; look up names in the SF Symbols app": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "系统里没有这个图标，名字可以在「SF Symbols」App 里查"
+          }
+        }
+      }
+    },
+    "Nod": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "点头"
+          }
+        }
+      }
+    },
+    "None": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不常驻"
+          }
+        }
+      }
+    },
+    "Not a valid IPv4 address, or already in the list.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不是有效的 IPv4 地址，或已在列表里。"
+          }
+        }
+      }
+    },
+    "Not a valid scheme, or already in the list.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不是有效的 scheme，或已在列表里。"
+          }
+        }
+      }
+    },
+    "Not installed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未安装"
+          }
+        }
+      }
+    },
+    "Not installed: panel displays session state as usual, but completed and error cards will not alert": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未安装：面板照常显示会话状态，但不弹完成卡和出错卡"
+          }
+        }
+      }
+    },
+    "Not linked: use the full path below, or link to ~/.local/bin": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未链接：用下面的完整路径，或链接到 ~/.local/bin"
+          }
+        }
+      }
+    },
+    "Notch": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刘海"
+          }
+        }
+      }
+    },
+    "Off": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未启用"
+          }
+        }
+      }
+    },
+    "Off, blocking nothing": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关着，什么都不拦"
+          }
+        }
+      }
+    },
+    "Offline": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "断网"
+          }
+        }
+      }
+    },
+    "Offline, can't check the egress": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有网络，暂时检查不了出口"
+          }
+        }
+      }
+    },
+    "On": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已启用"
+          }
+        }
+      }
+    },
+    "Only changes how Pip and the notch look; doesn’t affect egress decisions, doesn’t pop up alert cards or play sounds. Real alert cards still appear as usual. Nothing is written to disk; restarting the app restores the real state.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只改 Pip 和刘海的样子，不影响出口判定，也不弹红卡、不响；真的红卡照常弹出。不写入任何文件，重开 App 即恢复。"
+          }
+        }
+      }
+    },
+    "Only lowercase letters, digits, and hyphens, up to 32 characters": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只能用小写字母、数字和连字符，至多 32 个字符"
+          }
+        }
+      }
+    },
+    "Open": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开"
+          }
+        }
+      }
+    },
+    "Open Config File": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开配置文件"
+          }
+        }
+      }
+    },
+    "Open Link": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开链接"
+          }
+        }
+      }
+    },
+    "Open Plugin Settings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开插件设置"
+          }
+        }
+      }
+    },
+    "Open at Login": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登录时打开"
+          }
+        }
+      }
+    },
+    "Open in Ghostty": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 Ghostty 中打开"
+          }
+        }
+      }
+    },
+    "Open…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开…"
+          }
+        }
+      }
+    },
+    "Panel": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "面板"
+          }
+        }
+      }
+    },
+    "Paste": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "粘贴"
           }
         }
       }
@@ -80,1599 +1530,877 @@
     "Pip": {
       "shouldTranslate": false
     },
-    "Pip 只读它的 manifest.json，不运行里面的任何文件。装上后它发来的卡片会标明来源。": {
+    "Pip only reads its manifest.json and never runs any file inside. Cards it sends will show where they came from.": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pip only reads its manifest.json and never runs any file inside. Cards it sends will show where they came from."
+            "value": "Pip 只读它的 manifest.json，不运行里面的任何文件。装上后它发来的卡片会标明来源。"
           }
         }
       }
     },
-    "Pip 要保留防火墙：之后一直开着，重启也开着。": {
+    "Pip wants to install the firewall (it starts off and blocks nothing).": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pip wants to keep the firewall on: it stays on, even after a restart."
+            "value": "Pip 要安装防火墙（装完是关着的，什么都不拦）。"
           }
         }
       }
     },
-    "Pip 要关闭防火墙。": {
+    "Pip wants to keep the firewall on: it stays on, even after a restart.": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pip wants to turn the firewall off."
+            "value": "Pip 要保留防火墙：之后一直开着，重启也开着。"
           }
         }
       }
     },
-    "Pip 要卸载防火墙：清掉守护进程、规则和文件。": {
+    "Pip wants to turn the firewall off.": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pip wants to uninstall the firewall: remove its daemon, rules, and files."
+            "value": "Pip 要关闭防火墙。"
           }
         }
       }
     },
-    "Pip 要安装防火墙（装完是关着的，什么都不拦）。": {
+    "Pip wants to turn the firewall on, starting with a 2-minute trial.": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pip wants to install the firewall (it starts off and blocks nothing)."
+            "value": "Pip 要开启防火墙，先试运行 2 分钟。"
           }
         }
       }
     },
-    "Pip 要开启防火墙，先试运行 2 分钟。": {
+    "Pip wants to uninstall the firewall: remove its daemon, rules, and files.": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pip wants to turn the firewall on, starting with a 2-minute trial."
+            "value": "Pip 要卸载防火墙：清掉守护进程、规则和文件。"
           }
         }
       }
     },
-    "SF Symbol 名，例如 externaldrive": {
+    "Play Motion": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "SF Symbol name, e.g. externaldrive"
+            "value": "播放动作"
           }
         }
       }
     },
-    "id": {
-      "shouldTranslate": false
-    },
-    "id 只能用小写字母、数字和连字符，至多 32 个字符": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The id may only contain lowercase letters, digits, and hyphens, up to 32 characters"
-          }
-        }
-      }
-    },
-    "id 是内置插件的（guard、claude），换一个": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "That id belongs to a built-in plugin (guard, claude); choose another"
-          }
-        }
-      }
-    },
-    "manifest.json 不是 JSON，或缺 id、name、symbol": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "manifest.json isn’t valid JSON, or is missing id, name, or symbol"
-          }
-        }
-      }
-    },
-    "pipctl": {
-      "shouldTranslate": false
-    },
-    "terminal 是自带的终端插件，在设置 › 终端里装卸": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "terminal is the bundled Terminal plugin; install or uninstall it in Settings › Terminal"
-          }
-        }
-      }
-    },
-    "utun1024": {
-      "shouldTranslate": false
-    },
-    "zsh 里跑了 10 秒以上的命令结束时弹卡，点卡片跳回那个终端。你正看着那个终端时不弹（同一窗口的其他标签、分屏不算）。命令行只交出命令名，不带参数；vim、ssh、top 这类全屏或交互的命令不弹。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "When a zsh command that ran for 10 seconds or more finishes, a card pops up; click it to jump back to that terminal. No card if you're looking at that very terminal (other tabs or splits in the same window don't count). From the command line, only the command name is sent, never its arguments. Full-screen or interactive commands like vim, ssh and top don't pop cards."
-          }
-        }
-      }
-    },
-    "~/.local/bin/pipctl 已经是别的文件，不覆盖；用下面的完整路径": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "~/.local/bin/pipctl is already another file and won’t be overwritten; use the full path below"
-          }
-        }
-      }
-    },
-    "—": {
-      "shouldTranslate": false
-    },
-    "上下翻圈": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Flip"
-          }
-        }
-      }
-    },
-    "上次检查": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Last Check"
-          }
-        }
-      }
-    },
-    "上移": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Move Up"
-          }
-        }
-      }
-    },
-    "下移": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Move Down"
-          }
-        }
-      }
-    },
-    "不常驻": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "None"
-          }
-        }
-      }
-    },
-    "不弹卡，面板里也不显示会话": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No cards, and no sessions in the panel"
-          }
-        }
-      }
-    },
-    "不弹红卡，Pip 和面板也不显示出口；后台照常检查": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No red card, and Pip and the panel don't show the egress. Checks keep running in the background"
-          }
-        }
-      }
-    },
-    "不是有效的 IPv4 地址，或已在列表里。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Not a valid IPv4 address, or already in the list."
-          }
-        }
-      }
-    },
-    "不是有效的 scheme，或已在列表里。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Not a valid scheme, or already in the list."
-          }
-        }
-      }
-    },
-    "东张西望": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Look Around"
-          }
-        }
-      }
-    },
-    "低头看脚": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Look Down"
-          }
-        }
-      }
-    },
-    "例如 198.51.100.10": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "e.g. 198.51.100.10"
-          }
-        }
-      }
-    },
-    "例如 backup": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "e.g. backup"
-          }
-        }
-      }
-    },
-    "例如 raycast": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "e.g. raycast"
-          }
-        }
-      }
-    },
-    "侧身 90°": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Turn 90°"
-          }
-        }
-      }
-    },
-    "保留": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Keep"
-          }
-        }
-      }
-    },
-    "允许的出口 IP（IPv4）": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Allowed Egress IPs (IPv4)"
-          }
-        }
-      }
-    },
-    "全选": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Select All"
-          }
-        }
-      }
-    },
-    "关于": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "About"
-          }
-        }
-      }
-    },
-    "关掉后左耳不显示 Pip；右耳也没有内容时，刘海就是一块纯黑。展开和弹卡时照常显示": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "When off, the left ear has no Pip, and if the right ear is empty too the notch is plain black. Pip still appears when expanded and on cards"
-          }
-        }
-      }
-    },
-    "关掉提醒": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Turn Off Alerts"
-          }
-        }
-      }
-    },
-    "关掉插件只关提醒，出口守卫照常在后台检查。外部插件关掉后，它发来的卡片和活动都会丢掉。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Turning a plugin off only silences its alerts; Egress Guard keeps checking in the background. While an external plugin is off, its cards and activities are discarded."
-          }
-        }
-      }
-    },
-    "关着，什么都不拦": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Off, blocking nothing"
-          }
-        }
-      }
-    },
-    "关闭": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Close"
-          }
-        }
-      }
-    },
-    "出了问题不能保留：什么都不用做，到时自动关掉": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Can’t keep while there’s a problem: do nothing and it turns off when time’s up"
-          }
-        }
-      }
-    },
-    "出口 IP 不在允许列表里": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Unexpected egress IP"
-          }
-        }
-      }
-    },
-    "出口不符": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Egress Mismatch"
-          }
-        }
-      }
-    },
-    "出口守卫": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Egress Guard"
-          }
-        }
-      }
-    },
-    "出口守卫固定在最上面。各段合起来最多显示 %lld 行，排在前面的先占；多出来的在段里滚动。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The egress guard stays on top. All sections together show up to %lld rows, earlier sections first; the rest scroll within their section."
-          }
-        }
-      }
-    },
-    "出口已恢复": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Egress recovered"
-          }
-        }
-      }
-    },
-    "出口正常": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Egress OK"
-          }
-        }
-      }
-    },
-    "出错": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Error"
-          }
-        }
-      }
-    },
-    "切换 App": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Switch App"
-          }
-        }
-      }
-    },
-    "列出会话；做完、出错、等你时弹卡": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Lists sessions; cards when done, on errors, or when waiting for you"
-          }
-        }
-      }
-    },
-    "列表为空时，守卫判断不了出口 IP 对不对，只能显示「暂时判断不了出口」；有流量没走代理仍然会报。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "With an empty list the guard can't tell whether the egress IP is right, so it shows “Can't verify the egress”. Traffic bypassing the proxy is still reported."
-          }
-        }
-      }
-    },
-    "刘海": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Notch"
-          }
-        }
-      }
-    },
-    "删掉终端插件的脚本，~/.zshrc 里那一行留着也不报错。之后终端发来的卡片都会丢掉。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Deletes the terminal plugin’s script; the line in ~/.zshrc can stay without errors. Cards from the terminal will be dropped after this."
-          }
-        }
-      }
-    },
-    "剪切": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cut"
-          }
-        }
-      }
-    },
-    "卡上标明来源用，例如「备份」": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Shown on its cards, e.g. “Backup”"
-          }
-        }
-      }
-    },
-    "卡片停留": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Card Duration"
-          }
-        }
-      }
-    },
-    "卡片和面板里的链接默认只打开 https。这里加的 scheme 也放行：它们能让别的 App 执行动作，只加你信得过的。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Links in cards and the panel only open https by default. Schemes added here are allowed too; they can make other apps perform actions, so only add ones you trust."
-          }
-        }
-      }
-    },
-    "危险": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Danger"
-          }
-        }
-      }
-    },
-    "卸载": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Uninstall"
-          }
-        }
-      }
-    },
-    "卸载…": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Uninstall…"
-          }
-        }
-      }
-    },
-    "卸载「%@」？": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Uninstall “%@”?"
-          }
-        }
-      }
-    },
-    "卸载防火墙？": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Uninstall the firewall?"
-          }
-        }
-      }
-    },
-    "去公网的路由没走 Clash 的隧道": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Internet traffic is routed outside Clash's tunnel"
-          }
-        }
-      }
-    },
-    "取消": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cancel"
-          }
-        }
-      }
-    },
-    "只改 Pip 和刘海的样子，不影响出口判定，也不弹红卡、不响；真的红卡照常弹出。不写入任何文件，重开 App 即恢复。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Only changes how Pip and the notch look: the egress verdict is unaffected, and there's no red card or sound. Real red cards still pop up. Nothing is written to disk; relaunching the app restores everything."
-          }
-        }
-      }
-    },
-    "只能用小写字母、数字和连字符，至多 32 个字符": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Only lowercase letters, digits, and hyphens, up to 32 characters"
-          }
-        }
-      }
-    },
-    "同 id 的插件已经装着": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "A plugin with this id is already installed"
-          }
-        }
-      }
-    },
-    "名字": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Name"
-          }
-        }
-      }
-    },
-    "名字至多 %lld 个字，图标名至多 %lld 个字符": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Name can be at most %lld characters, icon name at most %lld"
-          }
-        }
-      }
-    },
-    "名字（name）和图标（symbol）不能是空的": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Name (name) and icon (symbol) can’t be empty"
-          }
-        }
-      }
-    },
-    "启动": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Startup"
-          }
-        }
-      }
-    },
-    "命令行": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Command Line"
-          }
-        }
-      }
-    },
-    "命令跑完时弹卡": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Card When a Command Finishes"
-          }
-        }
-      }
-    },
-    "固定展开": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Always Open"
-          }
-        }
-      }
-    },
-    "固定收起": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Always Closed"
-          }
-        }
-      }
-    },
-    "图标": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Icon"
-          }
-        }
-      }
-    },
-    "在 Finder 中显示": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Show in Finder"
-          }
-        }
-      }
-    },
-    "在 Ghostty 中打开": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Open in Ghostty"
-          }
-        }
-      }
-    },
-    "在系统设置中批准": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Approve in System Settings"
-          }
-        }
-      }
-    },
-    "在系统设置中更改语言…": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Change Language in System Settings…"
-          }
-        }
-      }
-    },
-    "在终端里跑下面这行，刘海会弹一张卡：": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Run this in Terminal and a card will pop out of the notch:"
-          }
-        }
-      }
-    },
-    "在访达中显示": {
+    "Plugin Disabled": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Show in Finder"
+            "value": "插件已关闭"
           }
         }
       }
     },
-    "外部插件 · %@": {
+    "Plugins": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "External plugin · %@"
+            "value": "插件"
           }
         }
       }
     },
-    "好奇歪看": {
+    "Pop up an alert card when traffic bypasses the proxy": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Curious Tilt"
+            "value": "有流量没走代理时弹红卡"
           }
         }
       }
     },
-    "守卫没响应": {
+    "Problem: the check failed (pf stopped, rules replaced, or the tunnel interface is missing); it may not be blocking": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Guard Not Responding"
+            "value": "异常：核对没通过（pf 被停、规则被换掉或隧道网卡不在），可能没在拦"
           }
         }
       }
     },
-    "安装": {
+    "Problem: the daemon hasn’t updated its status for 30 seconds, so it’s unclear whether anything is blocked; turn it off or uninstall": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Install"
+            "value": "异常：守护进程 30 秒没有更新状态，说不清在不在拦；关掉或卸载"
           }
         }
       }
     },
-    "安装…": {
+    "Protected": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Install…"
+            "value": "已保护"
           }
         }
       }
     },
-    "安装「%@」？": {
+    "Quit": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Install “%@”?"
+            "value": "退出"
           }
         }
       }
     },
-    "安装插件…": {
+    "Quit Pip": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Install Plugin…"
+            "value": "退出 Pip"
           }
         }
       }
     },
-    "安装要管理员密码，装完是关着的，什么都不拦。隧道网卡填 Clash 的 TUN 网卡名，只收 utun 加数字（Clash Verge 默认 utun1024）：填错了开启后会把外网全拦掉。": {
+    "Quit Pip?": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Installing needs an administrator password; the firewall starts off and blocks nothing. Enter Clash’s TUN interface name — utun followed by digits (Clash Verge defaults to utun1024): a wrong name blocks all internet traffic once the firewall is on."
+            "value": "退出 Pip？"
           }
         }
       }
     },
-    "安装防火墙？": {
+    "Quit Pip…": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Install the firewall?"
+            "value": "退出 Pip…"
           }
         }
       }
     },
-    "完成": {
+    "Quitting stops the notch and pop-up cards; the background Egress Guard continues running. To stop the guard, run the uninstall script.": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Done"
+            "value": "退出后刘海和卡片都会停止，后台的出口守卫照常运行；要停止守卫，请运行卸载脚本。"
           }
         }
       }
     },
-    "完成 Glass · 出错 Funk · 等你 Ping · 有流量没走代理 Basso": {
+    "Real State": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Done: Glass · Error: Funk · Waiting: Ping · Bypassing proxy: Basso"
+            "value": "真实状态"
           }
         }
       }
     },
-    "完成卡和出错卡": {
+    "Real state: %@": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Done and Error Cards"
+            "value": "真实状态：%@"
           }
         }
       }
     },
-    "完成跳转": {
+    "Redo": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Victory Hop"
+            "value": "重做"
           }
         }
       }
     },
-    "展开面板，查看出口状态和各插件": {
+    "Remove %@": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Opens the panel with the egress status and each plugin"
+            "value": "移除 %@"
           }
         }
       }
     },
-    "工作": {
+    "Remove Symlink": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Working"
+            "value": "移除链接"
           }
         }
       }
     },
-    "工作中": {
+    "Removes the daemon, rules, and files and lifts any blocking immediately; use it if you lose your connection": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Working"
+            "value": "清掉守护进程、规则和文件，开着的话立即放开，断网时也用它"
           }
         }
       }
     },
-    "左右转圈": {
+    "Removes the daemon, rules, and files, and lifts any blocking immediately. Needs an administrator password.": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Spin"
+            "value": "清掉守护进程、规则和文件，开着的话立即放开。要管理员密码。"
           }
         }
       }
     },
-    "已保护": {
+    "Replace": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Protected"
+            "value": "替换"
           }
         }
       }
     },
-    "已停止": {
+    "Resident Plugin": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Stopped"
+            "value": "常驻插件"
           }
         }
       }
     },
-    "已卸载，规则和文件都清掉了": {
+    "Restore Real State": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Uninstalled. Rules and files are removed"
+            "value": "恢复真实状态"
           }
         }
       }
     },
-    "已启用": {
+    "Run this in Terminal and a card will pop out of the notch:": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "On"
+            "value": "在终端里跑下面这行，刘海会弹一张卡："
           }
         }
       }
     },
-    "已安装": {
+    "SF Symbol name, e.g. externaldrive": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Installed"
+            "value": "SF Symbol 名，例如 externaldrive"
           }
         }
       }
     },
-    "已安装，但在 Claude Code 里关掉了（/plugin 里打开）": {
+    "Scripts use pipctl to post cards and update activities; run pipctl without arguments for usage. ~/.local/bin must be in your PATH to run pipctl directly (check with echo $PATH in Terminal).": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Installed, but turned off in Claude Code (turn it on in /plugin)"
+            "value": "脚本用 pipctl 发卡片、报活动，pipctl 不带参数看用法。~/.local/bin 要在 PATH 里才能直接敲 pipctl（终端里 echo /Users/ava/.gemini/antigravity/bin:/Users/ava/Library/Application Support/Antigravity/bin:/Users/ava/Library/pnpm/bin:/Users/ava/.bun/bin:/Users/ava/.local/share/mise/installs/bun/1.4.4/bin:/Users/ava/.local/share/mise/installs/go/1.23.12/bin:/Users/ava/.local/share/mise/installs/java/17.0.2/bin:/Users/ava/.local/share/mise/installs/node/26.3.0/bin:/Users/ava/.local/share/mise/installs/npm-sentry-cli/3.5.0/bin:/Users/ava/.local/share/mise/installs/pnpm/11.21.0:/Users/ava/.local/share/mise/installs/python/3.14.3/bin:/Users/ava/.local/share/mise/installs/ruby/4.0.5/bin:/Users/ava/.cargo/bin:/Users/ava/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/opt/homebrew/bin:/Users/ava/.foundry/bin:/Users/ava/.local/bin:/Users/ava/.orbstack/bin:/Users/ava/.foundry/bin 看）。"
           }
         }
       }
     },
-    "已安装，现在是关着的，什么都不拦": {
+    "Select All": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Installed. It’s off and blocks nothing"
+            "value": "全选"
           }
         }
       }
     },
-    "已安装：回合做完或出错时弹卡": {
+    "Settings": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Installed: cards when a turn is done or hits an error"
+            "value": "设置"
           }
         }
       }
     },
-    "已安装：把下面这行加进 ~/.zshrc，新开的终端生效": {
+    "Settings…": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Installed: add the line below to ~/.zshrc; new terminals pick it up"
+            "value": "设置…"
           }
         }
       }
     },
-    "已新建「%@」": {
+    "Shake Head": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Created “%@”"
+            "value": "摇头"
           }
         }
       }
     },
-    "已经装着同 id 的插件：旧版挪进备份，不会删除。": {
+    "Shielded": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "A plugin with the same id is installed: the old version moves to the backup folder and isn’t deleted."
+            "value": "防火墙守住"
           }
         }
       }
     },
-    "已链接：终端里可以直接用 pipctl": {
+    "Show Pip When Retracted": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Linked: you can run pipctl directly in Terminal"
+            "value": "收起时显示 Pip"
           }
         }
       }
     },
-    "常驻插件": {
+    "Show in Finder": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Resident Plugin"
+            "value": "在 Finder 中显示"
           }
         }
       }
     },
-    "干了很久": {
+    "Shown on its cards, e.g. “Backup”": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Long Turn"
+            "value": "卡上标明来源用，例如「备份」"
           }
         }
       }
     },
-    "开启试运行": {
+    "Sound Effects": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Start Trial"
+            "value": "提示音"
           }
         }
       }
     },
-    "开启防火墙？": {
+    "Spin": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Turn on the firewall?"
+            "value": "左右转圈"
           }
         }
       }
     },
-    "开着时，没走 Clash 隧道的流量除局域网、Clash 直连的地址和国内 IP 外一律拦下。每次开启先试运行 2 分钟，不点「保留」自动关掉。开启、保留、关闭都要管理员密码。": {
+    "Start Trial": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "While on, traffic that bypasses the Clash tunnel is blocked, except for the local network, addresses Clash connects to directly, and mainland China IPs. Each time you turn it on, it runs a 2-minute trial and turns itself off unless you click Keep. Turning on, keeping, and turning off all need an administrator password."
+            "value": "开启试运行"
           }
         }
       }
     },
-    "异常：守护进程 30 秒没有更新状态，说不清在不在拦；关掉或卸载": {
+    "Startup": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Problem: the daemon hasn’t updated its status for 30 seconds, so it’s unclear whether anything is blocked; turn it off or uninstall"
+            "value": "启动"
           }
         }
       }
     },
-    "异常：核对没通过（pf 被停、规则被换掉或隧道网卡不在），可能没在拦": {
+    "State Test": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Problem: the check failed (pf stopped, rules replaced, or the tunnel interface is missing); it may not be blocking"
+            "value": "状态测试"
           }
         }
       }
     },
-    "强制显示": {
+    "Status": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Force Display"
+            "value": "状态"
           }
         }
       }
     },
-    "强制：%@": {
+    "Stopped": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Forced: %@"
+            "value": "已停止"
           }
         }
       }
     },
-    "当前出口": {
+    "Switch App": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Current Egress"
+            "value": "切换 App"
           }
         }
       }
     },
-    "当前状态": {
+    "Terminal": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Current Status"
+            "value": "终端"
           }
         }
       }
     },
-    "思考": {
+    "Test rules are installed: only traffic to the test address is blocked, which isn’t protection": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Thinking"
+            "value": "装的是测试规则，只拦去测试地址的流量，不算保护"
           }
         }
       }
     },
-    "恢复真实状态": {
+    "That id belongs to a built-in plugin (guard, claude); choose another": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Restore Real State"
+            "value": "id 是内置插件的（guard、claude），换一个"
           }
         }
       }
     },
-    "打不开这个文件夹：%@": {
+    "The alert card will dismiss, and Pip and the panel will no longer show the egress. Background checks continue, and turning it back on restores everything immediately.": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Couldn’t open this folder: %@"
+            "value": "红卡会撤下，Pip 和面板不再显示出口；后台照常检查，重新打开立即恢复。"
           }
         }
       }
     },
-    "打开": {
+    "The config file can't be read, so settings can't be changed for now. They come back once the file is fixed.": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Open"
+            "value": "配置文件读不了，暂时不能改设置。修好文件后自动恢复。"
           }
         }
       }
     },
-    "打开…": {
+    "The configuration file can’t be read; default values are shown instead of the file’s list.": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Open…"
+            "value": "配置文件读不了，这里显示的是默认值，不是文件里的列表。"
           }
         }
       }
     },
-    "打开插件": {
+    "The firewall state file can’t be read, so it’s treated as off; to turn it on again, uninstall and reinstall": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Turn On Plugin"
+            "value": "防火墙状态文件读不出来，现在按关着办；要再开，先卸载再装"
           }
         }
       }
     },
-    "打开插件设置": {
+    "The folder has no manifest.json": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Open Plugin Settings"
+            "value": "文件夹里没有 manifest.json"
           }
         }
       }
     },
-    "打开配置文件": {
+    "The id may only contain lowercase letters, digits, and hyphens, up to 32 characters": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Open Config File"
+            "value": "id 只能用小写字母、数字和连字符，至多 32 个字符"
           }
         }
       }
     },
-    "打开链接": {
+    "The plugin folder moves to the backup folder and isn’t deleted. Cards and activities it sends afterwards are discarded.": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Open Link"
+            "value": "插件文件夹挪进备份，不会删除。之后它发来的卡片和活动都会丢掉。"
           }
         }
       }
     },
-    "找不到 App，可能被移动过。关掉再打开这个开关即可。": {
+    "The rules failed to load this round and will be retried; it may not be blocking right now": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Can't find the app; it may have been moved. Turn this off and on again."
+            "value": "规则这一轮没装上，下一轮重做；现在可能没在拦"
           }
         }
       }
     },
-    "找不到 Clash Verge 的配置目录：开启时要从那里读节点和国内 IP 段": {
+    "The status summary can’t be read": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Can’t find Clash Verge’s config folder: turning on reads the proxy nodes and China IP ranges from it"
+            "value": "状态摘要读不出来"
           }
         }
       }
     },
-    "找不到 claude": {
+    "There’s no SF Symbol named %@ (look up names in the SF Symbols app)": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Can't find claude"
+            "value": "系统里没有叫 %@ 的 SF Symbol（名字可以在「SF Symbols」App 里查）"
           }
         }
       }
     },
-    "找不到 claude（找过 ~/.local/bin、/opt/homebrew/bin、/usr/local/bin）": {
+    "Thinking": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "claude not found (looked in ~/.local/bin, /opt/homebrew/bin and /usr/local/bin)"
+            "value": "思考"
           }
         }
       }
     },
-    "抬头看天": {
+    "This build doesn't include the mod; package it with scripts/run.sh": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Look Up"
+            "value": "这个构建不含 mod，要用 scripts/run.sh 打包"
           }
         }
       }
     },
-    "拷贝": {
+    "This build doesn't include the terminal plugin; package it with scripts/run.sh": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Copy"
+            "value": "这个构建不含终端插件，要用 scripts/run.sh 打包"
           }
         }
       }
     },
-    "拷贝出口 IP": {
+    "This build doesn’t include the firewall; package it with scripts/run.sh": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Copy Egress IP"
+            "value": "这个构建不含防火墙，要用 scripts/run.sh 打包"
           }
         }
       }
     },
-    "提示": {
+    "This folder is the installed copy itself": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Alerts"
+            "value": "这个文件夹就是已经装着的那份"
           }
         }
       }
     },
-    "提示音": {
+    "This id is reserved for a built-in plugin; choose another": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sounds"
+            "value": "这个 id 留给内置插件，换一个"
           }
         }
       }
     },
-    "插件": {
+    "This plugin isn’t installed": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Plugins"
+            "value": "没装这个插件"
           }
         }
       }
     },
-    "插件已关闭": {
+    "Tilt Head": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Plugin Off"
+            "value": "歪头"
           }
         }
       }
     },
-    "插件文件夹挪进备份，不会删除。之后它发来的卡片和活动都会丢掉。": {
+    "Timed out": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "The plugin folder moves to the backup folder and isn’t deleted. Cards and activities it sends afterwards are discarded."
+            "value": "超时"
           }
         }
       }
     },
-    "插件是一个含 manifest.json 的文件夹，也可以直接拖到这一页上安装。Pip 不运行插件里的任何文件；卸掉的插件挪进 ~/Library/Application Support/Notchkeeper/backup/plugins/，不会删除（自带的终端插件除外）。": {
+    "Traffic is bypassing the proxy": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "A plugin is a folder containing manifest.json; you can also drag one onto this page to install it. Pip never runs any file in a plugin. Uninstalled plugins move to ~/Library/Application Support/Notchkeeper/backup/plugins/ and aren’t deleted (except the built-in terminal plugin)."
+            "value": "有流量没走代理"
           }
         }
       }
     },
-    "摇头": {
+    "Traffic is still bypassing the proxy. Turn off alerts anyway?": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Shake Head"
+            "value": "还有流量没走代理，确定关掉提醒？"
           }
         }
       }
     },
-    "撤销": {
+    "Traffic that bypasses the Clash tunnel will be blocked, except for the local network, addresses Clash connects to directly, and mainland China IPs. It starts with a 2-minute trial: if you lose your connection, do nothing and it turns itself off; if all is well, click Keep. It reads the proxy nodes and China IP ranges from Clash Verge once when turned on; after changing subscriptions, turn it off and on again.": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Undo"
+            "value": "没走 Clash 隧道的流量除局域网、Clash 直连的地址和国内 IP 外都会被拦下。先试运行 2 分钟：网断了什么都不用做，到时自动关掉；没问题就点「保留」。开启时从 Clash Verge 读一次节点和国内 IP 段，之后换了订阅要关掉再开。"
           }
         }
       }
     },
-    "播放动作": {
+    "Trial ended, turning off": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Play Motion"
+            "value": "试运行到期，正在关掉"
           }
         }
       }
     },
-    "操作失败：%@": {
+    "Tunnel Interface": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Failed: %@"
+            "value": "隧道网卡"
           }
         }
       }
     },
-    "收起时": {
+    "Tunnel interface missing (Clash TUN is off, or the name is wrong): all internet traffic is blocked right now": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "When Closed"
+            "value": "隧道网卡不在（Clash 没开 TUN，或网卡名填错）：现在外网全被拦下"
           }
         }
       }
     },
-    "收起时显示 Pip": {
+    "Turn 90°": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Show Pip When Closed"
+            "value": "侧身 90°"
           }
         }
       }
     },
-    "文件": {
+    "Turn Off Alerts": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Files"
+            "value": "关掉提醒"
           }
         }
       }
     },
-    "文件夹里没有 manifest.json": {
+    "Turn on the firewall?": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "The folder has no manifest.json"
+            "value": "开启防火墙？"
           }
         }
       }
     },
-    "断网": {
+    "URL Scheme Allowlist": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Offline"
+            "value": "链接白名单"
           }
         }
       }
     },
-    "新增": {
+    "Undo": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Add"
+            "value": "撤销"
           }
         }
       }
     },
-    "新建": {
+    "Unexpected egress IP": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Create"
+            "value": "出口 IP 不在允许列表里"
           }
         }
       }
     },
-    "新建插件…": {
+    "Uninstall": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "New Plugin…"
+            "value": "卸载"
           }
         }
       }
     },
-    "无法确认是否已安装：%@": {
+    "Uninstall the firewall?": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Couldn't tell whether it's installed: %@"
+            "value": "卸载防火墙？"
           }
         }
       }
     },
-    "日志": {
+    "Uninstall “%@”?": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Log"
+            "value": "卸载「%@」？"
           }
         }
       }
     },
-    "晕": {
+    "Uninstalled. Rules and files are removed": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dizzy"
+            "value": "已卸载，规则和文件都清掉了"
           }
         }
       }
     },
-    "暂时判断不了出口": {
+    "Uninstall…": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Can't verify the egress"
+            "value": "卸载…"
           }
         }
       }
     },
-    "替换": {
+    "Unknown": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Replace"
+            "value": "未知状态"
           }
         }
       }
     },
-    "最多 %lld 行": {
+    "Up to %lld rows": {
       "localizations": {
         "en": {
           "variations": {
@@ -1691,958 +2419,206 @@
               }
             }
           }
-        }
-      }
-    },
-    "有 pf 动作没做成，下一轮重做；关着时规则也可能还在": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "A pf step failed and will be retried next round; rules may still be loaded even while off"
-          }
-        }
-      }
-    },
-    "有插件在忙或要你看时，收起的刘海显示最急的那个；都平静时显示常驻插件。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "When a plugin is busy or needs you, the closed notch shows the most urgent one; when all are calm it shows the resident plugin."
-          }
-        }
-      }
-    },
-    "有流量没走代理": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Traffic is bypassing the proxy"
-          }
-        }
-      }
-    },
-    "有流量没走代理时弹红卡": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Show Red Card When Traffic Bypasses the Proxy"
-          }
-        }
-      }
-    },
-    "有流量没走代理时弹红卡，面板顶上显示出口": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Red card when traffic bypasses the proxy; egress shown at the top of the panel"
-          }
-        }
-      }
-    },
-    "未启用": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Off"
-          }
-        }
-      }
-    },
-    "未安装": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Not installed"
-          }
-        }
-      }
-    },
-    "未安装：面板照常显示会话状态，但不弹完成卡和出错卡": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Not installed: the panel still shows session states, but there are no done or error cards"
-          }
-        }
-      }
-    },
-    "未知状态": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Unknown"
-          }
-        }
-      }
-    },
-    "未链接：用下面的完整路径，或链接到 ~/.local/bin": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Not linked: use the full path below, or link it into ~/.local/bin"
-          }
-        }
-      }
-    },
-    "正在检查…": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Checking…"
-          }
-        }
-      }
-    },
-    "正在检查出口": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Checking egress"
-          }
-        }
-      }
-    },
-    "歪头": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tilt Head"
-          }
-        }
-      }
-    },
-    "没有开启的插件": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No plugins turned on"
-          }
-        }
-      }
-    },
-    "没有网络，暂时检查不了出口": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Offline, can't check the egress"
-          }
-        }
-      }
-    },
-    "没有进行中的会话或活动": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No sessions or activities in progress"
-          }
-        }
-      }
-    },
-    "没装这个插件": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "This plugin isn’t installed"
-          }
-        }
-      }
-    },
-    "没走 Clash 隧道的流量除局域网、Clash 直连的地址和国内 IP 外都会被拦下。先试运行 2 分钟：网断了什么都不用做，到时自动关掉；没问题就点「保留」。开启时从 Clash Verge 读一次节点和国内 IP 段，之后换了订阅要关掉再开。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Traffic that bypasses the Clash tunnel will be blocked, except for the local network, addresses Clash connects to directly, and mainland China IPs. It starts with a 2-minute trial: if you lose your connection, do nothing and it turns itself off; if all is well, click Keep. It reads the proxy nodes and China IP ranges from Clash Verge once when turned on; after changing subscriptions, turn it off and on again."
-          }
-        }
-      }
-    },
-    "流量又全部走代理了": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "All traffic is going through the proxy again"
-          }
-        }
-      }
-    },
-    "添加": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Add"
-          }
-        }
-      }
-    },
-    "清掉守护进程、规则和文件，开着的话立即放开。要管理员密码。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Removes the daemon, rules, and files, and lifts any blocking immediately. Needs an administrator password."
-          }
-        }
-      }
-    },
-    "清掉守护进程、规则和文件，开着的话立即放开，断网时也用它": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Removes the daemon, rules, and files and lifts any blocking immediately; use it if you lose your connection"
-          }
-        }
-      }
-    },
-    "点头": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nod"
-          }
-        }
-      }
-    },
-    "版本 %@（本机签名）": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Version %@ (signed locally)"
-          }
-        }
-      }
-    },
-    "状态": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Status"
-          }
-        }
-      }
-    },
-    "状态摘要读不出来": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The status summary can’t be read"
-          }
-        }
-      }
-    },
-    "状态测试": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "State Test"
-          }
-        }
-      }
-    },
-    "登录时打开": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Open at Login"
-          }
-        }
-      }
-    },
-    "看得见的 Pip 各播放一次；开启「减弱动态效果」时只有眨眼。不写入任何文件。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Every visible Pip plays it once; with Reduce Motion on, only blinking. Nothing is written to disk."
-          }
-        }
-      }
-    },
-    "真实状态": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Real State"
-          }
-        }
-      }
-    },
-    "真实状态：%@": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Real state: %@"
-          }
-        }
-      }
-    },
-    "眨眼": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Blink"
-          }
-        }
-      }
-    },
-    "眼睛跟着鼠标，身体也往那边转；鼠标移到刘海上时探头。关掉后一直看正前方": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Eyes follow the pointer and the body turns toward it; Pip peeks out when the pointer is on the notch. When off, Pip looks straight ahead"
-          }
-        }
-      }
-    },
-    "睡着": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Asleep"
-          }
-        }
-      }
-    },
-    "移除 %@": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Remove %@"
-          }
-        }
-      }
-    },
-    "移除链接": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Remove Link"
-          }
-        }
-      }
-    },
-    "空闲": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Idle"
-          }
-        }
-      }
-    },
-    "窗口": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Window"
-          }
-        }
-      }
-    },
-    "等你回答": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Waiting for Answer"
-          }
-        }
-      }
-    },
-    "等你批准": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Waiting for Approval"
-          }
-        }
-      }
-    },
-    "等守护进程确认…": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Waiting for the daemon to confirm…"
-          }
-        }
-      }
-    },
-    "粘贴": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Paste"
-          }
-        }
-      }
-    },
-    "系统里没有叫 %@ 的 SF Symbol（名字可以在「SF Symbols」App 里查）": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "There’s no SF Symbol named %@ (look up names in the SF Symbols app)"
-          }
-        }
-      }
-    },
-    "系统里没有这个图标，名字可以在「SF Symbols」App 里查": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No such icon; look up names in the SF Symbols app"
-          }
-        }
-      }
-    },
-    "红卡一直保留，直到恢复": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Keep Red Card Until Recovered"
-          }
-        }
-      }
-    },
-    "红卡会撤下，Pip 和面板不再显示出口；后台照常检查，重新打开立即恢复。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The red card goes away and Pip and the panel stop showing the egress. Checks keep running in the background; turn it back on to restore everything right away."
-          }
-        }
-      }
-    },
-    "终端": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Terminal"
-          }
-        }
-      }
-    },
-    "给 Claude Code 装上 Pip 自带的 mod：只记录每个回合怎么结束，不记录对话内容。安装会在 ~/.claude/settings.json 里加一项插件，卸载时去掉。已经开着的会话要重开或运行 /reload-plugins 才生效。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Installs the mod that ships with Pip into Claude Code. It only records how each turn ended, never the conversation. Installing adds a plugin entry to ~/.claude/settings.json; uninstalling removes it. Sessions already open need a restart or /reload-plugins."
-          }
-        }
-      }
-    },
-    "编辑": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Edit"
-          }
-        }
-      }
-    },
-    "网络正常就点「保留」，之后一直开着，重启也开着": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "If your connection works, click Keep: it stays on, even after a restart"
-          }
-        }
-      }
-    },
-    "脚本用 pipctl 发卡片、报活动，pipctl 不带参数看用法。~/.local/bin 要在 PATH 里才能直接敲 pipctl（终端里 echo $PATH 看）。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Scripts use pipctl to post cards and report activities; run pipctl with no arguments for usage. ~/.local/bin must be on your PATH to type pipctl directly (check with echo $PATH)."
-          }
-        }
-      }
-    },
-    "自动": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Auto"
-          }
-        }
-      }
-    },
-    "被打断": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Interrupted"
-          }
-        }
-      }
-    },
-    "装完是关着的，什么都不拦，要用时再打开。要管理员密码。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "It’s off after installing and blocks nothing; turn it on when you need it. Requires an administrator password."
-          }
-        }
-      }
-    },
-    "装的是测试规则，只拦去测试地址的流量，不算保护": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Test rules are installed: only traffic to the test address is blocked, which isn’t protection"
-          }
-        }
-      }
-    },
-    "要你看": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Needs You"
-          }
-        }
-      }
-    },
-    "规则这一轮没装上，下一轮重做；现在可能没在拦": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The rules failed to load this round and will be retried; it may not be blocking right now"
-          }
-        }
-      }
-    },
-    "设置": {
-      "localizations": {
-        "en": {
+        },
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Settings"
+            "value": "最多 %lld 行"
           }
         }
       }
     },
-    "设置…": {
+    "Version %@ (signed locally)": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Settings…"
+            "value": "版本 %@（本机签名）"
           }
         }
       }
     },
-    "试运行中，到时自动关掉": {
+    "Victory Hop": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "In trial; turns off automatically when it ends"
+            "value": "完成跳转"
           }
         }
       }
     },
-    "试运行中，还剩 %lld:%@，到时自动关掉": {
+    "Waiting for Answer": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "In trial, %lld:%@ left; turns off automatically"
+            "value": "等你回答"
           }
         }
       }
     },
-    "试运行到期，正在关掉": {
+    "Waiting for Approval": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Trial ended, turning off"
+            "value": "等你批准"
           }
         }
       }
     },
-    "语言": {
+    "Waiting for the daemon to confirm…": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Language"
+            "value": "等守护进程确认…"
           }
         }
       }
     },
-    "超时": {
+    "When Retracted": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Timed out"
+            "value": "收起时"
           }
         }
       }
     },
-    "跟随鼠标": {
+    "When off, Pip is hidden from the left ear; if the right ear is also empty, the retracted notch is solid black. Shows normally when expanded or popping up cards.": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Follow Pointer"
+            "value": "关掉后左耳不显示 Pip；右耳也没有内容时，刘海就是一块纯黑。展开和弹卡时照常显示"
           }
         }
       }
     },
-    "还有流量没走代理，确定关掉提醒？": {
+    "When plugins are active or require attention, the retracted notch displays the most urgent one; when all are quiet, it displays the resident plugin.": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Traffic is still bypassing the proxy. Turn off alerts anyway?"
+            "value": "有插件在忙或要你看时，收起的刘海显示最急的那个；都平静时显示常驻插件。"
           }
         }
       }
     },
-    "还没有状态：刚装上或刚卸到一半，稍等几秒；一直这样就卸载重装": {
+    "When the list is empty, the guard cannot verify whether the egress IP is correct, showing “Can’t verify the egress”; traffic bypassing the proxy will still be alerted.": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "No status yet: just installed or halfway through uninstalling; wait a few seconds. If it stays like this, uninstall and reinstall"
+            "value": "列表为空时，守卫判断不了出口 IP 对不对，只能显示「暂时判断不了出口」；有流量没走代理仍然会报。"
           }
         }
       }
     },
-    "这个 id 留给内置插件，换一个": {
+    "While on, traffic that bypasses the Clash tunnel is blocked, except for the local network, addresses Clash connects to directly, and mainland China IPs. Each time you turn it on, it runs a 2-minute trial and turns itself off unless you click Keep. Turning on, keeping, and turning off all need an administrator password.": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "This id is reserved for a built-in plugin; choose another"
+            "value": "开着时，没走 Clash 隧道的流量除局域网、Clash 直连的地址和国内 IP 外一律拦下。每次开启先试运行 2 分钟，不点「保留」自动关掉。开启、保留、关闭都要管理员密码。"
           }
         }
       }
     },
-    "这个文件夹就是已经装着的那份": {
+    "Window": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "This folder is the installed copy itself"
+            "value": "窗口"
           }
         }
       }
     },
-    "这个构建不含 mod，要用 scripts/run.sh 打包": {
+    "Working": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "This build doesn't include the mod; package it with scripts/run.sh"
+            "value": "工作"
           }
         }
       }
     },
-    "这个构建不含终端插件，要用 scripts/run.sh 打包": {
+    "e.g. 198.51.100.10": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "This build doesn't include the terminal plugin; package it with scripts/run.sh"
+            "value": "例如 198.51.100.10"
           }
         }
       }
     },
-    "这个构建不含防火墙，要用 scripts/run.sh 打包": {
+    "e.g. backup": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "This build doesn’t include the firewall; package it with scripts/run.sh"
+            "value": "例如 backup"
           }
         }
       }
     },
-    "进行中": {
+    "e.g. raycast": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "In Progress"
+            "value": "例如 raycast"
           }
         }
       }
     },
-    "退出": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Quit"
-          }
-        }
-      }
-    },
-    "退出 Pip": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Quit Pip"
-          }
-        }
-      }
-    },
-    "退出 Pip…": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Quit Pip…"
-          }
-        }
-      }
-    },
-    "退出 Pip？": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Quit Pip?"
-          }
-        }
-      }
-    },
-    "退出后刘海和卡片都会停止，后台的出口守卫照常运行；要停止守卫，请运行卸载脚本。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Quitting stops the notch and cards; the egress guard keeps running in the background. To stop the guard, run the uninstall script."
-          }
-        }
-      }
-    },
-    "退出码 %d": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Exit code %d"
-          }
-        }
-      }
-    },
-    "通用": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "General"
-          }
-        }
-      }
-    },
-    "配置文件": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Config File"
-          }
-        }
-      }
-    },
-    "配置文件读不了，暂时不能改设置。修好文件后自动恢复。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The config file can't be read, so settings can't be changed for now. They come back once the file is fixed."
-          }
-        }
-      }
-    },
-    "配置文件读不了，这里显示的是默认值，不是文件里的列表。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The config file can't be read, so these are the defaults, not the list in the file."
-          }
-        }
-      }
-    },
-    "重做": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Redo"
-          }
-        }
-      }
-    },
-    "链接到 ~/.local/bin": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Link into ~/.local/bin"
-          }
-        }
-      }
-    },
-    "链接白名单": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Allowed Link Schemes"
-          }
-        }
-      }
-    },
-    "防火墙": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Firewall"
-          }
-        }
-      }
-    },
-    "防火墙守住": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Shielded"
-          }
-        }
-      }
+    "id": {
+      "shouldTranslate": false
     },
-    "防火墙状态文件读不出来，现在按关着办；要再开，先卸载再装": {
+    "manifest.json isn’t valid JSON, or is missing id, name, or symbol": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "The firewall state file can’t be read, so it’s treated as off; to turn it on again, uninstall and reinstall"
+            "value": "manifest.json 不是 JSON，或缺 id、name、symbol"
           }
         }
       }
     },
-    "隧道网卡": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tunnel Interface"
-          }
-        }
-      }
-    },
-    "隧道网卡不在（Clash 没开 TUN，或网卡名填错）：现在外网全被拦下": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tunnel interface missing (Clash TUN is off, or the name is wrong): all internet traffic is blocked right now"
-          }
-        }
-      }
+    "pipctl": {
+      "shouldTranslate": false
     },
-    "需要在「系统设置 › 通用 › 登录项」里允许": {
+    "terminal is the bundled Terminal plugin; install or uninstall it in Settings › Terminal": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Needs approval in System Settings › General › Login Items"
+            "value": "terminal 是自带的终端插件，在设置 › 终端里装卸"
           }
         }
       }
     },
-    "面板": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Panel"
-          }
-        }
-      }
+    "utun1024": {
+      "shouldTranslate": false
     },
-    "默认跟随系统；也可以在「语言与地区」里单独给 Pip 选": {
+    "~/.local/bin/pipctl is already another file; not overwriting it. Use the full path below": {
       "localizations": {
-        "en": {
+        "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Follows the system by default. You can also pick one just for Pip in Language & Region"
+            "value": "~/.local/bin/pipctl 已经是别的文件，不覆盖；用下面的完整路径"
           }
         }
       }
     },
-    "鼠标悬停时展开": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Expand on Hover"
-          }
-        }
-      }
+    "—": {
+      "shouldTranslate": false
     }
   },
   "version": "1.0"

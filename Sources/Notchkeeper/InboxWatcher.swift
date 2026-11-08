@@ -3,12 +3,12 @@ import Darwin
 import PluginCore
 import PluginStore
 
-/// 回答：收件箱里来了哪些外部插件的卡和活动。
-/// 只做 I/O：建目录（0700，别的用户写不进来）、监听 `inbox/new/`、读完即删、读插件登记；
-/// 解不解得开、放不放、放成哪张卡全归 PluginCore（`Message`、`Manifest`、`InboxGate`）。可变状态只在 `queue` 上读写，所以标 `@unchecked Sendable`。
-/// 消息是外部数据：日志里只记丢的原因（PluginCore 的枚举、errno）和计数，不记内容和文件名（CLAUDE.md 准则 5）。
+/// Answers: Which external plugin cards and activities have arrived in the inbox.
+/// Handles I/O only: creates directories (0700, inaccessible to other users), monitors `inbox/new/`, reads and deletes immediately, reads plugin manifests;
+/// parsing, admission, and card creation belong entirely to PluginCore (`Message`, `Manifest`, `InboxGate`). Mutable state is read/written on `queue` only, marked `@unchecked Sendable`.
+/// Messages are external data: logs record only drop reasons (PluginCore enum, errno) and counts, never message content or filenames (CLAUDE.md Principle 5).
 final class InboxWatcher: @unchecked Sendable {
-    /// 一次扫描收下的：卡、活动，和这时读到的插件登记
+    /// Items admitted in a single scan: cards, activities, and current plugin registrations.
     struct Batch: Sendable {
         var cards: [InboxGate.Admitted] = []
         var activities: [ActivityUpdate] = []
@@ -18,22 +18,21 @@ final class InboxWatcher: @unchecked Sendable {
     private let onBatch: @Sendable (Batch) -> Void
     private let queue = DispatchQueue(label: "com.notchkeeper.inbox")
     private var gate = InboxGate()
-    /// 只看目录：照 Maildir 文件是 rename 进来的，不会原地改
+    /// Watches directory only: following Maildir semantics, files are renamed in and never modified in-place.
     private lazy var inbox = WatchedDirectory(PluginPaths.new, watchesFiles: false, queue: queue) { [weak self] in self?.scan() }
     private var dropped = 0
-    /// 删不掉的文件：不再读，免得每次有动静都再弹一次
+    /// Files that could not be deleted: do not reread to prevent popping up on every event.
     private var stuck: Set<String> = []
-    /// 解不开的登记文件：只在第一次记日志
+    /// Unparseable manifest files: logged once on first failure.
     private var badManifests: Set<String> = []
 
-    /// `tmp/` 里这么久的是写到一半崩了的（照 Maildir）
+    /// Files in `tmp/` older than this were abandoned midway (following Maildir).
     private static let staleTmp: TimeInterval = 36 * 3600
 
-    /// `onBatch` 在内部队列上调用，只在收下了卡或活动时调用
+    /// `onBatch` called on internal queue only when cards or activities are admitted.
     init(onBatch: @escaping @Sendable (Batch) -> Void) {
         self.onBatch = onBatch
     }
-
 
     func start() {
         queue.async { [self] in
@@ -43,30 +42,30 @@ final class InboxWatcher: @unchecked Sendable {
                     try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: dir.path)
                 }
             } catch {
-                Log.write("插件：建不了收件箱目录（\(Self.code(error))），不收外部插件的卡")
+                Log.write("plugin: cannot create inbox directory (\(Self.code(error))), will not receive external plugin cards")
                 return
             }
             pruneTmp()
             guard inbox.open() else {
-                Log.write("插件：打不开收件箱（errno \(errno)），不收外部插件的卡")
+                Log.write("plugin: cannot open inbox (errno \(errno)), will not receive external plugin cards")
                 return
             }
             scan()
         }
     }
 
-    /// 清不掉不影响收卡：记一行，下次启动再清
+    /// Inability to prune does not affect receiving cards: log line and retry next launch.
     private func pruneTmp() {
         let names: [String]
         do {
             names = try FileManager.default.contentsOfDirectory(atPath: PluginPaths.tmp.path)
         } catch {
-            Log.write("插件：读不了收件箱的 tmp/（\(Self.code(error))），这次不清理")
+            Log.write("plugin: cannot read inbox tmp/ (\(Self.code(error))), skipping cleanup")
             return
         }
         for name in names {
             let url = PluginPaths.tmp.appendingPathComponent(name)
-            // 不跟随符号链接；刚被 pipctl rename 走的查不到，跳过
+            // Do not follow symlinks; files just renamed by pipctl will not be found, skip.
             var info = stat()
             guard lstat(url.path, &info) == 0,
                   -Date(timeIntervalSince1970: TimeInterval(info.st_mtimespec.tv_sec)).timeIntervalSinceNow > Self.staleTmp else { continue }
@@ -79,7 +78,7 @@ final class InboxWatcher: @unchecked Sendable {
         do {
             names = try inbox.list()
         } catch {
-            Log.write("插件：读收件箱失败（\(Self.code(error))），不收外部插件的卡")
+            Log.write("plugin: failed to read inbox (\(Self.code(error))), will not receive external plugin cards")
             return
         }
         var messages: [Message] = []
@@ -91,27 +90,27 @@ final class InboxWatcher: @unchecked Sendable {
             } catch POSIXError.ENOENT {
                 continue
             } catch {
-                drop("读不了（errno \(error.code.rawValue)）")
+                drop("unreadable (errno \(error.code.rawValue))")
                 remove(url)
                 continue
             }
             remove(url)
             guard data.count <= Message.maxBytes else {
-                drop("太大")
+                drop("too large")
                 continue
             }
             do {
                 messages.append(try Message.parse(data))
             } catch {
-                drop("解不开（\(error)）")
+                drop("cannot parse (\(error))")
             }
         }
         guard !messages.isEmpty else { return }
-        // 每次有消息时现读（插件只有几个），装上、卸掉不用重启 App
+        // Read on demand when messages arrive (only a few plugins); install/uninstall requires no App restart.
         let plugins = Self.manifests { dir, error in
-            if badManifests.insert(dir).inserted { Log.write("插件：\(Self.safe(dir)) 的 manifest.json 读不了或解不开（\(error)），算没登记") }
+            if badManifests.insert(dir).inserted { Log.write("plugin: manifest.json for \(Self.safe(dir)) is unreadable or invalid (\(error)), treated as unregistered") }
         }
-        badManifests.subtract(plugins.keys) // 修好了的：再坏时再记
+        badManifests.subtract(plugins.keys) // Restored plugins: log again if corrupted later.
         let now = Date()
         var batch = Batch(plugins: plugins)
         for m in messages.sorted(by: { $0.at < $1.at }) {
@@ -122,19 +121,19 @@ final class InboxWatcher: @unchecked Sendable {
                     batch.activities.append(try gate.admitActivity(m, plugins: plugins, now: now))
                 }
             } catch .unregistered {
-                drop("插件 \(m.plugin) 没登记") // id 已按格式校验过，可以进日志
+                drop("plugin \(m.plugin) not registered") // ID validated by format, safe to log.
             } catch {
-                drop("插件 \(m.plugin)：\(error)")
+                drop("plugin \(m.plugin): \(error)")
             }
         }
         if !batch.cards.isEmpty || !batch.activities.isEmpty { onBatch(batch) }
     }
 
-    /// 已登记的外部插件。读不了的交给 `onBad`，算没登记；设置页也用它列插件。
-    /// 图标名系统里没有的（装好后登记被改过）换成拼图块：照样收卡，卡上不会空一块
+    /// Registered external plugins. Unreadable manifests passed to `onBad` and treated as unregistered; settings pane also lists plugins with this.
+    /// Missing system symbol replaced with puzzle piece: cards received normally without blank icon area.
     static func manifests(onBad: (String, Error) -> Void = { _, _ in }) -> [String: Manifest] {
         PluginStore().manifests { dir, error in
-            guard let dir else { return Log.write("插件：读不了插件目录（\(code(error))），都算没登记") }
+            guard let dir else { return Log.write("plugin: cannot read plugin directory (\(code(error))), treated as unregistered") }
             onBad(dir, error)
         }.mapValues { m in
             guard !symbolExists(m.symbol) else { return m }
@@ -144,30 +143,30 @@ final class InboxWatcher: @unchecked Sendable {
         }
     }
 
-    /// 每次新建一个 NSImage、不跨线程共用：Apple 允许在别的线程创建（Thread Safety Summary「NSImage Restrictions」），收件箱队列上也调
+    /// Create new NSImage each time, never shared across threads: Apple permits creation on background threads (Thread Safety Summary "NSImage Restrictions").
     /// @see https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Multithreading/ThreadSafetySummary/ThreadSafetySummary.html
     @Sendable static func symbolExists(_ name: String) -> Bool {
         NSImage(systemSymbolName: name, accessibilityDescription: nil) != nil
     }
 
-    /// 目录名是外部的：只留字母、数字、连字符，截短再记
+    /// Directory name is external input: retain letters, digits, hyphens only, truncate before logging.
     private static func safe(_ dir: String) -> String {
         String(String.UnicodeScalarView(dir.unicodeScalars.filter { $0.isASCII && ($0.properties.isAlphabetic || ("0"..."9").contains($0) || $0 == "-") }).prefix(32))
     }
 
     private func drop(_ why: String) {
         dropped += 1
-        Log.write("插件：丢掉一条消息，\(why)（共丢 \(dropped) 条）")
+        Log.write("plugin: dropped message, \(why) (\(dropped) dropped total)")
     }
 
-    /// 只删这一项：是符号链接就删链接本身
+    /// Delete only this item: deletes symlink itself if symlink.
     private func remove(_ url: URL) {
         guard unlink(url.path) != 0, errno != ENOENT else { return }
         stuck.insert(url.lastPathComponent)
-        Log.write("插件：收件箱里有文件删不掉（errno \(errno)），不再读它")
+        Log.write("plugin: cannot delete file in inbox (errno \(errno)), ignoring it")
     }
 
-    /// 只带错误码：Foundation 的错误描述里有路径，路径里有外部写的文件名
+    /// Error code only: Foundation error description contains paths, which could include externally authored filenames.
     private static func code(_ error: Error) -> String {
         let e = error as NSError
         return "\(e.domain) \(e.code)"

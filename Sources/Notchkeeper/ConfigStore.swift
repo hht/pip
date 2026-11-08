@@ -3,7 +3,7 @@ import Combine
 import GuardCore
 import NotchCore
 
-/// 回答：config.json 怎么读写——启动载入、改了存盘、外部改了热加载；文件解不开时不写盘，保留原文件（CLAUDE.md 准则 5）
+/// Answers: How to read and write config.json - loading at startup, persisting on modification, hot-reloading on external edits; retains original file on parse failures without overwriting (CLAUDE.md Principle 5).
 @MainActor
 final class ConfigStore: ObservableObject {
     static let shared = ConfigStore()
@@ -13,7 +13,7 @@ final class ConfigStore: ObservableObject {
     }
 
     let url: URL
-    /// 磁盘上的文件读不了或解不开：这时不写盘，免得默认值盖掉手改的内容（CLAUDE.md 准则 5）。改好后热加载会清掉它
+    /// File on disk is unreadable or unparseable: do not write to disk in this state to avoid default values overwriting manual edits (CLAUDE.md Principle 5). Cleared when repaired via hot reload.
     @Published private(set) var fileUnreadable = false
     private let log: (String) -> Void
     private var applyingExternal = false
@@ -38,8 +38,8 @@ final class ConfigStore: ObservableObject {
             lastData = data
         }
         lastMTime = mtime()
-        // 热加载：目录的监听收原子替换（大多数编辑器），文件的监听收原地改写。不轮询：没人改时不该每秒醒一次。
-        // 目录里别的文件变了也会叫醒它，比一次修改时间就回去
+        // Hot reload: directory monitoring catches atomic replacement (most editors), file monitoring catches in-place rewriting. No polling: do not wake up every second when idle.
+        // Other file changes in directory also wake it up; returns immediately if modification time unchanged.
         let name = url.lastPathComponent
         directory = WatchedDirectory(url.deletingLastPathComponent(), matching: { $0 == name }, queue: .main) { [weak self] in
             MainActor.assumeIsolated { self?.fileChanged() }
@@ -47,12 +47,12 @@ final class ConfigStore: ObservableObject {
         if directory?.open() == true {
             watchFile()
         } else {
-            log("配置目录打不开，外部改了配置文件要重启 App 才载入")
+            log("Configuration directory cannot be opened; external config file modifications will require App restart to load")
         }
     }
 
-    /// 守卫每轮取的允许列表。不是合法 IPv4 的条目丢掉：只有手改 config.json 才会有，设置页加的都校验过、列表里也看得见它们。
-    /// 启动时文件就解不开，`config` 是默认值（空列表），守卫最多判到 unknown，设置页有横幅；运行中改坏了沿用改坏前的
+    /// Allowlist fetched by guard each round. Discards entries that are not valid IPv4: only present if manually editing config.json, entries added via settings pane are validated and visible in list.
+    /// If file fails to parse on startup, `config` defaults to empty allowlist, guard falls back to unknown at most, and settings pane shows a banner; if corrupted while running, previous valid config is retained.
     var allowlistIPs: Set<IPv4> { Set(config.allowlist.compactMap(IPv4.init)) }
 
     private func fileChanged() {
@@ -60,12 +60,12 @@ final class ConfigStore: ObservableObject {
         reloadIfChanged()
     }
 
-    /// 文件被替换后要重新挂上监听
+    /// Re-attach monitoring after file is replaced.
     private func watchFile() {
         do {
             _ = try directory?.list()
         } catch {
-            log("配置目录读不了，外部改了配置文件要重启 App 才载入")
+            log("Configuration directory cannot be read; external config file modifications will require App restart to load")
         }
     }
 
@@ -74,7 +74,7 @@ final class ConfigStore: ObservableObject {
         case loaded(Config, Data)
     }
 
-    /// 只有这里写 `fileUnreadable`
+    /// Only mutated here.
     private func read() -> File {
         do {
             let data = try Data(contentsOf: url)
@@ -86,25 +86,25 @@ final class ConfigStore: ObservableObject {
             return .missing
         } catch {
             fileUnreadable = true
-            // 坏着时内存里的改动不算「和文件一致」：文件原样改回时也要重新载入
+            // In-memory changes while corrupted are not considered "consistent with file": reload when file restored.
             lastData = nil
-            log("配置文件\(Self.problem(error))，先用当前设置，不改文件")
+            log("Configuration file \(Self.problem(error)), using current settings without modifying file")
             return .unreadable
         }
     }
 
-    /// 只说哪个键坏了，不带值：值里可能有 IP（CLAUDE.md「日志不记 IP」）
+    /// Only names the broken key without its value: value may contain an IP (CLAUDE.md "Never log IPs").
     private static func problem(_ error: Error) -> String {
         let path: [CodingKey]
         switch error as? DecodingError {
         case let .typeMismatch(_, c)?, let .valueNotFound(_, c)?, let .keyNotFound(_, c)?, let .dataCorrupted(c)?:
             path = c.codingPath
         case nil:
-            return "读不了"
+            return "cannot be read"
         @unknown default:
-            return "解不开"
+            return "cannot be parsed"
         }
-        return path.isEmpty ? "不是合法的 JSON" : "里 \(path.map(\.stringValue).joined(separator: ".")) 这一项解不开"
+        return path.isEmpty ? "is not valid JSON" : "item at \(path.map(\.stringValue).joined(separator: ".")) cannot be decoded"
     }
 
     private func mtime() -> Date? {
@@ -119,10 +119,10 @@ final class ConfigStore: ObservableObject {
     }
 
     func saveNow() {
-        // 外部刚改过、监听的事件还没送到：先读进来，免得盖掉；读进来了就是外部的赢，内存和文件已经一致
+        // Just modified externally and events not delivered yet: read first to avoid overwriting; external edits win, memory and file align.
         if reloadIfChanged() { return }
         guard !fileUnreadable else {
-            log("配置文件解不开，这次改动只在内存里，改好文件后会被文件内容取代")
+            log("Configuration file cannot be parsed; this change remains in memory only and will be overwritten once the file is fixed")
             return
         }
         let enc = JSONEncoder()
@@ -133,11 +133,11 @@ final class ConfigStore: ObservableObject {
             lastData = data
             lastMTime = mtime()
         } catch {
-            log("配置写入失败：\(error.localizedDescription)")
+            log("Failed to write configuration: \(error.localizedDescription)")
         }
     }
 
-    /// 返回是否载入了外部的新内容
+    /// Returns whether new external content was loaded.
     @discardableResult
     func reloadIfChanged() -> Bool {
         let m = mtime()
@@ -149,7 +149,7 @@ final class ConfigStore: ObservableObject {
         applyingExternal = true
         config = c
         applyingExternal = false
-        log("已热加载配置文件")
+        log("Hot-reloaded configuration file")
         return true
     }
 

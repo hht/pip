@@ -1,21 +1,21 @@
 import AppKit
 import ServiceManagement
 
-/// 开机启动：SMAppService.mainApp（macOS 13+）。本机 ad-hoc 签名可用，但 App 换位置或重新签名后可能要重新打开开关。
+/// Launch at login: SMAppService.mainApp (macOS 13+). Works with local ad-hoc signatures, though toggling off and on may be required if App is relocated or re-signed.
 enum LoginItem {
     static var status: SMAppService.Status { SMAppService.mainApp.status }
 
     static func text(_ status: SMAppService.Status) -> String {
         switch status {
-        case .enabled: return String(localized: "已启用")
-        case .requiresApproval: return String(localized: "需要在「系统设置 › 通用 › 登录项」里允许")
-        case .notRegistered: return String(localized: "未启用")
-        case .notFound: return String(localized: "找不到 App，可能被移动过。关掉再打开这个开关即可。")
-        @unknown default: return String(localized: "未知状态")
+        case .enabled: return String(localized: "On")
+        case .requiresApproval: return String(localized: "Needs approval in System Settings › General › Login Items")
+        case .notRegistered: return String(localized: "Off")
+        case .notFound: return String(localized: "Can't find the app; it may have been moved. Turn this off and on again.")
+        @unknown default: return String(localized: "Unknown")
         }
     }
 
-    /// 返回 nil 表示成功，否则是错误描述
+    /// Returns nil on success, otherwise localized error description.
     static func set(_ on: Bool) -> String? {
         do {
             if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }

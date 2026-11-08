@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// 第一次点击即可响应（非激活面板里不用先点一下“激活”）
+/// Responds on the first click (no need to first click to "activate" an inactive panel)
 final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
@@ -16,11 +16,11 @@ struct PressableStyle: ButtonStyle {
 }
 
 enum Apps {
-    /// 切到这个 App：开着就拉到前面，没开就打开。false 表示没装这个 App。
-    /// 交给 `/usr/bin/open -b`：macOS 14 起激活是协作式的，刘海面板不激活自己、让不出前台。
-    /// 实测从后台进程调：`NSRunningApplication.activate()` 和 `NSWorkspace.openApplication` 都切不过去，
-    /// `open -b` 和 AppleScript `activate` 能切；后者每个目标 App 都要先弹「自动化」权限，所以用前者。
-    /// bundle id 作为参数传，不经过 shell
+    /// Switches to this app: brings to front if running, launches if not. Returns false if not installed.
+    /// Delegated to `/usr/bin/open -b`: macOS 14+ activation is cooperative; notch panel does not activate itself, cannot yield foreground.
+    /// Tested from background processes: `NSRunningApplication.activate()` and `NSWorkspace.openApplication` cannot switch,
+    /// while `open -b` and AppleScript `activate` can; the latter prompts for Automation permissions per app, so former is used.
+    /// Bundle ID passed as argument, no shell involved.
     /// @see https://developer.apple.com/documentation/appkit/nsrunningapplication/activate(options:)
     @discardableResult
     static func activate(_ bundleID: String) -> Bool {
@@ -28,25 +28,26 @@ enum Apps {
         let open = Process()
         open.executableURL = URL(fileURLWithPath: "/usr/bin/open")
         open.arguments = ["-b", bundleID]
-        do { try open.run() } catch { Log.write("切换 App 失败：\((error as NSError).domain) \((error as NSError).code)") }
+        do { try open.run() } catch { Log.write("Failed to switch App: \((error as NSError).domain) \((error as NSError).code)") }
         return true
     }
 }
 
-/// 装、卸这类操作失败，带一句给用户看的原因（设置页显示 `localizedDescription`）
+/// Operation failure with a user-facing explanation (Settings displays `localizedDescription`)
 struct Failure: LocalizedError {
     var errorDescription: String?
 }
 
 extension FileManager {
-    /// 用 `source` 的一份拷贝换掉 `destination`（文件或目录）：先拷到同一卷的临时目录再整体换上去，拷到一半失败时原来那份还在
+    /// Replaces `destination` with a copy of `source`: copies to a staging directory on the same volume first,
+    /// so if copy fails midway the original is preserved
     func replaceItem(at destination: URL, withCopyOf source: URL) throws {
         try createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
         let staging = try url(for: .itemReplacementDirectory, in: .userDomainMask, appropriateFor: destination.deletingLastPathComponent(), create: true)
             .appendingPathComponent(destination.lastPathComponent)
         defer {
-            // 临时目录，换上去之后已经空了；删不掉只占一个空目录
-            do { try removeItem(at: staging.deletingLastPathComponent()) } catch { Log.write("删不掉临时目录：\(error.localizedDescription)") }
+            // Temporary staging directory is empty after replacement; failure to delete only leaves an empty folder
+            do { try removeItem(at: staging.deletingLastPathComponent()) } catch { Log.write("Cannot delete temporary directory: \(error.localizedDescription)") }
         }
         try copyItem(at: source, to: staging)
         if fileExists(atPath: destination.path) {
@@ -57,9 +58,9 @@ extension FileManager {
     }
 }
 
-/// 刘海展开（含弹卡）、收起、卡片放完回到面板、面板行数变化的弹簧，只在这里定义（docs/mascot.md §5「收起与展开」）。
-/// 开了「减弱动态效果」就收紧成不回弹的（HIG Accessibility："Tightening animation springs to reduce bounce effects"）；
-/// 每次取都看一眼系统设置，改了马上生效
+/// Notch expand (including cards), collapse, return from cards to panel, and panel row transitions (docs/mascot.md §5 "Collapse and Expand").
+/// Tightens springs to non-bouncing when "Reduce Motion" is enabled (HIG Accessibility: "Tightening animation springs to reduce bounce effects");
+/// re-checks system settings on every access to apply changes immediately
 /// @see https://developer.apple.com/design/human-interface-guidelines/accessibility
 enum NotchSpring {
     static var page: Animation { spring(response: 0.42, dampingFraction: 0.84) }
@@ -71,8 +72,8 @@ enum NotchSpring {
     }
 }
 
-/// 「多久以前」：设置页的「上次检查」、会话行的时间。只说过去：刚写完的守卫状态、时钟差一点的时间
-/// 和现在一样或稍晚，格式化出来是「0 秒后」，按 1 秒前说
+/// Relative time text: "Last Check" in Settings, session row timestamps. Always describes the past: freshly written guard status
+/// or clock skews that are equal to or slightly ahead of now formatted as "in 0 seconds" are adjusted to 1 second ago
 /// @see https://developer.apple.com/documentation/foundation/relativedatetimeformatter
 enum AgoText {
     static func string(_ date: Date, now: Date = .now, locale: Locale = .autoupdatingCurrent) -> String {

@@ -1,7 +1,7 @@
 import AgentCore
 import AppKit
 import MascotCore
-// 只取用到的：GuardCore 有个叫 `Observation` 的类型（守卫一轮的观测），整个导入会盖住 @Observable 展开时用的 Observation 模块
+// Import specific symbols: GuardCore defines `Observation` (observation of a guard round) which shadows the Observation framework used by @Observable.
 import struct GuardCore.GuardDisplay
 import struct GuardCore.IPv4
 import GuardProbes
@@ -9,8 +9,8 @@ import NotchCore
 import Observation
 import PluginCore
 
-/// 视图按属性订阅（Observation）：只有读了 `display` 的视图（展开的面板、设置页）才随守卫每轮重算，
-/// 收起的刘海只跟着 `presentation` 等真正变了的东西走
+/// Views subscribe property-wise (Observation): only views that read `display` (expanded panel, settings pane) recalculate every round,
+/// while the retracted notch observes only genuinely changing properties like `presentation`.
 /// @see https://developer.apple.com/documentation/observation
 @MainActor
 @Observable
@@ -19,29 +19,29 @@ final class AppState {
 
     let store = ConfigStore.shared
 
-    /// 守卫最近一轮的结果（`GuardMonitor`）
+    /// Most recent round results from Egress Guard (`GuardMonitor`).
     private(set) var display = GuardDisplay.checking
-    /// 由 display 和用户关掉的是哪一次算出来（`ViolationAlert`），界面只看它
+    /// Computed from display and user dismiss state (`ViolationAlert`); UI observes this only.
     private(set) var presentation: GuardPresentation
-    /// 面板列的会话（AgentCore 判定的、活着的终端 claude）
+    /// Sessions listed in panel (live terminal claude sessions evaluated by AgentCore).
     private(set) var sessions: [Session] = []
-    /// Claude Code 各会话合起来此刻是什么（AgentCore 判定）；没有要画的是 nil
+    /// Aggregated Claude Code session state (evaluated by AgentCore); nil if none to draw.
     private(set) var agentActivity: AgentActivity?
-    /// 已登记的外部插件（`plugins/<id>/manifest.json`）
+    /// Registered external plugins (`plugins/<id>/manifest.json`).
     private(set) var manifests: [String: Manifest] = [:]
-    /// 外部插件开着的活动
+    /// Active activities from external plugins.
     private(set) var activities = ActivityBoard()
     @ObservationIgnored private var activityExpiry: DispatchWorkItem?
 
     @ObservationIgnored private var violationAlert: ViolationAlert
 
-    /// 守卫每查完一轮都调用（不论有没有变化），参数是红卡要做的事
+    /// Invoked after each guard check round regardless of changes; parameter indicates alert action.
     @ObservationIgnored var onAlertAction: ((ViolationAlert.Action) -> Void)?
-    /// AgentCore 判定的事件，连同同一次更新的会话列表
+    /// Events evaluated by AgentCore, along with concurrent session list snapshot.
     @ObservationIgnored var onAgentEvents: (([AgentEvent], [Session]) -> Void)?
-    /// 外部插件被卸掉（设置页、`pipctl plugin uninstall`、手动删目录都算）：App 撤掉它排着的卡
+    /// External plugin uninstalled (settings pane, `pipctl plugin uninstall`, manual deletion): App removes queued cards.
     @ObservationIgnored var onPluginsRemoved: ((Set<String>) -> Void)?
-    /// 订阅守卫每轮结果的长任务；`stopWatchingGuard()` / deinit 取消，流随之结束、探针停下
+    /// Long-running task subscribing to guard round results; cancelled via `stopWatchingGuard()` / deinit.
     @ObservationIgnored private var guardTask: Task<Void, Never>?
     @ObservationIgnored private var agentWatcher: AgentWatcher?
 
@@ -51,7 +51,7 @@ final class AppState {
     }
 
     func start() {
-        // 只在 App 运行时检查（docs/egress-guard.md「什么时候查」）；允许列表每轮从内存里的配置取
+        // Run checks only while App is running (docs/egress-guard.md "When to Check"); allowlist read each round from in-memory config.
         let store = store
         watchGuard(GuardMonitor(probes: .live(), allowlist: { await store.allowlistIPs }).displays())
         let watcher = AgentWatcher { update in
@@ -61,7 +61,7 @@ final class AppState {
         agentWatcher = watcher
     }
 
-    /// 每来一个显示就 apply 一次。参数是流，测试可以喂假的；再调一次会先取消旧的订阅
+    /// Applies each display update. Accepts stream for testing; subsequent calls cancel previous subscription.
     func watchGuard(_ displays: AsyncStream<GuardDisplay>) {
         guardTask?.cancel()
         guardTask = Task { [weak self] in
@@ -87,8 +87,8 @@ final class AppState {
         let old = presentation, new = violationAlert.presentation
         guard new != old else { return }
         presentation = new
-        // 日志不记录 IP
-        if new.title != old.title { Log.write("出口守卫：\(new.title)") }
+        // Never log IP addresses
+        if new.title != old.title { Log.write("Egress Guard: \(new.title)") }
     }
 
     private func applyAgent(_ update: AgentWatcher.Update) {
@@ -96,24 +96,24 @@ final class AppState {
         if update.sessions != sessions { sessions = update.sessions }
         for event in update.events {
             switch event {
-            case .turnDone(let pid): Log.write("agent：回合做完（pid \(pid)）")
-            case .turnFailed(let pid): Log.write("agent：回合出错（pid \(pid)）")
-            case .needsYou(let need, let pid): Log.write("agent：需要你介入，\(need)（pid \(pid)）")
-            case .needsYouEnded(let pid): Log.write("agent：介入结束（pid \(pid)）")
+            case .turnDone(let pid): Log.write("agent: turn completed (pid \(pid))")
+            case .turnFailed(let pid): Log.write("agent: turn error (pid \(pid))")
+            case .needsYou(let need, let pid): Log.write("agent: intervention needed, \(need) (pid \(pid))")
+            case .needsYouEnded(let pid): Log.write("agent: intervention ended (pid \(pid))")
             }
         }
-        // 关掉 Claude Code 插件：照常判定，只是不弹卡
+        // Disabled Claude Code plugin: evaluate normally, suppress popping cards.
         if !update.events.isEmpty, store.config.isEnabled(PluginID.claudeCode) { onAgentEvents?(update.events, update.sessions) }
     }
 
-    // MARK: 插件
+    // MARK: Plugins
 
-    /// 面板里各段的插件，按用户排的顺序：Claude Code 和登记了的外部插件，开没开都在。出口守卫固定在顶上，不在这里
+    /// Panel section plugins ordered per user settings: Claude Code and registered external plugins. Egress Guard is pinned at top, omitted here.
     var sectionPlugins: [String] {
         store.config.ordered([PluginID.claudeCode] + manifests.keys.sorted())
     }
 
-    /// 开着的插件各自的状态：守卫在前，其余按段的顺序（一样急时排在前面的上位）
+    /// Status of each enabled plugin: guard first, remaining per section order (higher priority breaks ties).
     var statuses: [PluginStatus] {
         let c = store.config
         var all: [PluginStatus] = c.isEnabled(PluginID.exitGuard) ? [PluginStatus(guard: presentation)] : []
@@ -123,12 +123,12 @@ final class AppState {
         return all
     }
 
-    /// 收起时 Pip 和右耳画谁（docs/ui.md「面板布局」）；nil：Pip 空闲、右耳空着
+    /// Determines who is rendered by Pip and right ear when retracted (docs/ui.md "Panel Layout"); nil: Pip idle, right ear empty.
     var lead: PluginStatus? { PluginStatus.lead(statuses, resident: store.config.resident) }
-    /// Pip 画哪个（docs/mascot.md §2「优先级」换成了插件的紧急程度）。晕、睡着由 `MascotDirector.shown` 叠上去
+    /// Look rendered by Pip (docs/mascot.md §2 "Priorities" mapped to plugin urgency). Dizziness and sleepiness overlaid via `MascotDirector.shown`.
     var look: Look { lead?.look ?? .idle }
 
-    /// 面板里开着的段和它们的行（空的段也在，画不画由面板定）
+    /// Active sections in panel and their rows (empty sections retained, rendering determined by panel).
     var sections: [PanelSection] {
         let c = store.config
         return sectionPlugins.filter(c.isEnabled).map { id in
@@ -136,22 +136,22 @@ final class AppState {
         }
     }
 
-    /// 设置页上插件的名字：外部的用它登记的名字，登记读不到时用 id
+    /// Plugin display name in settings: external plugins use manifest name, falling back to id if unreadable.
     func pluginName(_ id: String) -> String {
         switch id {
-        case PluginID.exitGuard: return String(localized: "出口守卫")
+        case PluginID.exitGuard: return String(localized: "Egress Guard")
         case PluginID.claudeCode: return "Claude Code"
         default: return manifests[id]?.name ?? id
         }
     }
 
-    /// 重读插件登记：启动、装卸终端插件、打开设置页时
+    /// Reload plugin manifests: launch, terminal plugin install/uninstall, settings pane open.
     func reloadManifests() {
         setManifests(InboxWatcher.manifests())
     }
 
-    /// 卸掉了的插件（目录没了）：撤它的行，告诉 App 撤卡。没登记的插件发来的已经一律丢掉，留下的卡和行也不该再出来。
-    /// 目录还在、只是 manifest.json 一时读不了（编辑器正在写）的不算：撤掉的卡回不来
+    /// Removed plugins (directory gone): dismiss rows, instruct App to dismiss cards.
+    /// Directories temporarily unreadable during edit do not count, preserving existing cards.
     private func setManifests(_ m: [String: Manifest]) {
         guard m != manifests else { return }
         let removed = Set(manifests.keys).subtracting(m.keys)
@@ -163,7 +163,7 @@ final class AppState {
         onPluginsRemoved?(removed)
     }
 
-    /// 收件箱收下的一批：记下当时的登记，活动记上面板，返回要弹或要刷新的卡（App 交给刘海）
+    /// Batch received from inbox: records manifests, registers activities in panel, returns cards to post or refresh.
     func applyInbox(_ batch: InboxWatcher.Batch) -> [ActivityBoard.CardChange] {
         setManifests(batch.plugins)
         guard !batch.activities.isEmpty else { return [] }
@@ -173,13 +173,13 @@ final class AppState {
         return changes
     }
 
-    /// 设置里关掉一个外部插件：它的行撤掉
+    /// Disable external plugin in settings: removes associated rows.
     func removeActivities(of plugin: String) {
         activities.remove(plugin: plugin)
         scheduleActivityExpiry()
     }
 
-    /// 活动过期的时刻一次性定时（最长 8 小时一次），到点撤行
+    /// Single timer for activity expiration (up to 8h interval), removing expired rows.
     private func scheduleActivityExpiry() {
         activityExpiry?.cancel()
         guard let at = activities.deadline else { return }
@@ -189,17 +189,17 @@ final class AppState {
             self.scheduleActivityExpiry()
         }
         activityExpiry = work
-        // 墙钟：睡眠期间也算时间，开盖后过了期的马上撤（`deadline:` 按开机时长算，睡眠时不走）
+        // Wall clock: includes sleep time, expiring stale items immediately on wake.
         DispatchQueue.main.asyncAfter(wallDeadline: .now() + max(0, at.timeIntervalSinceNow), execute: work)
     }
 
-    /// 开关出口守卫插件（关的是提醒，不是判定）：关掉撤红卡，打开按最近一轮的结果再判一次
+    /// Toggle Egress Guard plugin (disables alerts, not evaluation): dismissing removes red card; enabling re-evaluates latest round.
     func setGuardEnabled(_ on: Bool) {
         onAlertAction?(violationAlert.setEnabled(on, autoAlert: store.config.autoAlert))
-        Log.write("出口守卫插件：\(on ? "打开" : "关掉")")
+        Log.write("Egress Guard plugin: \(on ? "enabled" : "disabled")")
     }
 
-    /// 用户关掉了红卡（或非常驻红卡到时收起）
+    /// User dismissed red card (or non-resident card timed out).
     func dismissViolation() {
         violationAlert.dismiss()
         publishPresentation()
@@ -210,25 +210,25 @@ final class AppState {
     func demoAlert() { onAlertAction?(violationAlert.demo()) }
     #endif
 
-    /// 允许列表用 GuardCore 的 IPv4 校验，和守卫每轮取列表时的规则一致（`ConfigStore.allowlistIPs`）
+    /// Allowlist validated using GuardCore IPv4, matching guard evaluation rules (`ConfigStore.allowlistIPs`).
     @discardableResult
     func addAllowed(_ raw: String) -> Bool {
         let ip = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard IPv4(ip) != nil, !store.config.allowlist.contains(ip) else { return false }
         store.config.allowlist.append(ip)
-        Log.write("允许列表：新增 1 项")
+        Log.write("Allowlist: added 1 entry")
         return true
     }
 
     func removeAllowed(_ ip: String) {
         store.config.allowlist.removeAll { $0 == ip }
-        Log.write("允许列表：移除 1 项")
+        Log.write("Allowlist: removed 1 entry")
     }
 }
 
 enum Log {
     static let url = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/Notchkeeper/notchkeeper.log")
-    /// 本地时间 + 时区偏移，例如 2026-10-28 14:03:21 -07:00
+    /// Local time + timezone offset, e.g. 2026-10-28 14:03:21 -07:00
     private static let formatter: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
@@ -237,12 +237,12 @@ enum Log {
         return f
     }()
 
-    /// 主线程和 `AgentWatcher` 的队列都会写：串行起来，行不串、`formatter` 不被同时用
+    /// Main thread and `AgentWatcher` queue both log: serialized execution avoids race conditions on `formatter`.
     private static let queue = DispatchQueue(label: "com.notchkeeper.log")
 
     static func write(_ msg: String) {
         queue.sync {
-            // 带 pid：同时有两个实例时分得清是谁写的
+            // Includes pid to distinguish instances when multiple processes run concurrently
             let line = "\(formatter.string(from: Date())) [pid \(getpid())] \(msg)\n"
             guard let data = line.data(using: .utf8) else { return }
             if let h = try? FileHandle(forWritingTo: url) {

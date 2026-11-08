@@ -1,11 +1,13 @@
 import Foundation
 import GuardCore
 
-/// 回答：以前单独装的守卫后台进程 guardd（用户级 LaunchAgent）怎么卸掉。
-/// 守卫并进 App 之后它没用了，留着还会每 5 秒探一次网络。App 每次启动看一眼：plist 在就卸下 LaunchAgent，
-/// 卸下来了才删 plist、二进制和它写的状态文件；卸不下来什么都不删，下次启动再试。日志和安装备份留着。
-/// 不要 sudo：LaunchAgent 在当前用户的 `gui/<uid>` 域里。等所有装过 guardd 的机器都启动过一次新版，这个文件可以删掉。
-/// @see https://keith.github.io/xcode-man-pages/launchctl.1.html （bootout、print）
+/// Answers: How to remove the legacy standalone guard background process guardd (user-level LaunchAgent).
+/// After Egress Guard was integrated into the App, guardd became obsolete. Keeping it would probe the network every 5s.
+/// On each App launch, check: if the plist exists, unload the LaunchAgent. Only after unloading, delete the plist,
+/// binary, and state files. If unload fails, delete nothing and retry on next launch. Logs and install backups are kept.
+/// No sudo required: LaunchAgent lives in the current user's `gui/<uid>` domain.
+/// Once all machines running guardd have launched the new version at least once, this file can be removed.
+/// @see https://keith.github.io/xcode-man-pages/launchctl.1.html (bootout, print)
 enum LegacyGuardd {
     static let label = "com.notchkeeper.guardd"
 
@@ -20,11 +22,11 @@ enum LegacyGuardd {
             state: GuardPaths.directory.appendingPathComponent("guard-state.json"))
     }
 
-    /// launchctl 的两个动作，测试换成假的
+    /// Two launchctl actions, replaced with fakes in tests.
     struct Launchd {
         var bootout: () -> Void
         var isLoaded: () -> Bool
-        /// 两次查询之间等一会儿
+        /// Wait briefly between two queries.
         var wait: () -> Void
 
         static let live = Launchd(
@@ -34,7 +36,7 @@ enum LegacyGuardd {
 
         private static var domain: String { "gui/\(getuid())" }
 
-        /// 退出码；启动不了算 -1。输出丢掉：print 会打出整份 job 描述
+        /// Exit code; return -1 if unable to run. Discard output: print dumps the entire job description.
         private static func launchctl(_ args: String...) -> Int32 {
             let p = Process()
             p.executableURL = URL(fileURLWithPath: "/bin/launchctl")
@@ -47,31 +49,31 @@ enum LegacyGuardd {
         }
     }
 
-    /// 会等 launchctl，别在主线程上调
+    /// Waits for launchctl; do not call on the main thread.
     static func remove(_ files: Files = .live, launchd: Launchd = .live, log: (String) -> Void = Log.write) {
         let fm = FileManager.default
         guard fm.fileExists(atPath: files.plist.path) else { return }
         if launchd.isLoaded() {
             launchd.bootout()
-            // guardd 收到 SIGTERM 在当前一步结束时退出，最长等一轮的截止时间
+            // guardd exits at the end of the current round upon receiving SIGTERM; wait up to one round's deadline.
             var waits = 0
             while launchd.isLoaded(), waits < 10 {
                 launchd.wait()
                 waits += 1
             }
             guard !launchd.isLoaded() else {
-                return log("旧的守卫后台进程 guardd 卸不下来，下次启动再试；文件都没删")
+                return log("Legacy guard daemon (guardd) could not be unloaded, will retry next launch; files were not deleted")
             }
         }
         for url in [files.plist, files.binary, files.state] {
             do {
                 try fm.removeItem(at: url)
             } catch CocoaError.fileNoSuchFile {
-                // 早就没有了
+                // Already deleted.
             } catch {
-                log("删旧的守卫文件 \(url.lastPathComponent) 失败：\(error.localizedDescription)")
+                log("Failed to delete legacy guard file \(url.lastPathComponent): \(error.localizedDescription)")
             }
         }
-        log("守卫已并进 App：卸掉了旧的后台进程 guardd")
+        log("Egress Guard integrated into App: unloaded legacy guardd background process")
     }
 }

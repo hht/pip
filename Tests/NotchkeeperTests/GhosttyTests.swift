@@ -5,7 +5,7 @@ private func terminal(_ id: String, _ dir: String) -> Ghostty.Terminal {
     Ghostty.Terminal(id: id, title: "zsh", workingDirectory: dir)
 }
 
-/// docs/agent-integration.md「跳转到 Ghostty」：标记找不到时退回按目录认，只有一个才算
+/// docs/agent-integration.md "Jumping to Ghostty": falls back to directory matching when marker cannot be found; only unique matches qualify.
 @Suite struct GhosttyDirectoryFallback {
     private let terminals = [terminal("A", "/Users/u/p1"), terminal("B", "/Users/u/p2"), terminal("C", "/Users/u/p2")]
 
@@ -13,7 +13,7 @@ private func terminal(_ id: String, _ dir: String) -> Ghostty.Terminal {
         #expect(Ghostty.pick(terminals, cwd: "/Users/u/p1") == "A")
     }
 
-    /// 同目录还开着 dev server 之类：认不出来，不随便挑一个
+    /// Ambiguous if dev server or other instances share directory: does not guess.
     @Test func sameDirectoryIsAmbiguous() {
         #expect(Ghostty.pick(terminals, cwd: "/Users/u/p2") == nil)
     }
@@ -27,10 +27,10 @@ private func terminal(_ id: String, _ dir: String) -> Ghostty.Terminal {
     }
 }
 
-/// 写回 tty 的标题来自 Ghostty（信任边界）：控制字符一律去掉，免得原标题里夹着转义序列被重放
+/// Titles written back to tty originate from Ghostty (trust boundary): strip control characters to avoid replaying embedded escape sequences.
 @Suite struct GhosttyTitleSequence {
     @Test func wrapsTitleInOSC2() {
-        #expect(Ghostty.titleSequence("✳ 修登录") == Array("\u{1B}]2;✳ 修登录\u{07}".utf8))
+        #expect(Ghostty.titleSequence("✳ Fix login") == Array("\u{1B}]2;✳ Fix login\u{07}".utf8))
     }
 
     @Test func stripsControlCharacters() {
@@ -38,11 +38,11 @@ private func terminal(_ id: String, _ dir: String) -> Ghostty.Terminal {
     }
 }
 
-/// 只在 claude 直接跑在 Ghostty 的终端里时写标记：套在 tmux、nvim 的 :terminal 里时，OSC 2 被它们吃掉，写了恢复不了
+/// Only write markers when claude runs directly inside Ghostty: nested inside tmux or nvim :terminal, OSC 2 is consumed and cannot be restored.
 @Suite struct GhosttyAncestry {
     private struct Proc { var parent: Int32; var tty: String? }
-    /// claude 100 → zsh 90 → login 80 → Ghostty 70；tmux 里的 claude 200 → zsh 190 → tmux 180 → launchd 1；
-    /// nvim :terminal 里的 claude 300（ttys9）→ zsh 290（ttys9）→ nvim 280（ttys1）→ zsh 270 → login 260（ttys1）→ Ghostty 70
+    /// claude 100 -> zsh 90 -> login 80 -> Ghostty 70; tmux: claude 200 -> zsh 190 -> tmux 180 -> launchd 1;
+    /// nvim :terminal: claude 300 (ttys9) -> zsh 290 (ttys9) -> nvim 280 (ttys1) -> zsh 270 -> login 260 (ttys1) -> Ghostty 70
     private let procs: [Int32: Proc] = [
         100: Proc(parent: 90, tty: "/dev/ttys1"), 90: Proc(parent: 80, tty: "/dev/ttys1"), 80: Proc(parent: 70, tty: "/dev/ttys1"),
         200: Proc(parent: 190, tty: "/dev/ttys2"), 190: Proc(parent: 180, tty: "/dev/ttys2"), 180: Proc(parent: 1, tty: nil),
@@ -62,12 +62,12 @@ private func terminal(_ id: String, _ dir: String) -> Ghostty.Terminal {
         #expect(tty(200) == nil)
     }
 
-    /// 祖先里有 Ghostty，但 claude 的 tty 是 nvim 开的，不是 Ghostty 开的
+    /// Ghostty exists in ancestors, but claude's tty was opened by nvim, not Ghostty.
     @Test func insideNestedTerminalIsNot() {
         #expect(tty(300) == nil)
     }
 
-    /// Ghostty 配了 `command = claude`：claude 自己就是 Ghostty 的直接子进程
+    /// Ghostty configured with `command = claude`: claude itself is direct child of Ghostty.
     @Test func claudeIsGhosttysChild() {
         #expect(Ghostty.markableTTY(500, ghostty: [70], parent: { $0 == 500 ? 70 : nil }, tty: { $0 == 500 ? "/dev/ttys5" : nil }) == "/dev/ttys5")
     }
@@ -76,7 +76,7 @@ private func terminal(_ id: String, _ dir: String) -> Ghostty.Terminal {
         #expect(Ghostty.markableTTY(600, ghostty: [70], parent: { $0 == 600 ? 70 : nil }, tty: { _ in nil }) == nil)
     }
 
-    /// 进程中途没了（查不到父进程）
+    /// Process vanished midway (parent cannot be inspected).
     @Test func vanishedProcessIsNot() {
         #expect(tty(400) == nil)
     }

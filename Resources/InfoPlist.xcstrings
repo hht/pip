@@ -1,8 +1,8 @@
 {
-  "sourceLanguage" : "zh-Hans",
+  "sourceLanguage" : "en",
   "strings" : {
     "NSAppleEventsUsageDescription" : {
-      "comment" : "第一次切到 Ghostty 时系统弹的权限说明",
+      "comment" : "Permission prompt displayed by system when switching to Ghostty for the first time",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {

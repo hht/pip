@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import Notchkeeper
 
-/// 临时目录里的 `bin/pipctl`（装好的）和 `.local/bin/pipctl`（PATH 上的链接）
+/// Temporary directory with installed `bin/pipctl` and PATH link `.local/bin/pipctl`.
 private struct Sandbox {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent("pipctl-link-\(UUID().uuidString)")
     var target: URL { root.appendingPathComponent("bin/pipctl") }
@@ -15,7 +15,7 @@ private struct Sandbox {
 }
 
 @Suite struct CommandLineToolLink {
-    /// `.local/bin` 还不存在时一起建出来
+    /// Creates `.local/bin` if it does not yet exist.
     @Test func linkThenUnlink() throws {
         let s = try Sandbox()
         #expect(CommandLineTool.linkState(s.link, target: s.target) == .absent)
@@ -24,11 +24,11 @@ private struct Sandbox {
         #expect(try FileManager.default.destinationOfSymbolicLink(atPath: s.link.path) == s.target.path)
         try CommandLineTool.removeLink(s.link, target: s.target)
         #expect(CommandLineTool.linkState(s.link, target: s.target) == .absent)
-        // 设置页开着时链接在终端里被删了：再点「移除链接」不报错
+        // If link was deleted in terminal while settings pane was open, clicking remove again won't error.
         try CommandLineTool.removeLink(s.link, target: s.target)
     }
 
-    /// 那个名字已经被别的文件、或指向别处的链接占了：不覆盖，也不删
+    /// Pre-existing file or external symlink is left untouched.
     @Test(arguments: [false, true])
     func occupiedIsLeftAlone(_ symlink: Bool) throws {
         let s = try Sandbox()
@@ -36,7 +36,7 @@ private struct Sandbox {
         if symlink {
             try FileManager.default.createSymbolicLink(atPath: s.link.path, withDestinationPath: "/usr/bin/true")
         } else {
-            try Data("别人的".utf8).write(to: s.link)
+            try Data("someone-elses".utf8).write(to: s.link)
         }
         #expect(CommandLineTool.linkState(s.link, target: s.target) == .occupied)
         #expect(throws: (any Error).self) { try CommandLineTool.createLink(s.link, target: s.target) }
@@ -44,7 +44,7 @@ private struct Sandbox {
         if symlink {
             #expect(try FileManager.default.destinationOfSymbolicLink(atPath: s.link.path) == "/usr/bin/true")
         } else {
-            #expect(try String(contentsOf: s.link, encoding: .utf8) == "别人的")
+            #expect(try String(contentsOf: s.link, encoding: .utf8) == "someone-elses")
         }
         #expect(CommandLineTool.linkState(s.link, target: s.target) == .occupied)
     }

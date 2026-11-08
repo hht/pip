@@ -3,25 +3,25 @@ import NotchCore
 import QuartzCore
 import SwiftUI
 
-/// 卡片边缘的流星（docs/ui.md「卡片」）：卡片弹出、形状长好后，两颗流星从顶部两端沿边匀速流到底边中间，
-/// 1.5 秒走完、汇合处淡出。只走一趟，不循环；不再代表倒计时，卡片停多久照设置。
-/// 悬停、熄屏锁屏时卡片停住，还没走完的光也停在原处。常驻红卡没有倒计时、或开了减弱动态效果：不流，
-/// 只画一条很淡的同色细边（照灵动岛的 keylineTint）。
+/// Shooting stars along the card edge (docs/ui.md "Card"): After a card pops up and its shape forms, two shooting stars travel along the edge at a constant speed from both top ends down to the bottom center.
+/// They complete the sweep in 1.5s and fade out at convergence. Runs once only, does not loop; no longer represents a countdown timer, dwell time follows user settings.
+/// When hovered, display turns off, or screen locks, the card pauses and incomplete light halts in place. Persistent red cards have no countdown, or when Reduce Motion is enabled: no sweep,
+/// only drawing a faint subtle border in the same tint (matching Dynamic Island's keylineTint).
 /// @see https://developer.apple.com/documentation/widgetkit/dynamicisland/keylinetint(_:)
-/// 不知道卡片是什么。
+/// Agnostic to what the card content is.
 ///
-/// 照 Magic UI 的 Border Beam：一块渐变色块（透明 → 颜色 → 亮白）沿边框路径跑，用只留边框一圈的遮罩裁出来，
-/// 尾巴是顺滑的渐变，拐角也跟着弯。光压在卡片边缘正中（视图放在卡片的裁切外面），柔光往里外两边晕开。
+/// Follows Magic UI's Border Beam: a gradient color block (transparent -> tint -> bright white) travels along the border path, masked to a single outline stroke,
+/// leaving a smooth fading tail that curves around corners. The light sits centered directly on the card edge (view placed outside the card clipping), diffusing soft glow inward and outward.
 /// @see https://magicui.design/docs/components/border-beam
-/// 位置交给 Core Animation：一条 1.5 秒的沿路径关键帧动画，按卡片弹出后已过的时间从对应那一帧放起；
-/// 暂停时动画速度设成 0、停在那一帧。主线程不逐帧重画（docs/ui.md「原则」）。
+/// Positioning handled by Core Animation: a 1.5s along-path keyframe animation, playing from the frame corresponding to elapsed time since card appeared;
+/// on pause, animation speed is set to 0, holding at that exact frame. The main thread performs no frame-by-frame redraws (docs/ui.md "Principles").
 /// @see https://developer.apple.com/library/archive/qa/qa1673/_index.html
 struct CardEdge: NSViewRepresentable {
-    /// 和形状同一组参数：路径要和卡片外形完全重合
+    /// Same parameters as the shape: path must match card outline precisely.
     let topRadius: CGFloat
     let bottomRadius: CGFloat
     let tint: Color
-    /// nil：常驻卡片
+    /// nil: persistent card
     let countdown: CardCountdown?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -34,7 +34,7 @@ struct CardEdge: NSViewRepresentable {
 }
 
 final class CardEdgeView: NSView {
-    /// 一层光：外层负责模糊，里层用一圈描边做遮罩，里面是左右两块沿边跑的渐变。先遮再模糊，光才晕得开
+    /// A beam layer: outer layer handles blur, inner layer uses outline stroke mask, containing left and right edge gradients. Masking before blur allows proper glow diffusion.
     private final class Beams {
         let blurred = CALayer()
         let ring = CALayer()
@@ -52,11 +52,11 @@ final class CardEdgeView: NSView {
             for g in [left, right] {
                 g.startPoint = CGPoint(x: 0, y: 0.5)
                 g.endPoint = CGPoint(x: 1, y: 0.5)
-                // 头在右端：锚点放在头上，头压在路径上、尾巴拖在后面
+                // Head at right end: anchor at head, head rides path, tail trails behind.
                 g.anchorPoint = CGPoint(x: 1, y: 0.5)
                 g.bounds = CGRect(x: 0, y: 0, width: length, height: 24)
                 g.locations = [0, 0.55, 0.92, 1]
-                // 没在流的时候放在画面外
+                // Place off-screen when not sweeping.
                 g.position = CGPoint(x: -1000, y: -1000)
                 ring.addSublayer(g)
             }
@@ -66,16 +66,16 @@ final class CardEdgeView: NSView {
         }
     }
 
-    /// 常驻卡片的细边
+    /// Faint keyline for persistent cards.
     private let keyline = CAShapeLayer()
-    /// 流星头外面的一层光：拉长的椭圆，顺着来的方向往后拉；不受边框遮罩，往边缘里外两边晕开
+    /// Outer glow around shooting star head: elongated ellipse trailing in direction of travel; unmasked by border, diffuses both inside and outside the edge.
     private let heads = [CAGradientLayer(), CAGradientLayer()]
-    /// 流星的实体头：清晰的水滴形，前端是比尾巴粗的亮核，往后收尖接进细尾巴；前白后卡片色，不模糊。
-    /// 水滴是直的，放进一条沿边的窄带遮罩里：拐弯时偏出边缘的部分被裁掉，看上去贴着圆弧弯过去
+    /// Solid nucleus of shooting star: distinct teardrop shape, front has bright core thicker than tail, tapering into thin tail; white front, card tint rear, unblurred.
+    /// Teardrop is linear, constrained within a narrow band mask along the path: portions deviating on curves get clipped, appearing to bend along the arc.
     private let nuclei = [CAGradientLayer(), CAGradientLayer()]
     private let nucleusBand = CALayer()
     private let nucleusMask = CAShapeLayer()
-    /// 流星的形状 = 头上的椭圆光团 + 只在靠近头那一段的柔光（短）+ 一路拖到后面的细芯（长）：亮而宽 → 渐细 → 消失
+    /// Shooting star profile = elliptical glow bundle on head + short soft halo near head + long thin trailing core: bright & wide -> tapering -> vanishing.
     private let core = Beams(width: 1, blur: 0, opacity: 1, length: 200)
     private let halo = Beams(width: 4, blur: 3, opacity: 0.6, length: 80)
     private var shape = NotchShape(topRadius: 0, bottomRadius: 0, closed: false)
@@ -83,25 +83,25 @@ final class CardEdgeView: NSView {
     private var countdown: CardCountdown?
     private var reduceMotion = false
 
-    /// 头上光团的长和宽；实体头的长度和亮核半径；模糊层四周留的余量
-    /// 光团不能拉太长：拐弯时会朝切线方向甩出去
+    /// Head glow width/height; solid nucleus length and radius; blur layer padding margin.
+    /// Head glow must not be too long, or it will fling along the tangent on sharp corners.
     private static let headSize = CGSize(width: 18, height: 9)
-    /// 水滴不能太长：圆角半径 28pt，越长拐弯时偏出越多；剩下的长度交给会拐弯的细尾巴
+    /// Teardrop cannot be too long: corner radius is 28pt; longer lengths deviate more on curves; remaining length is handled by curving tail.
     private static let nucleusLength: CGFloat = 16
     private static let nucleusRadius: CGFloat = 1.5
     private static let blurPad: CGFloat = 16
-    /// 流星走一趟的时长
+    /// Duration of single shooting star sweep.
     private static let sweep: TimeInterval = 1.5
-    /// 卡片弹出后等形状快长好再流，免得拐角错开；和 `Notch.swift` 里流星视图的淡入延迟是同一个数
+    /// Wait until card shape is mostly formed after popping up before sweeping, avoiding misaligned corners; matches fade-in delay in `Notch.swift`.
     static let appearDelay: TimeInterval = 0.35
 
     init() {
         super.init(frame: .zero)
         wantsLayer = true
-        // 柔光要高斯模糊：图层的 filters 只在打开它时生效，代价是这个视图在 App 进程里渲染；卡片收起就拆掉
+        // Soft glow requires Gaussian blur: layer filters only apply when enabled, rendering in App process; torn down when card retracts.
         // @see https://developer.apple.com/documentation/appkit/nsview/layerusescoreimagefilters
         layerUsesCoreImageFilters = true
-        guard let root = layer else { preconditionFailure("wantsLayer 之后一定有 layer") }
+        guard let root = layer else { preconditionFailure("layer is guaranteed after wantsLayer = true") }
         root.masksToBounds = false
         keyline.fillColor = nil
         keyline.lineWidth = 1
@@ -114,13 +114,13 @@ final class CardEdgeView: NSView {
             h.endPoint = CGPoint(x: 1, y: 1)
             h.locations = [0, 0.25, 1]
             h.bounds = CGRect(origin: .zero, size: Self.headSize)
-            // 椭圆的大半在头后面：光团往来的方向拉长，再收进尾巴
+            // Most of the ellipse trails behind head: glow elongates in travel direction before tapering into tail.
             h.anchorPoint = CGPoint(x: 0.7, y: 0.5)
             h.position = CGPoint(x: -1000, y: -1000)
             h.opacity = 0.7
             root.addSublayer(h)
         }
-        // 水滴：尖在左（尾巴那头），圆在右（头）；锚点放在圆心上，圆心压在路径上
+        // Teardrop: tip on left (tail end), circle on right (head); anchor at circle center riding on path.
         let l = Self.nucleusLength, r = Self.nucleusRadius
         let drop = CGMutablePath()
         drop.move(to: CGPoint(x: 0, y: r))
@@ -149,9 +149,9 @@ final class CardEdgeView: NSView {
     }
 
     @available(*, unavailable)
-    required init?(coder: NSCoder) { preconditionFailure("只用代码创建") }
+    required init?(coder: NSCoder) { preconditionFailure("code initialization only") }
 
-    /// 和 SwiftUI 的 Shape 一样原点在左上
+    /// Matches SwiftUI Shape origin at top-left.
     override var isFlipped: Bool { true }
     func set(shape s: NotchShape, tint t: NSColor, countdown c: CardCountdown?, reduceMotion rm: Bool) {
         let changed = t != tint || c != countdown || rm != reduceMotion
@@ -160,13 +160,13 @@ final class CardEdgeView: NSView {
         reduceMotion = rm
         if t != tint {
             tint = t
-            // 尾巴是卡片色、越往后越淡，头是亮白
+            // Tail is card tint fading toward end; head is bright white.
             let colors = [t.withAlphaComponent(0), t.withAlphaComponent(0.35), t.blended(withFraction: 0.5, of: .white) ?? t, .white].map(\.cgColor)
             CATransaction.begin()
             CATransaction.setDisableActions(true)
             for b in [core, halo] { [b.left, b.right].forEach { $0.colors = colors } }
             keyline.strokeColor = t.withAlphaComponent(0.5).cgColor
-            // 中心亮白，往外过渡到卡片色，再到透明
+            // Center bright white, transitioning outward to card tint, then transparent.
             heads.forEach { $0.colors = [NSColor.white.withAlphaComponent(0.8), t.withAlphaComponent(0.35), t.withAlphaComponent(0)].map(\.cgColor) }
             nuclei.forEach { $0.colors = [t.withAlphaComponent(0), t.withAlphaComponent(0.7), NSColor.white, NSColor.white].map(\.cgColor) }
             CATransaction.commit()
@@ -174,7 +174,7 @@ final class CardEdgeView: NSView {
         if changed { reshape() }
     }
 
-    /// 卡片跟着弹簧长大时，遮罩和轨迹都按新尺寸重算（动画按时间对齐，重挂不跳）
+    /// When card expands with spring animation, recalculate masks and trajectories to new dimensions (animations align by time without jumping).
     override func layout() {
         super.layout()
         reshape()
@@ -186,7 +186,7 @@ final class CardEdgeView: NSView {
         CATransaction.setDisableActions(true)
         defer { CATransaction.commit() }
         let path = shape.path(in: bounds).cgPath
-        // 不流的时候（常驻卡片、减弱动态效果）只留一条很淡的同色细边
+        // When not sweeping (persistent card, reduce motion), retain only a subtle keyline.
         let flowing = countdown != nil && !reduceMotion
         keyline.frame = bounds
         keyline.path = path
@@ -194,7 +194,7 @@ final class CardEdgeView: NSView {
         nucleusMask.frame = bounds
         nucleusMask.path = path
         keyline.isHidden = flowing
-        // 模糊只画在图层范围里：四周多留余量，压在底边上的光才能往外晕开，不被切掉一半
+        // Blur renders within layer bounds only: extra margin around edges allows light at bottom to bloom outward without being clipped.
         let pad = Self.blurPad
         for b in [core, halo] {
             b.blurred.frame = bounds.insetBy(dx: -pad, dy: -pad)
@@ -209,19 +209,19 @@ final class CardEdgeView: NSView {
             $0.isHidden = !flowing
         }
         guard flowing, let c = countdown else { return }
-        // 走过的时间从形状长好那一刻算起；还没到时为负，动画在未来开始
+        // Elapsed time counted from moment shape finishes forming; negative if yet to reach, animation starts in future.
         let elapsed = c.total - c.remaining(at: Date()) - Self.appearDelay
-        // 已经走完：不再挂动画（暂停时 timeOffset 超过时长会绕回起点）
+        // Sweep completed: do not attach animation (when paused, timeOffset exceeding duration loops back to start).
         guard elapsed < Self.sweep else {
             ([core.blurred, halo.blurred] + heads + nuclei).forEach { $0.isHidden = true }
             return
         }
-        // 左边一道沿左半边从顶端流到底边中间，右边一道走镜像；头朝前，顺着路径转向，匀速走（看得出还剩多少）
+        // Left beam travels along left half from top to bottom center; right beam mirrors; head faces forward, rotating along path at constant speed.
         let half = shape.leftHalf(in: bounds).cgPath
         var mirror = CGAffineTransform(translationX: bounds.width, y: 0).scaledBy(x: -1, y: 1)
-        guard let mirrored = half.copy(using: &mirror) else { preconditionFailure("仿射变换一定能复制路径") }
+        guard let mirrored = half.copy(using: &mirror) else { preconditionFailure("affine transform copy path always succeeds") }
         let sides = [half, mirrored]
-        // 光团和流星的头走同一条路、同一个时间轴，都顺着路径转向
+        // Glow bundle and nucleus follow same path and timeline, rotating along path.
         let layers = [core.left, core.right, halo.left, halo.right, heads[0], heads[1], nuclei[0], nuclei[1]]
         for (i, layer) in layers.enumerated() {
             let path = sides[i % 2]
@@ -229,22 +229,22 @@ final class CardEdgeView: NSView {
             move.path = path
             move.calculationMode = .paced
             move.rotationMode = .rotateAuto
-            // 开头淡入，汇合前淡出
+            // Fade in at start, fade out before convergence.
             let fade = CAKeyframeAnimation(keyPath: "opacity")
             fade.values = [0, 1, 1, 0]
             fade.keyTimes = [0, 0.12, 0.8, 1]
             let once = CAAnimationGroup()
             once.animations = [move, fade]
             once.duration = Self.sweep
-            // 走着：开始时刻往前推已过的时间（QA1673 恢复动画的写法；用 timeOffset 会在到点时绕回起点）；
-            // 暂停：速度 0、停在已过的那一帧
+            // Active: offset beginTime backward by elapsed time (QA1673 resume animation pattern; timeOffset loops on completion);
+            // Paused: speed 0, hold on elapsed frame.
             if c.isPaused {
                 once.speed = 0
                 once.timeOffset = max(elapsed, 0)
             } else {
                 once.beginTime = CACurrentMediaTime() - elapsed
             }
-            // 开始前停在第一帧（透明），走完停在最后一帧（透明）
+            // Hold on first frame (transparent) before start, hold on last frame (transparent) when finished.
             once.fillMode = .both
             once.isRemovedOnCompletion = false
             layer.add(once, forKey: "once")

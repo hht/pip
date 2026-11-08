@@ -2,17 +2,17 @@ import Testing
 import MascotCore
 @testable import Notchkeeper
 
-/// 收起态左耳不画 sign 装饰，也就不能给这些不存在的部件挂循环（挂了会崩：出口不符时左耳的循环找不到装饰层）
+/// Retracted left ear does not render sign decorations and must not attach loops to these non-existent parts (attaching causes crashes: missing decoration layer on mismatched egress).
 @Suite struct MascotLoopTests {
     @Test func hiddenSignsHaveNoDecoLoops() {
         for l in Look.allCases where l.isSign {
             let tracks = MascotFigureView.loops(l, reduceMotion: false, hidesSigns: true)
             #expect(!tracks.contains { if case .decoPart = $0.part { return true } else { return false } }, "\(l)")
-            #expect(tracks.contains { $0.part == .body }, "身体照样呼吸：\(l)")
+            #expect(tracks.contains { $0.part == .body }, "Body still breathes: \(l)")
         }
     }
 
-    /// 心情装饰留在左耳，照常循环
+    /// Mood decorations remain in left ear and loop normally.
     @Test func moodLoopsStay() {
         let tracks = MascotFigureView.loops(.sleeping, reduceMotion: false, hidesSigns: true)
         #expect(tracks == Choreography.loop(.sleeping, reduceMotion: false))

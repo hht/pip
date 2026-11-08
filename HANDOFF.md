@@ -1,79 +1,79 @@
 # HANDOFF
 
-最后更新：2026-11-07（守卫并进 App、去掉 guardd；App 图标；`run.sh` 装进 /Applications；开着设置时出现在 Dock）。只放接下来要做的和没解决的；做完的看 `git log`，规则看 `CLAUDE.md` 和 `docs/*`。开工前 `git log --oneline -5` 核对。实机验证的技巧见 `docs/dev-notes.md`。
+Last updated: 2026-11-07 (guard integrated into App, guardd removed; App icon; `run.sh` installs into /Applications; appears in Dock when settings open). Only lists upcoming tasks and unresolved issues; for completed work see `git log`, for rules see `CLAUDE.md` and `docs/*`. Before starting work verify with `git log --oneline -5`. Real-device verification tips are in `docs/dev-notes.md`.
 
-## 接下来
+## Next Steps
 
-**新会话从这里开始**：先读下面「第 5 步」和「等用户定」，再读 `docs/firewall.md` 全文（硬规则；§4 规则、§5 `user` 死锁、§7 事故和实测记录）。插件化和第 4 步都做完了（见 `git log`），第 4 步的实机验收用户 10-31 全过。
+**New sessions start here**: first read "Step 5" and "Awaiting User Decision" below, then read `docs/firewall.md` in full (hard rules; §4 rules, §5 `user` deadlock, §7 incidents and test records). Plugin architecture and Step 4 are complete (see `git log`), Step 4 real-device acceptance passed completely by user on 10-31.
 
-**和用户协作的规矩（10-31）**：
-- 测试时**不能真的断网**、**不能重启这台 Mac**（`docs/firewall.md` §7 开头）。
-- 要 root 的命令都由用户在没跑 agent 的终端里自己 `sudo` 执行，执行完 `sudo -k`；agent 不跑 sudo，用户当轮明确让 agent 执行时用 osascript 提权（CLAUDE.md 硬规则，10-31 定）。请用户跑的命令单独放进代码块、写明只读与否：夹在长段落里用户会看不到。
-- 不在用户机器上模拟键盘和点击；`demo.sh settings` 会抢焦点，用户在用机器时别用。
-- 用户偏好：文档尽量少、先做代码。
-- **产品面向普通用户**（10-31）：流程不要求用户读 dry-run、哈希、plist 这类技术输出，确认框一句话说清会发生什么。注释只写最终解释，日期、谁定的、哪轮审查发现写进提交说明（CLAUDE.md 准则 8）。
-- **10-31 事故后的约束**：会动 pf 的实机测试不在这台 Mac 上跑，除非用户在当轮明确同意；同意了也先把要做的事给用户看。10-31 晚用户当轮让 agent 跑了演练、恢复脚本和 `firewall-test.sh`（已用掉，下次重新问）。
-- agent 提权只能用 `osascript -e 'do shell script "…" with administrator privileges'`（用户在系统密码框输密码；agent 的 shell 没有 tty，sudo 弹不出提示）。提权进程读不了 `~/Documents`（TCC，报 Operation not permitted），读得了 `~/Library/Application Support`（10-31 实测）：要跑的脚本连同仓库 `rsync -a --exclude .build --exclude build --exclude .git ./ /private/tmp/<目录>/` 再跑，命令前加 `cd /private/tmp`；要降回用户身份的脚本（安装、`firewall-test.sh`）在命令前加 `SUDO_USER=ava`，提权进程里没有它。脚本跑在 macOS 自带的 bash 3.2 上，别在 zsh 里验 bash 语法。
+**Collaboration rules with user (10-31)**:
+- During testing **never actually disrupt network connection**, **never reboot this Mac** (start of `docs/firewall.md` §7).
+- Commands requiring root are executed by the user themselves via `sudo` in a terminal not running the agent, followed by `sudo -k`; the agent does not run sudo, only escalates via osascript when explicitly instructed by user in current turn (CLAUDE.md hard rule, decided 10-31). Place commands requested for user in standalone code blocks and specify whether they are read-only: buried in long paragraphs users will miss them.
+- Do not simulate keyboard input or mouse clicks on user's machine; `demo.sh settings` steals focus, do not use it while user is active on the machine.
+- User preference: minimal documentation, code first.
+- **Product targets regular users** (10-31): workflows do not require user to read technical output like dry-run, hash, plist; confirmation dialogs state in one sentence what will happen. Comments only write final explanations; dates, who decided, and review rounds go into commit messages (CLAUDE.md Principle 8).
+- **Constraints after 10-31 incident**: real-device tests touching pf are not run on this Mac unless user gives explicit consent in current turn; even if agreed, show the actions to user first. On the evening of 10-31, user explicitly asked agent in turn to run drill, rescue script, and `firewall-test.sh` (consumed, ask anew next time).
+- Agent privilege escalation only via `osascript -e 'do shell script "…" with administrator privileges'` (user enters password in system dialog; agent shell lacks tty, sudo cannot prompt). Escalated processes cannot read `~/Documents` (TCC, errors with Operation not permitted), but can read `~/Library/Application Support` (verified 10-31): scripts to run along with repository are synced via `rsync -a --exclude .build --exclude build --exclude .git ./ /private/tmp/<dir>/` before running, prefix command with `cd /private/tmp`; scripts that drop back to user identity (installer, `firewall-test.sh`) prefix command with `SUDO_USER=ava`, escalated processes lack it. Scripts run on macOS default bash 3.2, do not verify bash syntax in zsh.
 
-**插件化**：App 是「刘海 + Pip + 卡片队列 + 面板」外壳，插件产出同一种 `Card`，各报一个 `PluginStatus`（紧急程度），面板里各占一段（`PanelRow`）。内置插件是出口守卫、Claude Code（id 见 `NotchCore/PluginID.swift`，外部插件不能用）。外部插件写收件箱（`pipctl notify`、`pipctl activity`），`InboxWatcher` 读，`InboxGate` 收，活动归 `ActivityBoard`；插件开没开只在 App 主线程的收件箱回调里判。
+**Plugin architecture**: App is a shell of "notch + Pip + card queue + panel", plugins produce the same `Card`, each reports a `PluginStatus` (urgency), each occupies a section in panel (`PanelRow`). Built-in plugins are egress guard, Claude Code (ids in `NotchCore/PluginID.swift`, cannot be used by external plugins). External plugins write to inbox (`pipctl notify`, `pipctl activity`), `InboxWatcher` reads, `InboxGate` ingests, activities belong to `ActivityBoard`; whether a plugin is enabled is checked only in inbox callbacks on App main thread.
 
-**快捷指令（App Intents）：用户 10-31 定先不做**。当时的调研：纯 `swift build` 产不出 `Metadata.appintents`；给 swiftc 加 `-emit-const-values` 和 `-Xfrontend -const-gather-protocols-file <协议清单>`（协议清单抄自 swift-build `SWBCore`），再在 `run.sh` 里手工跑 `xcrun appintentsmetadataprocessor`，/tmp 实测能生成含 intent 和 AppShortcut 的元数据。代价：参数和协议清单都没有文档、Xcode 升级可能坏；要装完整 Xcode；注册进快捷指令要用户在快捷指令 App 里看。出处：swift-build `Sources/SWBCore/SpecImplementations/Tools/SwiftCompiler.swift`、`Sources/SWBApplePlatform/Specs/AppIntentsMetadata.xcspec`。
+**Shortcuts (App Intents): user decided on 10-31 not to do for now**. Research at that time: pure `swift build` cannot produce `Metadata.appintents`; adding `-emit-const-values` and `-Xfrontend -const-gather-protocols-file <protocols-list>` to swiftc (protocol list copied from swift-build `SWBCore`), then manually running `xcrun appintentsmetadataprocessor` in `run.sh`, generated metadata with intent and AppShortcut in /tmp in testing. Costs: parameters and protocol lists are undocumented, Xcode updates may break; requires full Xcode; registering into Shortcuts requires user viewing in Shortcuts App. References: swift-build `Sources/SWBCore/SpecImplementations/Tools/SwiftCompiler.swift`, `Sources/SWBApplePlatform/Specs/AppIntentsMetadata.xcspec`.
 
-插件化 10-31 实机验证过：设置 › 插件页（开关、面板顺序和行数、常驻插件、链接白名单的显示）；活动卡原地刷新；红卡挂着时外部卡排着、每个插件只补放最新 3 张、排着的活动卡被刷新；红卡挂着时关守卫红卡立刻撤；插件全关时面板的占位和纯黑刘海。还没试的：
-- 面板「打开插件设置」按钮跳到插件页；设置页上移、下移、行数步进、白名单添加和报错（10-31 模拟的键盘输入落到了 Ghostty，之后不再在用户机器上模拟键盘和点击，要用户自己点）。
-- 违规中关守卫的确认框：要真违规（`demo.sh alert` 不算违规，不弹确认）。
-- 终端插件在 Ghostty 里的两件事：点卡片跳回 shell 所在的终端（按 tty 认）；焦点正停在跑命令的那个终端上时不弹（用户 10-31 定：只按那一个终端算，同窗口别的标签、分屏、别的窗口都照常弹；日志「正看着要跳回的终端」；同目录只开一个终端时才认得出）。10-31 用 AppleScript 在 Ghostty 里开新窗口试时，窗口在命令跑完前没了、原因没查；`script` 伪终端里跑的端到端已通。
-- demo 卡上「看 Swift 文档」（https）按钮。
+Plugin architecture verified on real device 10-31: Settings › Plugins page (toggles, panel order and row count, resident plugin, link whitelist display); activity cards refresh in place; external cards queue while red card is active, each plugin backfills only latest 3, queued activity cards get refreshed; disabling guard while red card active dismisses red card immediately; placeholder and pure black notch when all plugins disabled. Not yet tested:
+- Panel "Open Plugin Settings" button jumps to plugins page; settings page move up, move down, row step, whitelist add and errors (10-31 simulated keyboard input landed in Ghostty, never simulate clicks/keys on user machine since then, user must click).
+- Confirmation dialog for disabling guard during violation: needs real violation (`demo.sh alert` does not count as violation, no confirmation prompted).
+- Two items for terminal plugin in Ghostty: clicking card jumps back to terminal where shell lives (matched by tty); does not alert when focus is currently on the terminal running the command (user decided 10-31: only count that single terminal, other tabs, splits, other windows in same window alert normally; log "looking at terminal to jump back to"; recognized only when single terminal in same directory). On 10-31 using AppleScript to open new window in Ghostty for testing, window disappeared before command finished, cause uninvestigated; end-to-end run in `script` pseudo-terminal passed.
+- "View Swift Docs" (https) button on demo card.
 
-**第 5 步：防火墙**：恢复脚本 → 状态机和辅助程序 → 安装脚本 → 规则重新设计（测试规则下实机通过）→ App 里装卸（卸载就是恢复网络）→ App 开关，代码都做完了；还没做：shielded 造型接线、守卫 violated 时按 §5 换锁图标、不响 Basso，刘海上不显示防火墙状态。按全局 Contract「高影响」档收工。
+**Step 5: Firewall**: rescue script → state machine and helper → install script → rule redesign (passed on real device under test rules) → install/uninstall in App (uninstall means restoring network) → App toggle, all code completed; not yet done: shielded look wiring, switching to lock icon without playing Basso on guard violated per §5, firewall status not displayed on notch. Complete work under global Contract "high-impact" tier.
 
-*10-31 事故*（`docs/firewall.md` §5、§7，记忆 `firewall-pf-freeze-incident`）：`user` 规则让 pf 内核死锁，整机断网、只能重启。本机现在装着正式规则的防火墙、关着（10-31 晚实测后装回的），anchor 是空的。
+*10-31 Incident* (`docs/firewall.md` §5, §7, memory `firewall-pf-freeze-incident`): `user` rule caused pf kernel deadlock, machine disconnected, only reboot could recover. Machine currently has production rules installed, turned off (reinstalled after testing on evening of 10-31), anchor is empty.
 
-*10-31 用户定的*（都已写进 `docs/firewall.md` 和 CLAUDE.md 硬规则）：任何规则不写 `user` / `group`；放行改成按目的地址：`<clash>`（节点 + mihomo 的 IP 上游）和 `<cn>`（`Country.mmdb` 里 CN 的网段，让 DIRECT 照常）；**开启时拍快照**（用户目录里的配置和 mmdb 谁都能改，守护进程不读它们），不定时重新解析；守护进程 off 时不跑、trial / on 时每 10 秒一轮（用户要求不做没必要的轮询，on 时仍每 10 秒核对）；测试规则只拦去测试表 `<test>` 的流量；`on` 跨重启保留；设置里能卸载（就是恢复网络，跑恢复脚本）。
+*User decisions on 10-31* (recorded in `docs/firewall.md` and CLAUDE.md hard rules): no rules write `user` / `group`; allow rules match destination addresses: `<clash>` (nodes + mihomo IP upstreams) and `<cn>` (CN subnets in `Country.mmdb`, allowing DIRECT as usual); **snapshot taken upon enabling** (user directory configs and mmdb can be edited by anyone, daemon does not read them), no periodic re-resolution; daemon does not run when off, runs every 10s during trial / on (user requirement: no unnecessary polling, still checks every 10s when on); test rules only block traffic to test table `<test>`; `on` persists across reboots; uninstallable in settings (restores network, runs rescue script).
 
-*下一步*：
-1. 实机还没测：真开机、守护进程崩溃后被 `KeepAlive` 拉起、`-F rules` 后 `pfctl -a … -s Tables` 是否为空。正式规则（整机拦截）一次都没加载过，加载前先问用户。
-2. 设置 › 防火墙的装、卸、开关：要用户自己点，见「等实机验证 › 防火墙」。
-3. 没做、按需再定（第四轮 reviewer 的建议修里没做的也在这）：订阅换了要关掉再开；`nameserver-policy` 里的上游不读；写成域名的境外 DoH 上游开着防火墙时不通（开启时可以提示）；IPv6 fake-ip 段不查；DNS 上游回得慢但回应时，拍快照没有总时限；`firewall-test.sh` 里的 pfctl 没限时。
-4. 复审建议里没做的：提权命令没有超时，同用户进程在检查和 `head` 之间把 /private/tmp 里的脚本换成 FIFO 会让 root 一直等、App 一直转圈（可改成把脚本内容直接放进提权命令）；装、卸、开启成功后弹的脚本输出页对普通用户也没意义，要不要换成一句话（等用户定）；插件安装第二次 rename 失败时旧版留在备份、不自动挪回；`InstalledPluginsSection` 判「替换」用 `fileExists`（跟链接），和 `PluginStore` 的 `lstat` 不一致；安装、卸载的错误文案在设置页和 `pipctl` 各写一份。「保留」只在 App 里按最近的摘要判 `canKeep`，辅助程序的 `keep` 不再核对：摘要说正常之后 10 秒内 Clash 关了 TUN 又点了保留，断网会被锁住（可让 `keep` 拿锁后看一眼最近的摘要）。提权失败时界面显示的是 osascript 的错误文本（带 `execution error:` 前缀；按 TN2065 只含 stderr，没实测）。
+*Next steps*:
+1. Not yet tested on real device: real reboot, daemon crash recovered by `KeepAlive`, whether tables are empty after `-F rules` (`pfctl -a … -s Tables`). Production rules (whole-machine block) have never been loaded, ask user before loading.
+2. Settings › Firewall install, uninstall, toggle: user must click themselves, see "Awaiting Real-Device Verification › Firewall".
+3. Not done, decide as needed (uncompleted recommendations from review round 4 here as well): disabling and re-enabling required when subscription changes; upstreams in `nameserver-policy` not read; overseas DoH upstreams written as domain names fail while firewall is on (can prompt when enabling); IPv6 fake-ip ranges not checked; no overall timeout when DNS upstreams respond slowly; pfctl in `firewall-test.sh` has no timeout.
+4. Uncompleted review recommendations: privilege escalation commands lack timeout, same-user process replacing script in /private/tmp with FIFO between check and `head` causes root to hang and App to spin (can change to inlining script content directly into escalation command); script output sheet after install, uninstall, enable has little value for regular users, consider replacing with a single sentence (awaiting user decision); second rename failure during plugin install leaves old version in backup without auto-revert; `InstalledPluginsSection` checks "replacement" via `fileExists` (follows symlink), inconsistent with `PluginStore`'s `lstat`; install/uninstall error messages duplicated in settings page and `pipctl`. "Keep" checks `canKeep` only in App based on latest summary, helper `keep` does not re-verify: if Clash closes TUN within 10s after summary reports normal and Keep is clicked, network disruption will be locked (can let `keep` check latest summary after acquiring lock). On escalation failure UI displays osascript error text (with `execution error:` prefix; per TN2065 contains only stderr, unverified).
 
-*等用户定*（10-31 问过、没回答）：
-- 安装脚本把测试地址打到 stdout（两轮审查都认为可保留）。
+*Awaiting user decision* (asked 10-31, unanswered):
+- Install script prints test address to stdout (both review rounds deemed acceptable to keep).
 
-## 等实机验证
+## Awaiting Real-Device Verification
 
-- **插件和 pipctl**（10-31 晚 agent 实测过命令行这边：装、坏图标被拒、升级进备份、自己换自己被拒、`terminal` 被拒、卸载进备份、卸后的卡被丢、`notify` / `send` / `activity` 都收下、参数错和超大退出 64；往收件箱塞随机字节、超长消息、FIFO、符号链接，往插件目录塞乱码 manifest，App 都没崩、逐条记日志）。还要用户自己点、自己看：设置 › 插件的「新建插件…」「安装插件…」、拖文件夹（虚线框）、「卸载…」、「命令行」一段的链接按钮；刘海上卡片和活动长什么样（这个会话没有录屏权限，截不了图）。sheet 和确认框挂在 Form 里的 Section 上，弹不出来就挪到 Form 上（推断）。卸掉一个还有卡排着的插件（红卡挂着时发几张再卸），红卡撤后那些卡不该再弹。旧的 `bin/nk` 10-31 晚已删：删之前开着的终端要重开，终端插件才调得到 `bin/pipctl`。
-- **防火墙**（10-31 晚 agent 用 App 的提权路径实测过装、开、保留、关、卸，记在 `docs/firewall.md` §7；现在装着正式规则、关着）。还要用户自己点：设置 › 防火墙的开关、确认框、倒计时、「保留」（试运行出问题时应当灰着）、「卸载…」、「安装…」的确认框；密码框点取消应当什么都不报（取消靠 osascript 报 -128 认，没测过）。正式规则（整机拦截）一次都没开过：第一次开在 Clash 正常时由用户点，网断了什么都别做，等 2 分钟回滚。
-- **改名 Pip**：`./scripts/run.sh` 后看设置页标题、关于页、「退出 Pip」、Ghostty 权限弹窗里的名字；Claude Code 里已装的 mod 说明要重装或下次刷新才变成 Pip。
-- **装进 /Applications、图标、Dock**（11-07 agent 实测过：`run.sh` 装进 `/Applications/Pip.app`、仓库里不留包、聚焦搜索只找到这一份；App 启动后自动卸掉了本机的 guardd，进程、plist、二进制、状态文件都没了）。还要用户自己看：启动台和访达里的图标（finished 造型）；打开设置时 Dock 出现图标、⌘Tab 切得到、菜单栏有 Pip / 编辑 / 窗口，关掉设置后 Dock 图标消失；之前设置窗口「忽然跑到别的窗口后面」还会不会出现（推断是 accessory App 在密码框、文件选择框这类别的进程的窗口关掉后拿不回焦点，没复现过；再遇到时记下刚点了什么）。**在设置里把「开机启动」关掉再打开一次**：登记的还是 `build/` 下的旧路径。
-- **Ghostty 跳转**：同目录开两个 Claude；Claude 套在 tmux 里（应退回按目录认）；工作中的会话多点几次，看转圈字符会不会盖掉标记（推断）。有一次脚本连点两行第二下没切过去、没复现：用户再遇到时记下哪一行、面板开着没有。
-- **mod**：开着的会话装上后 `/reload-plugins` 应该开始写（没实测）；后台 agent 崩溃时会不会发带 `agentId` 的 `turn.complete`（不发的话该会话的完成卡被压住到 `/clear`）；后台 agent 在跑时 `/reload-plugins` 可能提前弹完成卡（推断）。`Funk` 出错音没人耳听过。
-- **Claude Code 升级后**：重跑 `ClaudeMod/plugins/notchkeeper` 的 `claude plugin test`，在 tmux 里按 `docs/agent-integration.md`「实测」8 重测。
-- **卡片流星**：介入卡、出错卡、恢复卡、红卡的颜色（`demo.sh question|approval|failed|alert`）；常驻红卡和减弱动态效果时的淡细边；悬停时流星停住、移开接着走；队列里下一张卡接上时流星从头扫一趟；流星每次 `layout` 重挂动画的 CPU。
-- **面板**：减弱动态效果时 Pip 和徽章原地淡入淡出（要切系统设置，先问用户）；finished 的星、sleeping 的 Z 可能顶出面板上沿被裁（推断）；已停止的会话行；左耳 Pip 可能总低着头（推断）；设置页预览可能不跟鼠标（推断）。
-- **灵动岛规范**（`docs/ui.md`）：IP 换值时数字滚动、徽章图标替换、VoiceOver 弹卡播报。
-- **设置页**：`config.json` 解不开时的横幅（要临时改坏真实配置，先备份）。
-- **空闲 CPU**：App 这边 10-31 测过、达标（数在那次提交说明里）。还没做的：WindowServer 那边算不出多少是我们的（disc 栅格化的代价算在哪边没核实），最坏的 working 造型没单独测；Instruments 的 Core Animation 工具看 disc 有没有命中缓存。方法：`run.sh` 后取 pid；循环读 `ioreg -c IOHIDSystem` 的 `HIDIdleTime`，≥ 30s 无人操作才用 `top -l 2 -s 1 -pid <pid> -stats pid,cpu` 取样，采样后仍无人操作才留，攒 60 个求平均，App 和 WindowServer 都量。验收数字见 `docs/mascot.md`「性能验收」。
+- **Plugins and pipctl** (tested by agent on CLI side on evening of 10-31: install, bad icon rejected, upgrade moves to backup, self-replace rejected, `terminal` rejected, uninstall moves to backup, cards after uninstall dropped, `notify` / `send` / `activity` accepted, argument errors and oversized payload exit 64; stuffed random bytes, oversized messages, FIFOs, symlinks into inbox, corrupted manifest into plugin dir, App never crashed, logged line by line). Still needs user clicking and observing: Settings › Plugins "New Plugin…", "Install Plugin…", drag folder (dashed border), "Uninstall…", link button in "Command Line" section; how cards and activities look on notch (this session lacks screen recording permission, cannot take screenshots). Sheets and confirmation dialogs attached to Sections in Form, move to Form if not showing (inference). Uninstalling a plugin that still has cards queued (send several while red card is active, then uninstall), those cards should not pop after red card dismissed. Old `bin/nk` deleted evening of 10-31: terminals open before deletion must restart for terminal plugin to invoke `bin/pipctl`.
+- **Firewall** (agent tested install, enable, keep, disable, uninstall via App escalation path on evening of 10-31, recorded in `docs/firewall.md` §7; currently has production rules installed, turned off). Still needs user clicking: Settings › Firewall toggle, confirmation dialog, countdown, "Keep" (should be disabled when trial hits issue), "Uninstall…", "Install…" confirmation; clicking Cancel in password dialog should report nothing (cancel recognized via osascript returning -128, untested). Production rules (whole-machine block) never enabled: first enable clicked by user while Clash is normal, do nothing if network drops, wait 2 minutes for rollback.
+- **Rename to Pip**: verify settings window title, About page, "Quit Pip", name in Ghostty permission prompt after `./scripts/run.sh`; installed mod description in Claude Code requires reinstallation or next refresh to become Pip.
+- **Install into /Applications, Icon, Dock** (verified by agent 11-07: `run.sh` installs into `/Applications/Pip.app`, no bundle left in repo, Spotlight only finds this copy; after App launch automatically uninstalled local guardd, processes, plist, binary, state file removed). Still needs user observation: icon in Launchpad and Finder (finished look); icon appears in Dock when settings open, switchable via ⌘Tab, menu bar has Pip / Edit / Window, Dock icon disappears after closing settings; check if settings window still "suddenly moves behind other windows" (inferred accessory App loses focus after external dialogs close, unverified; record action if encountered again). **Toggle "Launch at Login" off and on once in Settings**: registered path was old path under `build/`.
+- **Ghostty Jump**: two Claude instances in same directory; Claude wrapped in tmux (should fall back to directory match); click busy sessions repeatedly, check if spinner characters overwrite marker (inference). Once script clicked two rows consecutively and second didn't switch, unreproduced: record row and panel state if user encounters again.
+- **mod**: `/reload-plugins` should start writing when installed on running sessions (untested); whether crashed background agents emit `turn.complete` with `agentId` (if not, completion card suppressed until `/clear`); `/reload-plugins` while background agent running might pop completion card prematurely (inference). `Funk` error sound never heard by human ear.
+- **After Claude Code upgrade**: re-run `claude plugin test` in `ClaudeMod/plugins/notchkeeper`, re-test in tmux per `docs/agent-integration.md` "Real-Device Testing" 8.
+- **Card meteor**: colors for needs-you, error, recovery, red cards (`demo.sh question|approval|failed|alert`); thin faint keyline for resident red card and reduced motion; hover pauses meteor, moving away resumes; next card in queue sweeps meteor from beginning; CPU cost of meteor re-attaching animations on every `layout`.
+- **Panel**: Pip and badge fade in/out in place under reduced motion (requires system settings toggle, ask user first); finished star and sleeping Z might clip top of panel (inference); stopped session rows; left-ear Pip might keep head down (inference); settings page preview might not track mouse (inference).
+- **Dynamic Island specs** (`docs/ui.md`): rolling numbers on IP change, badge icon replace, VoiceOver card announcements.
+- **Settings page**: banner when `config.json` cannot be decoded (requires temporarily corrupting real config, backup first).
+- **Idle CPU**: App side measured 10-31, met criteria (numbers in that commit message). Remaining: WindowServer side cannot attribute how much belongs to us (cost of disc rasterization unverified), worst-case working look not measured in isolation; Instruments Core Animation tool to check if disc hits cache. Method: get pid after `run.sh`; loop reading `IOHIDIdleTime` from `ioreg -c IOHIDSystem`, sample with `top -l 2 -s 1 -pid <pid> -stats pid,cpu` only when no activity for ≥ 30s, keep sample only if still no activity after sampling, collect 60 samples and average, measure both App and WindowServer. Acceptance numbers in `docs/mascot.md` "Performance Acceptance".
 
-## 已知问题
+## Known Issues
 
-- `Look.stale`（守卫没响应，沙漏）守卫并进 App 后没有来源，暂不接线，留着等用户定删不删。
-- 违规时 App 重启：红卡在第一轮（几秒）查完后重新弹出、重新响 Basso；以前靠 guardd 的状态文件接续，现在不接续（用户 11-07 接受）。
-- **用户定：先不管**：关掉「自动弹红卡」后恢复卡可能在违规期间放出；从等你回答换成等你批准不换卡；Mac 系统灵动岛会和我们抢位置（等 HIG 和 ActivityKit 在 macOS 上开放再定，当时的调研见 `git show f4792ab:docs/research/dynamic-island.md`）。
-- 看不见时换了 A→B→A 回到原造型，也会重播进场。
-- 滚出可视区的会话行，三蓝点循环照跑（量小）。
-- 守卫只查 IPv4，IPv6 直连泄漏看不见；任何 utun 都算在隧道上，开着别的 VPN 时可能看漏；每 5 秒请求 3 个回显服务可能被限流（都是推断）。
-- `TerminalPluginTests` 在机器很忙时（紧跟一次全新编译）失败过一次，重跑都绿；推断是真 zsh 子进程的时序，没查。
-- mod 写完盘才 `next(e)`，本地写盘挂住会拖住回合（认为不现实，没改）。
-- 测试里当普通地址用的 `1.2.3.4`（`GuardCoreTests/EgressGuardTests`、`GuardProbesTests/ProbeTests`，后者还有 `1.1.1.1`）不合 CLAUDE.md「测试里的 IP 用 198.51.100.x」；测解析边界的非法地址、特殊地址不算。
+- `Look.stale` (guard not responding, hourglass) has no event source after guard merged into App, temporarily unwired, kept awaiting user decision to delete or keep.
+- App restart during violation: red card pops up anew after first round (few seconds) finishes, re-playing Basso; previously continued via guardd state file, now does not continue (accepted by user 11-07).
+- **User decision: ignore for now**: disabling "Automatically pop red card" may let recovery cards show during violation; switching from waiting for answer to waiting for approval does not replace card; Mac system Dynamic Island competes for space with us (decide after HIG and ActivityKit open on macOS, research at `git show f4792ab:docs/research/dynamic-island.md`).
+- Switching A→B→A back to original look while invisible re-plays entrance animation.
+- Session rows scrolled out of view still run three blue dots cycle (small impact).
+- Guard only checks IPv4, IPv6 direct leaks unmonitored; any utun counts toward tunnel, other active VPNs might cause missed detections; 3 echo requests every 5 seconds might be rate-limited (all inferences).
+- `TerminalPluginTests` failed once under heavy load (immediately after fresh build), passed on rerun; inferred timing issue in real zsh subprocess, uninvestigated.
+- mod only calls `next(e)` after disk write finishes; local disk stall hangs turn (deemed unrealistic, unchanged).
+- `1.2.3.4` used as normal address in tests (`GuardCoreTests/EgressGuardTests`, `GuardProbesTests/ProbeTests`, latter also has `1.1.1.1`) violates CLAUDE.md "IPs in tests use 198.51.100.x"; testing invalid/special addresses at parsing boundaries does not count.
 
-## 建议用的 skill
+## Recommended Skills
 
-- `tdd`：每一刀先写会失败的测试、亲眼看红，再在临时副本里改坏实现确认测试会红（本会话每条新行为都这么做过）。
-- `research`：动 pf / launchd 行为前先查一手资料（XNU 源码、man page、Mullvad `talpid-core/src/firewall/macos.rs`），**连锁行为一起查**（10-31 只查了 `user root` 能匹配、没查它的内核锁，酿成事故）；结论写进 `docs/firewall.md` §6。Clash Verge 运行时配置的事实（路径、节点格式、mihomo 的 GEOIP）已记在 §4、§6。
-- `diagnosing-bugs`：实机测试规则时行为和预期不符就用它，先复现再改。
-- `ui-ux-pro-max`：改设置 › 防火墙、做 shielded 造型时用。
-- `domain-modeling`：防火墙的新词已进 `docs/ubiquitous-language.md`，再起名先查它。
-- `run`：打包启动、`demo.sh` 弹卡、截图。
-- `writing-for-agents`：改 CLAUDE.md 时用。
-- `handoff`：换会话时更新本文件（就是 `HANDOFF.md`，不另写 `handoff.md`）。
+- `tdd`: write failing test and see it red before each edit, verify test turns red when implementation broken in temporary copy (done for every new behavior in this session).
+- `research`: check primary sources (XNU source, man page, Mullvad `talpid-core/src/firewall/macos.rs`) before touching pf / launchd behavior, **research cascading effects together** (10-31 only checked `user root` syntax match without its kernel lock, causing incident); record conclusions in `docs/firewall.md` §6. Facts about Clash Verge runtime config (paths, node format, mihomo GEOIP) recorded in §4, §6.
+- `diagnosing-bugs`: use when behavior diverges from expectations during real-device rule testing; reproduce before modifying.
+- `ui-ux-pro-max`: use when modifying Settings › Firewall or creating shielded look.
+- `domain-modeling`: new firewall terms already in `docs/ubiquitous-language.md`, consult it before naming.
+- `run`: bundle and launch, `demo.sh` cards, screenshots.
+- `writing-for-agents`: use when editing CLAUDE.md.
+- `handoff`: update this file when handing off sessions (this is `HANDOFF.md`, do not write `handoff.md`).

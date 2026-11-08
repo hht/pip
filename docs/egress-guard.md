@@ -1,50 +1,50 @@
-# 出口守卫
+# Egress Guard
 
-只**监测**：流量有没有全部走 Clash 隧道，结果画在刘海上，不拦任何东西（拦截见 `docs/firewall.md`）。规则：除局域网外，全部流量必须走代理（用户定）。
+**Monitors** only: checks whether traffic exclusively traverses the Clash tunnel, drawing results on the notch without blocking anything (for blocking see `docs/firewall.md`). Rule: all traffic except local network must go through the proxy (user decision).
 
-## 1. 三路观测和判定
+## 1. Three Observations and Verdicts
 
-| 观测 | 怎么拿 | 证明什么 |
+| Observation | How Obtained | What It Proves |
 |---|---|---|
-| Clash 内核 | `ClashProbe`：进程表里有没有 `verge-mihomo`（实测的名字，换内核要重测） | 流量有没有可能经过 Clash |
-| 路由 | `RouteProbe`：`route -n get` 查几个公网地址 | 内核把去公网的流量交给哪个网卡 |
-| 出口 IP | `EgressProbe`：问几个第三方回显服务 | 回显那条连接从哪个节点出去 |
+| Clash core | `ClashProbe`: checks if `verge-mihomo` exists in process table (verified name; re-verify if core changes) | Whether traffic could possibly route through Clash |
+| Routes | `RouteProbe`: `route -n get` queries several public addresses | Which network interface the kernel sends public traffic to |
+| Egress IP | `EgressProbe`: queries several third-party echo services | Which node the echo connection exits from |
 
-`EgressGuard` 按顺序取第一个成立的：任何路由不走 `utun` → `violated`；拿到不在允许列表的出口 IP → `egressMismatch`；Clash 在、路由都走 utun、出口 IP 都在允许列表 → `healthy`；其余 → `unknown`。
+`EgressGuard` evaluates in order and takes the first matching condition: any route not using `utun` → `violated`; obtained egress IP not in allowed list → `egressMismatch`; Clash present, all routes use utun, and egress IPs all in allowed list → `healthy`; otherwise → `unknown`.
 
-- **局域网豁免**：探测目标只有公网地址，从不查私有网段。
-- **出口 IP 只是间接证据**：路由能证明流量进了 Clash，证明不了 Clash 交给哪个节点；回显服务和别的 App 可能分到不同节点，所以不符只提示、不算违规。
-- 排除的做法（违反本仓规则）：读 Clash 控制接口、看进程的 TCP 对端（TUN 模式下是 fake-ip）、走 Anthropic 域名回显 IP。
+- **Local network exemption**: probe targets are public addresses only, never probing private subnets.
+- **Egress IP is indirect evidence only**: routes prove traffic entered Clash, but cannot prove which node Clash assigned it to; echo services and other Apps might be routed to different nodes, so mismatches only prompt and do not count as violations.
+- Excluded approaches (violating repository rules): reading Clash control API, inspecting process TCP peers (fake-ip under TUN mode), echoing IP via Anthropic domains.
 
-## 2. 什么时候查
+## 2. When to Check
 
-**只在 App 运行时查**（用户定）：检查跑在 App 进程里（`GuardProbes` 的 `GuardMonitor`），App 退出就停。结果只有刘海画得出来，App 没开时查了也没人看；以前单独装的后台进程 guardd 因此去掉了，App 启动时会把装过的卸掉（`LegacyGuardd`）。
+**Checked only while App is running** (user decision): checks run inside the App process (`GuardMonitor` in `GuardProbes`), stopping when App exits. Results can only be drawn on the notch, so checking when App is closed has no audience; the previously installed separate background daemon guardd was removed, and App startup uninstalls any legacy instance (`LegacyGuardd`).
 
-- 每 5 秒一轮，三路并发，有总截止。**哪一路没赶上就算「没有结果」，绝不算「好」**（`GuardMonitor.merge`）：本地探针没赶上落到 unknown，不判 violated（没有证据说路由不在隧道上）。
-- **网络路径快照**（`NetworkPathProbe`，只读不发包）只用来区分 unknown 的两种原因：断网 offline、探针没结果 probeFailed。
-- **粘性**：进入 violated 后，只有一轮完整的 healthy 才能解除；断网、超时、出口不符都不降级。粘性只在这次运行之内：App 重启后从 unknown 开始，路由还不走 utun 的话第一轮就又是 violated。
-- **第一轮查完之前**（启动后几秒）显示「正在检查出口」：状态点是灰环，Pip 不改造型、右耳不显示，不弹卡。
-- 守卫是监测本身，不是界面动画：收起、锁屏、熄屏时照常每 5 秒一轮（不受「看不见就不调度」约束）。
-- **允许列表**每轮从 App 内存里的配置取，不合法的条目丢掉；空列表判不了出口，是 unknown。
+- Every 5 seconds per round, 3 concurrent paths with an overall deadline. **Whichever path misses deadline is treated as "no result", never as "good"** (`GuardMonitor.merge`): local probes missing deadline fall back to unknown, never judging violated (no evidence that route was off tunnel).
+- **Network path snapshot** (`NetworkPathProbe`, read-only, sends no packets) is used only to distinguish between two unknown reasons: offline (disconnected), probeFailed (no probe result).
+- **Stickiness**: once entered violated, can only be cleared by a full round of healthy; network disconnects, timeouts, and egress mismatches never degrade it. Stickiness applies only within the current run: after App restarts, begins at unknown, and if route still bypasses utun, the first round becomes violated again.
+- **Before first round finishes** (first few seconds after launch) displays "Checking egress": status dot is gray ring, Pip look unchanged, right ear empty, no cards popped.
+- Guard is monitoring itself, not UI animation: checks run every 5 seconds even when collapsed, screen locked, or screen off (exempt from "never schedule when invisible").
+- **Allowed list** is retrieved each round from config in App memory, discarding invalid entries; an empty list cannot evaluate egress and results in unknown.
 
-## 3. 每一轮给 App 什么
+## 3. What Each Round Provides to App
 
-`GuardCore` 的 `GuardDisplay`：verdict、unknown 原因（只在 unknown 时有）、`violatedSince`（只在 violated 时有：这次违规开始的那一轮，粘住期间不变）、`egressIP`（这一轮观测到的出口 IPv4；没拿到就是空，绝不沿用上一轮）、查完的时刻。IP 只出现在 `egressIP`，日志不带 IP。
+`GuardDisplay` in `GuardCore`: verdict, unknown reason (present only on unknown), `violatedSince` (present only on violated: round when this violation began, invariant while sticky), `egressIP` (egress IPv4 observed in this round; empty if not obtained, never carrying over previous round), and timestamp when check completed. IP appears only in `egressIP`; logs never include IP.
 
-## 4. 怎么画
+## 4. How It Is Rendered
 
-判定在 `NotchCore` 的 `GuardPresentation`、`ViolationAlert`，文案和颜色在 App 的 `GuardPresentation.swift`。状态 = 颜色 + 图标 + 文案：
+Decided in `GuardPresentation` and `ViolationAlert` in `NotchCore`; text and colors in App's `GuardPresentation.swift`. Status = Color + Icon + Text:
 
-| 显示 | 图形 |
+| Display | Visual |
 |---|---|
-| healthy | 绿 |
-| egressMismatch | 琥珀实心 |
-| unknown（断网、探针没结果、第一轮还没查完） | 灰色空心环 |
-| violated | 红卡，响 Basso |
-| violated 且防火墙已开、状态摘要新鲜、核对通过（第 5 步，`docs/firewall.md`） | 红卡、锁图标、不响：「代理断开，防火墙已拦住外网」 |
+| healthy | Green |
+| egressMismatch | Solid amber |
+| unknown (offline, probe timeout, first round incomplete) | Gray hollow ring |
+| violated | Red card, plays Basso |
+| violated with firewall enabled, status fresh, check passed (Step 5, `docs/firewall.md`) | Red card, lock icon, silent: "Proxy disconnected, firewall blocked external network" |
 
-收起时右耳显示什么由 Pip 造型决定（`docs/mascot.md` §2）。
+What appears on the right ear when collapsed is determined by Pip look (`docs/mascot.md` §2).
 
-- **关掉红卡**：记下这次的 `violatedSince`，之后同一次不再弹，状态点照画（违规红点）；不同的 `violatedSince` 是新的一次，照弹。只在内存，App 重启后会再弹一次（宁可多提醒）。
-- **和临时卡共用刘海**：见 `docs/ui.md`「卡片」。
-- **恢复**：弹过红卡的那次违规回到 healthy 才弹恢复卡；中间断网、探针没结果、关掉红卡都算同一次。任何路径进入 healthy 都撤红卡。
+- **Dismissing red card**: records current `violatedSince`; subsequent rounds of the same violation do not pop again, status dot continues to render (violation red dot); a different `violatedSince` represents a new violation and pops normally. Kept in memory only; App restart pops once again (prefers alerting over silence).
+- **Sharing notch with temporary cards**: see `docs/ui.md` "Cards".
+- **Recovery**: only violations that popped a red card emit a recovery card upon returning to healthy; intermediate disconnects, probe timeouts, and manual red card dismissals count as the same incident. Reaching healthy from any path dismisses the red card.

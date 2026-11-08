@@ -48,9 +48,9 @@ export function register(on) {
     return next(e)
   })
 
-  // Fires on primary turn only (verified)
+  // Subagent turns also fire turn.start, carrying agentId (Claude Code 2.1.316; 2.1.296 fired on primary turns only)
   on('turn.start', async ($, e, next) => {
-    running = { id: e.turnId, lastStop: null }
+    if (e.agentId === undefined) running = { id: e.turnId, lastStop: null }
     return next(e)
   })
 

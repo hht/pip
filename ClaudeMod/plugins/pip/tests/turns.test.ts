@@ -135,3 +135,15 @@ test('never writes prompts or answers', async ($, on) => {
   await $.turn.complete({ turnId: 't1', answer: 'secret answer', durationMs: 1, isAborted: false, reason: 'answer', usage: null })
   expect(JSON.stringify(writes)).not.toContain('secret')
 })
+
+test('subagent turn.start does not replace the running primary turn', async ($, on) => {
+  const { writes } = stubs(on)
+  await start($)
+  await $.turn.start({ text: '', turnId: 't1' })
+  await $.turn.start({ text: '', turnId: 'sub', agentId: 'a1' })
+  await spawn($, 'a1', true)
+  await step($, 'sub', 'tool_use', 'a1')
+  await step($, 't1', 'end_turn')
+  await complete($, 't1', 'answer')
+  expect(writes).toEqual([{ sessionId: 's1', ended: { turnId: 't1', reason: 'answer', lastStop: 'end_turn', backgroundAgents: 1, at: 1000 } }])
+})

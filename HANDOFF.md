@@ -57,6 +57,8 @@ Plugin architecture verified on real device 10-31: Settings › Plugins page (to
 
 ## Known Issues
 
+- **Done card while Claude keeps working** (user saw it in a live session, 11-07): unexplained. Ruled out: mid-turn user message (Claude Code 2.1.316 folds it into the same turn), external plugins (only the unsourced terminal plugin is installed). Card display itself is not logged, so pops can't be matched to sources: log card source/outcome in `Notch.present` (no text) and have the user report times.
+- `swift test` writes "pipctl: symlinked / removed symlink" into the real `~/Library/Logs/Notchkeeper/notchkeeper.log`: `CommandLineTool` tests inject paths but not the log.
 - `Look.stale` (guard not responding, hourglass) has no event source after guard merged into App, temporarily unwired, kept awaiting user decision to delete or keep.
 - App restart during violation: red card pops up anew after first round (few seconds) finishes, re-playing Basso; previously continued via guardd state file, now does not continue (accepted by user 11-07).
 - **User decision: ignore for now**: disabling "Automatically pop red card" may let recovery cards show during violation; switching from waiting for answer to waiting for approval does not replace card; Mac system Dynamic Island competes for space with us (decide after HIG and ActivityKit open on macOS, research at `git show f4792ab:docs/research/dynamic-island.md`).

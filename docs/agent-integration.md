@@ -149,5 +149,5 @@ Methodology: launch interactive `claude` in tmux, run `claude -p`, spawn subagen
    - Esc during generation: `reason: "aborted"`.
    - Esc at approval: `reason: "answer"`, final step `tool_use`, tool result `isError: true`.
    - `ANTHROPIC_BASE_URL` pointing to closed port: `reason: "error"`.
-   - Background subagent: `agent.spawn` with `background: true`; main turn `turn.complete` arrives first, subagents arrive with `agentId`, followed by notice main turn start and complete. `turn.start` fires only on main turns. TaskStop termination also delivers `turn.complete` with `agentId`.
+   - Background subagent: `agent.spawn` with `background: true`; main turn `turn.complete` arrives first, subagents arrive with `agentId`, followed by notice main turn start and complete. `turn.start` fired only on main turns up to 2.1.296; from 2.1.316 subagent turns also fire it, carrying `agentId` (mod ignores those). TaskStop termination also delivers `turn.complete` with `agentId`.
 9. **End-to-end with mod**: normal answer → done; Esc → none; reject approval → intervention card and intervention end only; background agents → single alert at completion; bad `ANTHROPIC_BASE_URL` → error card.

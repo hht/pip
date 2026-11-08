@@ -67,7 +67,7 @@ A turn end occurs when `turnId` changes in turn file:
 
 ## Pip Mod
 
-Official Claude Code plugin JS module (enabled by default since 2.1.287), invoked on events (<https://code.claude.com/docs/en/plugins/mods/overview>). Source in `ClaudeMod/` (local marketplace), tested offline via `claude plugin test`. mod API evolves with versions without backward compatibility (user decision): re-run tests and "Real-Device Testing" 8 after upgrading Claude Code.
+Official Claude Code plugin JS module (enabled by default since 2.1.287), invoked on events (<https://code.claude.com/docs/en/plugins/mods/overview>). Source in `ClaudeMod/` (local marketplace), tested offline via `claude plugin test`; manifests checked with `claude plugin validate ClaudeMod`. mod API evolves with versions without backward compatibility (user decision): re-run tests and "Real-Device Testing" 8 after upgrading Claude Code.
 
 - **Reports facts only**: `turnId`, `reason`, last step `stopReason`, background agent count at termination, timestamp. Verdict belongs to AgentCore.
 - **Writes only at main turn completion, only in interactive sessions** (`isInteractive` from `session.start`); **writes metadata only**, never prompts, answers, or tool parameters.
@@ -94,7 +94,7 @@ Overwritten completely on every main turn completion. `$.fs.write` is non-atomic
 Single toggle in Settings; App executes `claude` commands without manual config edits:
 
 1. **Install**: copies App's `ClaudeMod/` to `~/Library/Application Support/Notchkeeper/ClaudeMod/`, running `claude plugin install pip --marketplace <dir> --json`. Claude Code updates `extraKnownMarketplaces` and `enabledPlugins`; plugins in local marketplace load in place (<https://code.claude.com/docs/en/plugins/loading#in-place-and-copied-plugins>).
-2. **Uninstall**: `claude plugin marketplace remove pip` (removes `enabledPlugins`), deletes directory. Leaves empty `"extraKnownMarketplaces": {}`, harmless.
+2. **Uninstall**: `claude plugin marketplace remove notifier` (removes `enabledPlugins`), deletes directory. Leaves empty `"extraKnownMarketplaces": {}`, harmless.
 3. **Update**: App replaces directory on launch if present; loads in place, taking effect next session without bumping version. Open sessions require `/reload-plugins` or restart.
 4. `claude` searched only in `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`, ignoring shell config; runs with `DISABLE_AUTOUPDATER=1` (prevents child process holding output pipe), SIGKILL on 60s timeout.
 

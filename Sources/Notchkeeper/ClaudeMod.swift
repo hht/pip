@@ -15,8 +15,9 @@ enum ClaudeMod {
         case unknown(String)
     }
 
-    private static let pluginID = "pip@pip"
-    private static let marketplace = "pip"
+    private static let pluginID = "pip@notifier"
+    /// Not `pip`: Claude Code reserves that marketplace name for Python package index plugins (`claude plugin validate` and `claude plugin install` reject it, Claude Code 2.1.316).
+    private static let marketplace = "notifier"
     /// Fixed marketplace location: plugin loads in-place from here, resilient to App relocation.
     static let directory = GuardPaths.directory.appendingPathComponent("ClaudeMod", isDirectory: true)
     /// Bundled copy in App bundle; absent when running directly via `swift run`.

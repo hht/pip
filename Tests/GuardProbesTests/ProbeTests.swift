@@ -3,7 +3,7 @@ import Testing
 import GuardCore
 @testable import GuardProbes
 
-// `route -n get 1.1.1.1` 的真实输出（Clash Verge TUN 开启）
+// Real output of `route -n get 1.1.1.1` (Clash Verge TUN enabled)
 private let routeOutputTUN = """
    route to: 1.1.1.1
 destination: 1.0.0.0
@@ -15,12 +15,12 @@ destination: 1.0.0.0
 
 @Suite struct RouteParsing {
     @Test func checksClaudeRouteDirectly() { #expect(RouteProbe.destinations.first?.hasPrefix("160.79.10") == true) }
-    /// 局域网豁免：只查公网地址，局域网直连的路由永远不会被判异常
+    /// LAN exemption: only queries public addresses, routes connected directly to LAN are never judged anomalous
     @Test func destinationsAreAllPublic() {
         for d in RouteProbe.destinations {
             let o = d.split(separator: ".").compactMap { Int($0) }
             #expect(o.count == 4)
-            #expect(!(o[0] == 10 || (o[0] == 172 && (16...31).contains(o[1])) || (o[0] == 192 && o[1] == 168) || (o[0] == 169 && o[1] == 254) || o[0] == 127), "\(d) 是局域网地址")
+            #expect(!(o[0] == 10 || (o[0] == 172 && (16...31).contains(o[1])) || (o[0] == 192 && o[1] == 168) || (o[0] == 169 && o[1] == 254) || o[0] == 127), "\(d) is a LAN address")
         }
     }
     @Test func readsInterfaceLine() { #expect(RouteProbe.parseInterface(routeOutputTUN) == "utun1024") }
@@ -40,7 +40,7 @@ destination: 1.0.0.0
         ]))
     }
 
-    /// 只开着 GUI 或特权服务、内核没起来，不算在
+    /// Running GUI or privileged service alone without the core does not count as running
     @Test func guiOrServiceAloneIsNotCore() {
         #expect(!ClashProbe.isRunning(executablePaths: [
             "/Applications/Clash Verge.app/Contents/MacOS/clash-verge",
@@ -92,8 +92,8 @@ private func probe(_ responses: [String: Result<(String, Int), Canned>]) -> Egre
     }
 }
 
-/// 真机冒烟：默认跳过。`NOTCHKEEPER_LIVE_PROBES=1 swift test --filter LiveProbes` 打印三路真实结果，
-/// 只读本机路由表和进程表、问三个 IP 回显服务，不改任何设置。不打印 IP（CLAUDE.md：日志不记 IP）。
+/// Hardware smoke test: skipped by default. `NOTCHKEEPER_LIVE_PROBES=1 swift test --filter LiveProbes` prints real 3-way results,
+/// only reading local routing table and process list, and querying 3 IP echo services without modifying any settings. Does not print IP (CLAUDE.md: no IPs in logs).
 @Suite(.enabled(if: ProcessInfo.processInfo.environment["NOTCHKEEPER_LIVE_PROBES"] == "1"))
 struct LiveProbes {
     @Test func printsRealObservation() async {

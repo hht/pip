@@ -1,20 +1,20 @@
 import Foundation
 
-/// 回答：出口守卫最近一轮查到了什么，App 该显示什么。
-/// 由一轮的判定和观测算出来，不知道观测怎么拿（GuardProbes 的 `GuardMonitor`），也不知道画成什么样（NotchCore 的 `GuardPresentation`）。
-/// IP 只出现在 `egressIP`（界面完整显示），日志不记它（CLAUDE.md「日志不记 IP」）。
+/// Answers: what egress guard discovered in the latest round, and what App should display.
+/// Calculated from single-round verdict and observation, agnostic of probe mechanics (GuardProbes `GuardMonitor`) and rendering (NotchCore `GuardPresentation`).
+/// IP appears in `egressIP` only (fully displayed in UI), never written to logs (CLAUDE.md "logs never record IP").
 public struct GuardDisplay: Equatable, Sendable {
     public var verdict: Verdict
-    /// 这一轮查完的时刻；`nil` 是 App 这次启动后还没查完第一轮（`checking`）
+    /// Timestamp when check completed; `nil` if first round incomplete after launch (`checking`)
     public var checkedAt: Date?
-    /// 只有 verdict 是 unknown 且查过一轮时才有（见 `UnknownReason`）
+    /// Present only when verdict is unknown and a round has finished (see `UnknownReason`)
     public var unknownReason: UnknownReason?
-    /// 只有 verdict 是 violated 时才有：这次违规开始的那一轮（见 `EgressGuard.violatedSince`）。App 用它记用户关掉的是哪一次
+    /// Present only when verdict is violated: round when this violation began (see `EgressGuard.violatedSince`). App uses it to record which incident user dismissed.
     public var violatedSince: Date?
-    /// 这一轮观测到的出口 IP（见 `Observation.shownEgressIP`）。没拿到就是 `nil`，绝不沿用上一轮；粘住的 violated 期间也是这一轮的
+    /// Egress IP observed in this round (see `Observation.shownEgressIP`). `nil` if not obtained, never carrying over previous round; sticky violated also reports this round
     public var egressIP: String?
 
-    /// App 刚启动、第一轮还没查完
+    /// App just launched, first round incomplete
     public static let checking = GuardDisplay(verdict: .unknown)
 
     public init(verdict: Verdict, checkedAt: Date? = nil, unknownReason: UnknownReason? = nil, violatedSince: Date? = nil, egressIP: String? = nil) {
@@ -25,8 +25,8 @@ public struct GuardDisplay: Equatable, Sendable {
         self.egressIP = egressIP
     }
 
-    /// 一轮的结果。`networkPath` 是这一轮的网络快照（`nil` 是没拿到），只用来决定 `unknownReason`；
-    /// `violatedSince` 传 `EgressGuard.violatedSince`，verdict 不是 violated 时忽略
+    /// Single round result. `networkPath` is round snapshot (`nil` if unavailable), used solely for `unknownReason`;
+    /// `violatedSince` forwards `EgressGuard.violatedSince`, ignored if verdict is not violated
     public init(verdict: Verdict, observation o: Observation, allowlist: Set<IPv4>, networkPath: NetworkPath?,
                 violatedSince: Date?, checkedAt: Date) {
         self.init(verdict: verdict, checkedAt: checkedAt,
@@ -36,7 +36,7 @@ public struct GuardDisplay: Equatable, Sendable {
     }
 }
 
-/// 回答：App 的配置、插件、命令行工具这些文件放在哪个目录。只求路径，不碰文件。
+/// Answers: which directory stores App configuration, plugins, and CLI tool files. Path computation only, touches no files.
 public enum GuardPaths {
     public static let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("Notchkeeper", isDirectory: true)

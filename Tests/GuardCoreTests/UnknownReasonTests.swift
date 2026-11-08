@@ -21,10 +21,10 @@ private let unknownRound = Observation(clashRunning: true, routeInterface: nil, 
         #expect(UnknownReason.decide(verdict: .unknown, path: up) == .probeFailed)
     }
 
-    /// 没拿到网络快照（监视器还没回话或超时）不能断言「断网」，只能说探针没结果
+    /// Missing snapshot cannot assert offline; treated as probeFailed
     @Test func noSnapshotIsProbeFailed() { #expect(UnknownReason.decide(verdict: .unknown, path: nil) == .probeFailed) }
 
-    /// 优先级：断网时探针必然也失败，原因报 offline
+    /// Priority: offline takes precedence as probes necessarily fail during disconnect
     @Test func offlineBeatsProbeFailed() {
         var g = EgressGuard()
         #expect(g.observe(Observation(clashRunning: nil, routeInterface: nil, egressIPs: []), allowlist: []) == .unknown)

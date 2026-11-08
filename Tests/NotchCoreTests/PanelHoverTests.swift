@@ -4,21 +4,21 @@ import NotchCore
 
 private let t0 = Date(timeIntervalSinceReferenceDate: 0)
 
-/// 悬停展开面板：在刘海上停一下才展开，离开一会儿才收起（docs/ui.md「原则」：悬停或点击展开）
+/// Hover expand panel: pauses briefly on notch to open, lingers before closing after cursor leaves (docs/ui.md "Principles": hover or click to expand)
 @Suite struct PanelHovering {
     @Test func opensAfterDwellOnNotch() {
         var h = PanelHover()
         h.mouseMoved(onNotch: true, nearShape: false, canOpen: true, now: t0)
         #expect(!h.isOpen)
         #expect(h.deadline == t0 + PanelHover.openDelay)
-        // 停着时继续动不重新计时
+        // Continued motion while dwelling does not reset timer
         h.mouseMoved(onNotch: true, nearShape: false, canOpen: true, now: t0 + 0.1)
         h.tick(now: t0 + PanelHover.openDelay)
         #expect(h.isOpen)
         #expect(h.deadline == nil)
     }
 
-    /// 只是路过：没停够就离开，不展开
+    /// Just passing by: leaves before dwell duration, does not open
     @Test func passingByDoesNotOpen() {
         var h = PanelHover()
         h.mouseMoved(onNotch: true, nearShape: false, canOpen: true, now: t0)
@@ -28,7 +28,7 @@ private let t0 = Date(timeIntervalSinceReferenceDate: 0)
         #expect(!h.isOpen)
     }
 
-    /// 关了「悬停展开」或固定了展开 / 收起：悬停不展开，点击照样展开
+    /// Hover expand disabled or pinned open/closed: hover does not expand, click still expands
     @Test func hoverDisabledStillOpensOnClick() {
         var h = PanelHover()
         h.mouseMoved(onNotch: true, nearShape: false, canOpen: false, now: t0)
@@ -37,7 +37,7 @@ private let t0 = Date(timeIntervalSinceReferenceDate: 0)
         #expect(h.isOpen)
     }
 
-    /// 离开形状（含 10pt 余量）一会儿才收起；回来就不收
+    /// Closes after leaving shape (including 10pt margin) for a duration; returning cancels close
     @Test func closesAfterLeaving() {
         var h = PanelHover()
         h.open()
@@ -47,13 +47,13 @@ private let t0 = Date(timeIntervalSinceReferenceDate: 0)
         h.mouseMoved(onNotch: false, nearShape: true, canOpen: true, now: t0 + 0.1)
         #expect(h.deadline == nil)
         h.mouseMoved(onNotch: false, nearShape: false, canOpen: true, now: t0 + 0.2)
-        // 在外面继续动不重新计时
+        // Continued motion outside does not reset timer
         h.mouseMoved(onNotch: false, nearShape: false, canOpen: true, now: t0 + 0.3)
         h.tick(now: t0 + 0.2 + PanelHover.closeDelay)
         #expect(!h.isOpen)
     }
 
-    /// 点击展开的面板不受「悬停展开」开关影响，离开时照样收起
+    /// Panel opened via click unaffected by "hover expand" toggle, closes on leave as usual
     @Test func clickOpenedClosesOnLeaveEvenIfHoverDisabled() {
         var h = PanelHover()
         h.open()
@@ -62,7 +62,7 @@ private let t0 = Date(timeIntervalSinceReferenceDate: 0)
         #expect(!h.isOpen)
     }
 
-    /// 没到点的 tick 什么也不做
+    /// Early tick does nothing
     @Test func earlyTickIsIgnored() {
         var h = PanelHover()
         h.mouseMoved(onNotch: true, nearShape: false, canOpen: true, now: t0)
@@ -70,7 +70,7 @@ private let t0 = Date(timeIntervalSinceReferenceDate: 0)
         #expect(!h.isOpen && h.deadline == t0 + PanelHover.openDelay)
     }
 
-    /// 打开设置、换固定方式、关掉悬停展开：立刻收起，等着的展开也作废
+    /// Opening settings, changing pin mode, disabling hover expand: close immediately and cancel pending expand
     @Test func closeCancelsEverything() {
         var h = PanelHover()
         h.mouseMoved(onNotch: true, nearShape: false, canOpen: true, now: t0)

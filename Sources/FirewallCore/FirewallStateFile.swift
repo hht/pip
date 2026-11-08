@@ -1,19 +1,19 @@
 import Foundation
 
-/// 回答：防火墙状态文件 `firewall.state` 长什么样、读出来算什么（docs/firewall.md §4）。
-/// 恢复脚本 `scripts/firewall-rescue.sh` 用 plutil 从里面读 `token`（数字串）和 `bootSession`，这两个字段改名或改类型要两边一起改。
-/// 不知道文件放在哪、怎么写。
+/// Answers: format of the firewall state file `firewall.state` and interpretation of restored values (docs/firewall.md §4).
+/// Rescue script `scripts/firewall-rescue.sh` reads `token` (numeric string) and `bootSession` using plutil; any renaming or type changes must be synced across both.
+/// Unaware of file locations or write mechanisms.
 extension FirewallState {
     public static let fileName = "firewall.state"
 
-    /// 读防火墙状态文件的结果。读不出来（坏了、格式对不上）和没有文件分开：没有是常态（刚安装），坏了要报出来、不覆盖原文件
+    /// Result of reading the firewall state file. Separates unreadable (corrupt/mismatched format) from missing: missing is normal (fresh install); corrupt is reported without overwriting original.
     public enum Restored: Equatable, Sendable {
         case valid(FirewallState)
         case missing
         case unreadable
     }
 
-    /// `data == nil` 是文件不存在
+    /// `data == nil` indicates missing file
     public static func restore(from data: Data?) -> Restored {
         guard let data else { return .missing }
         guard let f = try? JSONDecoder().decode(Fields.self, from: data) else { return .unreadable }
@@ -53,10 +53,10 @@ extension FirewallState {
         return try e.encode(f)
     }
 
-    /// 文件里的字段，缺了用默认值，多了忽略（CLAUDE.md「配置与状态文件」）
+    /// Fields in the file: missing fields use default values, extra fields are ignored (CLAUDE.md "Configuration and state files")
     private struct Fields: Codable {
         var mode: String?
-        /// 试运行截止时间，单调时钟毫秒
+        /// Trial run deadline, monotonic clock milliseconds
         var deadline: Int64?
         var bootSession: String?
         var token: String?
@@ -67,6 +67,6 @@ extension FirewallState {
 }
 
 extension FirewallRules {
-    /// 防火墙状态文件里记的「上次装进去的规则」：只拿来和这一轮该装的比，不再装进 pf
+    /// "Last loaded rules" recorded in the firewall state file: only used to compare with current desired rules, not reloaded into pf
     init(loaded text: String) { self.text = text }
 }

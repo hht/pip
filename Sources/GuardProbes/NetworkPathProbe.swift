@@ -3,20 +3,21 @@ import GuardCore
 import Network
 import os
 
-/// 回答：本机此刻的网络路径快照（有没有不经过 TUN 的物理网络）。守卫每轮取一次，测试换成桩。
+/// Answers: snapshot of the local network path at this moment (whether there is a physical network not going through TUN).
+/// Guard takes this once per round; replaced with stubs in tests.
 public protocol NetworkPathSource: Sendable {
-    /// 还没拿到快照时返回 `nil`（不是「断网」）
+    /// Returns `nil` when a snapshot has not been retrieved yet (not "disconnected").
     func current() async -> NetworkPath?
 }
 
-/// 把 Network.framework 的路径换成两个布尔值。纯函数，不碰网络。
+/// Converts Network.framework path into two booleans. Pure function, no network access.
 public enum NetworkPathProbe {
     struct Interface: Sendable {
         var name: String
         var isPhysical: Bool
     }
 
-    /// 名字以 utun 开头的一律不算物理网卡：断网时 Clash 的 TUN 网卡仍在。
+    /// Interfaces starting with utun never count as physical: Clash's TUN interface still exists when disconnected.
     static func snapshot(satisfied: Bool, interfaces: [Interface], hasGateway: Bool) -> NetworkPath {
         let physical = interfaces.contains { $0.isPhysical && !$0.name.hasPrefix("utun") }
         return NetworkPath(physicalInterfaceSatisfied: satisfied && physical, hasDefaultRoute: hasGateway)
@@ -30,9 +31,9 @@ public enum NetworkPathProbe {
     }
 }
 
-/// 常驻的 `NWPathMonitor`，只读：不发包、不改任何网络设置。排除 `.other`（utun 属于这类）和回环，
-/// 所以路径只在物理网卡上求值，Clash 的 TUN 不会让断网看起来像有网。
-/// 系统在路径变化时回调，这里只记下最新快照；`current()` 直接返回它，刚启动还没回调时最多等 2 秒。
+/// Resident `NWPathMonitor`, read-only: sends no packets, modifies no network settings. Excludes `.other` (utun belongs here) and loopback,
+/// so path evaluates only on physical interfaces; Clash TUN won't make a disconnected state appear connected.
+/// System callbacks fire on path changes; this only records the latest snapshot; `current()` returns it directly, waiting up to 2 seconds if just launched before first callback.
 /// @see https://developer.apple.com/documentation/network/nwpathmonitor
 public final class LiveNetworkPath: NetworkPathSource, @unchecked Sendable {
     private let monitor = NWPathMonitor(prohibitedInterfaceTypes: [.other, .loopback])
@@ -52,7 +53,7 @@ public final class LiveNetworkPath: NetworkPathSource, @unchecked Sendable {
     public func current() async -> NetworkPath? {
         for _ in 0..<40 {
             if let p = latest.withLock({ $0 }) { return p }
-            do { try await Task.sleep(for: .milliseconds(50)) } catch { return nil } // 一轮截止时被取消
+            do { try await Task.sleep(for: .milliseconds(50)) } catch { return nil } // Cancelled when round deadline expires
         }
         return latest.withLock { $0 }
     }

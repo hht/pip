@@ -11,7 +11,7 @@ import Testing
         #expect(try FirewallStatus.decode(s.encoded()) == s)
     }
 
-    /// 缺字段用默认值、多的字段忽略；时间是 ISO 8601
+    /// Missing fields use defaults, extra fields are ignored; timestamp is ISO 8601
     @Test func decodesWithDefaults() throws {
         let s = try FirewallStatus.decode(Data(#"{"checkedAt":"2026-10-31T04:05:00Z","future":1}"#.utf8))
         #expect(s == FirewallStatus(mode: .off, scope: nil, checkedAt: Date(timeIntervalSince1970: 1_793_419_500)))

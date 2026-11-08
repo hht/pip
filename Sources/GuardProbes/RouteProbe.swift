@@ -1,19 +1,19 @@
 import Foundation
 
-/// 回答：内核把去往公网的流量交给哪个网卡。
-/// 不看默认路由，也不看 SCDynamicStore 的 PrimaryInterface：Clash Verge 的 TUN 模式用 `1/8`、`16/4`、
-/// `128.0/1` 等更具体的路由把流量导进 utun，默认路由和主网卡仍是 en0（Clash Verge TUN 开着时实测，
-/// macOS 26.5）。
-/// @see https://keith.github.io/xcode-man-pages/route.8.html  `route -n get <dest>` 打印内核为该地址选的路由
+/// Answers: which network interface the kernel directs public internet traffic to.
+/// Does not check default routes, nor SCDynamicStore's PrimaryInterface: Clash Verge's TUN mode uses more specific routes
+/// like `1/8`, `16/4`, `128.0/1` to direct traffic into utun, while the default route and primary interface remain en0 (verified
+/// with Clash Verge TUN enabled on macOS 26.5).
+/// @see https://keith.github.io/xcode-man-pages/route.8.html  `route -n get <dest>` prints the kernel's selected route for the address
 public enum RouteProbe {
-    /// 只查本机路由表，不发包。第一个是 Anthropic 公布的入站网段 160.79.104.0/23 里的地址，
-    /// 第一个直接回答「去 Claude 的路由走哪」；另两个是不同网段的公网地址。
-    /// 三者同权：任何一个不走 utun 都判 violated（除局域网外全部流量必须走代理，docs/egress-guard.md）。
-    /// Clash 的 DIRECT 规则不改内核路由表；只有 TUN 排除了某网段，这里才会看到 en0，那本身就违反规则。
+    /// Only checks local kernel routing table, sends no packets. The first is within Anthropic's published inbound range 160.79.104.0/23,
+    /// directly answering "which route does Claude traffic take"; the other two are public addresses in different subnets.
+    /// All three carry equal weight: if any one does not route via utun, it is judged violated (all non-LAN traffic must go through proxy, docs/egress-guard.md).
+    /// Clash's DIRECT rule does not modify the kernel routing table; only when TUN excludes a subnet would en0 appear here, which itself violates policy.
     /// @see https://docs.anthropic.com/en/api/ip-addresses
     static let destinations = ["160.79.104.10", "1.1.1.1", "8.8.8.8"]
 
-    /// 取 `interface:` 那一行；没有就是查不到。
+    /// Extracts the `interface:` line; absent means not found.
     static func parseInterface(_ output: String) -> String? {
         for line in output.split(separator: "\n") {
             let parts = line.split(separator: ":", maxSplits: 1)
@@ -25,7 +25,7 @@ public enum RouteProbe {
         return nil
     }
 
-    /// 多个目的地合成一个结果：任何一个不走 utun 就报它（最坏情况优先），全查不到才是未知。
+    /// Combines multiple destinations into one result: reports any interface not routing via utun (worst case priority); only unknown if all fail.
     static func combine(_ interfaces: [String?]) -> String? {
         let known = interfaces.compactMap { $0 }
         return known.first { !$0.hasPrefix("utun") } ?? known.first
@@ -40,9 +40,9 @@ public enum RouteProbe {
         return combine(interfaces)
     }
 
-    /// 跑一个子进程，正常退出且状态码 0 时返回 stdout，否则 `nil`。
-    /// 调用方的任务被取消（一轮超时）时 `terminate` 子进程；已取消时不再启动。
-    /// 启动和结束放在同一把锁里，避免对还没启动的 `Process` 调 `terminate`（会抛 ObjC 异常）。
+    /// Runs a child process; returns stdout if exited normally with status code 0, otherwise `nil`.
+    /// Terminates child process when caller's task is cancelled (round timeout); does not launch if already cancelled.
+    /// Launch and termination share the same lock to avoid calling `terminate` on an unlaunched `Process` (throws ObjC exception).
     /// @see https://developer.apple.com/documentation/foundation/process/terminate()
     static func output(of executable: URL, arguments: [String]) async -> String? {
         let child = Child(executable: executable, arguments: arguments)
@@ -55,7 +55,7 @@ public enum RouteProbe {
         }
     }
 
-    /// `Process` 不是 Sendable；所有对它的跨线程访问都经过 `lock`。
+    /// `Process` is not Sendable; all cross-thread access goes through `lock`.
     private final class Child: @unchecked Sendable {
         private let process = Process()
         private let stdout = Pipe()
@@ -76,7 +76,7 @@ public enum RouteProbe {
                 return true
             }
             guard launched else { return nil }
-            let data = stdout.fileHandleForReading.readDataToEndOfFile() // 输出只有几行，读到 EOF 再等退出不会死锁
+            let data = stdout.fileHandleForReading.readDataToEndOfFile() // Output is only a few lines; reading to EOF before waiting for exit avoids deadlock
             process.waitUntilExit()
             let ok = process.terminationReason == .exit && process.terminationStatus == 0
             return ok ? String(decoding: data, as: UTF8.self) : nil

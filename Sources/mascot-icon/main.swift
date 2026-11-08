@@ -4,17 +4,17 @@ import ImageIO
 import MascotCore
 import UniformTypeIdentifiers
 
-// App 图标：黑底圆角方块上一只 finished 造型的 Pip，静止姿态，按 MascotCore 的造型数据画，Pip 改了图标跟着变。
-// 用法：mascot-icon <输出目录.iconset>；run.sh 再用 iconutil 合成 AppIcon.icns。
-// 眼睛贴球面的算法照 App 的图层树（MascotFigureView：先按经纬度把平面眼形转到球面，再按造型的朝向 roll → pitch → yaw），
-// 这里没有 Core Animation，用正交投影自己算。
-// @see https://developer.apple.com/design/human-interface-guidelines/app-icons （macOS：1024 画布里 824 的圆角方块）
-// @see https://developer.apple.com/library/archive/documentation/GraphicsAnimation/Conceptual/HighResolutionOSX/Optimizing/Optimizing.html （iconset 的文件名）
+// App Icon: Pip in finished look on black rounded rectangle plate, static pose, drawn using MascotCore look data; icon updates when Pip changes.
+// Usage: mascot-icon <output-dir.iconset>; run.sh then builds AppIcon.icns with iconutil.
+// Eye mapping onto sphere matches App's layer tree (MascotFigureView: rotate planar eye onto sphere by lat/long, then apply roll -> pitch -> yaw of pose);
+// calculated here using orthographic projection without Core Animation.
+// @see https://developer.apple.com/design/human-interface-guidelines/app-icons (macOS: 824 rounded rectangle inside 1024 canvas)
+// @see https://developer.apple.com/library/archive/documentation/GraphicsAnimation/Conceptual/HighResolutionOSX/Optimizing/Optimizing.html (iconset filenames)
 
 let look = Look.finished
 
 guard CommandLine.arguments.count == 2 else {
-    FileHandle.standardError.write(Data("用法：mascot-icon <输出目录.iconset>\n".utf8))
+    FileHandle.standardError.write(Data("Usage: mascot-icon <output-dir.iconset>\n".utf8))
     exit(64) // EX_USAGE
 }
 let dir = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
@@ -27,7 +27,7 @@ do {
         }
     }
 } catch {
-    FileHandle.standardError.write(Data("mascot-icon：\(error)\n".utf8))
+    FileHandle.standardError.write(Data("mascot-icon: \(error)\n".utf8))
     exit(1)
 }
 
@@ -35,14 +35,14 @@ func render(side: Int) -> CGImage {
     let s = CGFloat(side)
     let space = CGColorSpace(name: CGColorSpace.sRGB)!
     guard let ctx = CGContext(data: nil, width: side, height: side, bitsPerComponent: 8, bytesPerRow: 0, space: space,
-                              bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { preconditionFailure("参数是写死的，一定建得出来") }
+                              bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { preconditionFailure("Parameters are constant, creation must succeed") }
     ctx.translateBy(x: 0, y: s)
-    ctx.scaleBy(x: 1, y: -1) // 和画布一样 +y 向下
+    ctx.scaleBy(x: 1, y: -1) // +y downward matching canvas
     func gradient(_ top: RGB, _ bottom: RGB) -> CGGradient {
         CGGradient(colorsSpace: space, colors: [top.cg, bottom.cg] as CFArray, locations: [0, 1])!
     }
 
-    // 底板：带一点投影，从上到下由深灰到近黑，和刘海一个颜色
+    // Plate: with drop shadow, gradient from dark grey to near black matching notch color
     let box = CGRect(x: s * 100 / 1024, y: s * 100 / 1024, width: s * 824 / 1024, height: s * 824 / 1024)
     let plate = CGPath(roundedRect: box, cornerWidth: s * 185 / 1024, cornerHeight: s * 185 / 1024, transform: nil)
     ctx.saveGState()
@@ -55,7 +55,7 @@ func render(side: Int) -> CGImage {
     ctx.clip()
     ctx.drawLinearGradient(gradient(RGB(0x2A2B30), RGB(0x0B0B0D)), start: CGPoint(x: 0, y: box.minY), end: CGPoint(x: 0, y: box.maxY), options: [])
 
-    // 身体加装饰的外框居中放进底板
+    // Center body with decorations onto plate
     let c = Anatomy.bodyCenter, r = Anatomy.bodyRadius
     let deco = look.decoration
     let body = CGRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r)
@@ -95,21 +95,21 @@ func render(side: Int) -> CGImage {
         }
         ctx.restoreGState()
     }
-    guard let image = ctx.makeImage() else { preconditionFailure("位图上下文一定出得了图") }
+    guard let image = ctx.makeImage() else { preconditionFailure("Bitmap context must yield an image") }
     return image
 }
 
-/// 眼形上相对静止中心偏 d 的点，贴到球面、按造型朝向转过之后，正面看过去在画布上的位置
+/// Point on eye contour offset by d from rest center, mapped onto sphere and rotated by pose, as projected onto canvas
 func onSphere(_ d: CGPoint, rest: CGPoint) -> CGPoint {
     let c = Anatomy.bodyCenter, R = Double(Anatomy.bodyRadius)
     let (pitch, yaw) = Sphere.place(rest)
     let lat = -pitch
-    // 平面眼形在球心前方 R 处：先绕 x 轴转到纬度，再绕 y 轴转到经度
+    // Planar eye contour at distance R in front of sphere center: rotate around x-axis to latitude, then y-axis to longitude
     var y = Double(d.y) * cos(lat) + R * sin(lat)
     var z = -Double(d.y) * sin(lat) + R * cos(lat)
     var x = Double(d.x) * cos(yaw) + z * sin(yaw)
     z = -Double(d.x) * sin(yaw) + z * cos(yaw)
-    // 造型朝向：roll（正 = 顺时针）→ pitch（正 = 抬头）→ yaw（正 = 脸朝右），约定同 HeadPose
+    // Pose orientation: roll (positive = clockwise) -> pitch (positive = looking up) -> yaw (positive = looking right), same as HeadPose
     let p = look.pose
     (x, y) = (x * cos(p.roll) - y * sin(p.roll), x * sin(p.roll) + y * cos(p.roll))
     (y, z) = (y * cos(p.pitch) - z * sin(p.pitch), y * sin(p.pitch) + z * cos(p.pitch))

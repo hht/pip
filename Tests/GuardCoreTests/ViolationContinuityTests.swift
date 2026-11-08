@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import GuardCore
 
-/// `violatedSince`：一次违规从开始到被 healthy 解除的固定标识，App 用它记「用户关掉了哪一次」。
+/// `violatedSince`: stable identifier for a violation from inception until cleared by healthy, used by App to record "which incident user dismissed".
 
 private let allowed = IPv4("198.51.100.8")!
 private let leaked = IPv4("198.51.100.66")!

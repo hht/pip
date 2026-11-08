@@ -1,24 +1,24 @@
 import AgentCore
 import Foundation
 
-/// 回答：面板里插件那一段的一行画什么——图标、标题、可选副标题、状态指示、右侧「距今多久」或短值、点了去哪（docs/ui.md「面板布局」）。
-/// 内容由插件定（Claude 会话、外部插件的活动），版式由 App 定；不知道颜色和文案。只放路径、状态和时间，不放对话内容
+/// Answers: What a row in a plugin's panel section displays — icon, title, optional subtitle, status indicator, right-side elapsed time or short value, click action (docs/ui.md "Panel Layout").
+/// Content determined by plugin (Claude sessions, external plugin activities), layout determined by App; agnostic of colors and copy. Only includes paths, status, and times, not conversational text
 public struct PanelRow: Identifiable, Equatable, Sendable {
     public enum Icon: Equatable, Sendable {
-        /// Claude 的厂商标志
+        /// Claude brand mark
         case claude
-        /// SF Symbol 名
+        /// SF Symbol name
         case symbol(String)
     }
 
-    /// 不写字，只用指示；文案留给悬停提示和旁白
+    /// Indicators only, no text; copy reserved for tooltips and VoiceOver
     public enum Indicator: Equatable, Sendable {
         case none, working, question, approval, attention
         case progress(Double)
     }
 
     public enum Trailing: Equatable, Sendable {
-        /// 状态变化距今多久
+        /// Time elapsed since status change
         case since(Date)
         case value(String)
     }
@@ -26,12 +26,12 @@ public struct PanelRow: Identifiable, Equatable, Sendable {
     public var id: String
     public var icon: Icon
     public var title: String
-    /// 标题是路径：太长从前面截，留住最后几段
+    /// Title is a file path: truncated from start if too long, keeping trailing segments
     public var titleIsPath = false
     public var subtitle: String?
     public var indicator: Indicator
     public var trailing: Trailing
-    /// 已停止的会话：图标和标题变暗，时间不暗（保住对比度）
+    /// Stopped sessions: icon and title dimmed, timestamp remains bright (maintaining contrast)
     public var dimmed = false
     public var action: Card.Action?
 
@@ -48,7 +48,7 @@ public struct PanelRow: Identifiable, Equatable, Sendable {
         self.action = action
     }
 
-    /// Claude 会话：路径 + 状态指示 + 状态变化距今；点了跳回它的终端。不显示会话名（它可能从对话推出来）
+    /// Claude session: path + status indicator + elapsed time since status change; click jumps to terminal. Does not show session name (which may be inferred from conversation)
     public init(_ session: Session) {
         let indicator: Indicator = switch session.state {
         case .working: .working
@@ -66,11 +66,11 @@ extension TerminalRef {
     public init(_ session: Session) { self.init(pid: session.pid, identity: .started(session.processStart), cwd: session.cwd) }
 }
 
-/// 面板里一个插件的那一段（docs/ui.md「面板布局」）
+/// A plugin's section in the panel (docs/ui.md "Panel Layout")
 public struct PanelSection: Identifiable, Equatable, Sendable {
     public var plugin: String
     public var rows: [PanelRow]
-    /// 最多露几行，多的在段里滚
+    /// Maximum rows displayed, excess scrolls within section
     public var maxRows: Int
     public var id: String { plugin }
 

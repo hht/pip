@@ -25,7 +25,7 @@ private func run(_ seq: [Observation]) -> [Verdict] {
 @Suite struct Verdicts {
     @Test func allGoodIsHealthy() { #expect(run([obs()]) == [.healthy]) }
 
-    /// Clash 不在但路由和 IP 都正常：流量没漏，只算 unknown
+    /// Clash down while route and IP normal: no traffic leaked, evaluates as unknown
     @Test func clashDownAloneIsUnknown() {
         #expect(run([obs(clash: false)]) == [.unknown])
     }
@@ -38,7 +38,7 @@ private func run(_ seq: [Observation]) -> [Verdict] {
         #expect(run([obs(iface: "en0")]) == [.violated])
     }
 
-    /// 出口 IP 不在允许列表只提示，永远不判 violated（回显服务可能和别的 App 不在同一节点）
+    /// Disallowed egress IP warns only, never evaluates as violated
     @Test func badEgressOnlyWarnsNeverViolates() {
         #expect(run([obs(ips: [leaked]), obs(ips: [leaked]), obs(ips: [leaked])])
             == [.egressMismatch, .egressMismatch, .egressMismatch])
@@ -61,7 +61,7 @@ private func run(_ seq: [Observation]) -> [Verdict] {
     ])
     func missingSignalIsUnknown(_ o: Observation) { #expect(run([o]) == [.unknown]) }
 
-    /// violated 只有一轮完整 healthy 才解除：断网、探针超时、IP 不符都不放行
+    /// violated is cleared only by a full healthy round: disconnects, timeouts, mismatches do not clear it
     @Test func violationIsStickyUntilHealthy() {
         #expect(run([obs(iface: "en0"), obs(ips: []), obs(clash: nil), obs(ips: [leaked])])
             == [.violated, .violated, .violated, .violated])
@@ -75,7 +75,7 @@ private func run(_ seq: [Observation]) -> [Verdict] {
         #expect(run([obs(iface: "en0", ips: [leaked])]) == [.violated])
     }
 
-    /// 允许列表为空是配置问题：IP 一律算未知
+    /// Empty allowlist is a configuration issue: IPs treated as unknown
     @Test func emptyAllowlistIsUnknown() {
         var g = EgressGuard()
         #expect(g.observe(obs(ips: [leaked]), allowlist: []) == .unknown)

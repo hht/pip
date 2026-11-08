@@ -3,7 +3,7 @@ import Testing
 
 private let deg = Double.pi / 180
 
-/// 某次编排里所有 Track（循环、进场、动作、右耳的点）
+/// All Tracks in choreography (loops, entrances, motions, ear dots)
 private func everything(reduceMotion: Bool) -> [Track] {
     let looks = Look.allCases.flatMap { l in
         Choreography.loop(l, reduceMotion: reduceMotion)
@@ -26,9 +26,9 @@ private func near(_ a: [Double]?, _ b: [Double]) -> Bool {
     @Test func everyTrackIsWellFormed() {
         for t in everything(reduceMotion: false) + everything(reduceMotion: true) {
             #expect(t.duration > 0, "\(t)")
-            #expect(t.phase >= 0 && t.phase < t.duration, "相位在一圈之内：\(t)")
+            #expect(t.phase >= 0 && t.phase < t.duration, "Phase is within one period: \(t)")
             if case .spring = t.timings.first {
-                #expect(t.values.count == 2 && t.timings.count == 1 && !t.repeats, "弹簧只能是一段：\(t)")
+                #expect(t.values.count == 2 && t.timings.count == 1 && !t.repeats, "Spring can only have one segment: \(t)")
             } else {
                 #expect(t.keyTimes.count == t.values.count, "\(t)")
                 #expect(t.timings.count == t.values.count - 1, "\(t)")
@@ -38,15 +38,15 @@ private func near(_ a: [Double]?, _ b: [Double]) -> Bool {
         }
     }
 
-    /// 动画都叠加在静止值上：一次性动作播完必须回到 0（整圈旋转除外），否则结束那一刻会跳
+    /// Animations are additive on top of rest values: one-shot motions must return to 0 when finished (except full rotations), otherwise it will jump when finished
     @Test func oneShotsEndAtRest() {
         for t in everything(reduceMotion: false) where !t.repeats {
             #expect(t.values.last == 0 || isFullTurn(t), "\(t)")
         }
     }
 
-    /// 循环首尾相接，否则每圈开头会跳。例外：整圈旋转；四角星转 90°（转完和原来一样）；
-    /// 同一部件首尾时刻完全透明的（Z 和汗珠回到原处时看不见）
+    /// Loops must be seamless, otherwise each cycle starts with a jump. Exceptions: full rotation; 4-point star rotated by 90 deg (looks identical after rotation);
+    /// parts that are completely transparent at start/end (Z and sweat drops invisible when returning to origin)
     @Test func loopsAreSeamless() {
         for l in Look.allCases {
             let tracks = Choreography.loop(l, reduceMotion: false)
@@ -64,7 +64,7 @@ private func isFullTurn(_ t: Track) -> Bool {
 }
 
 @Suite struct ReduceMotion {
-    /// docs/mascot.md §5「减弱动态效果」：不位移、不缩放、不旋转，只剩不透明度
+    /// docs/mascot.md §5 "Reduce Motion": no translation, no scale, no rotation, opacity only
     @Test func onlyOpacity() {
         for t in everything(reduceMotion: true) { #expect(t.property == .opacity, "\(t)") }
     }
@@ -74,7 +74,7 @@ private func isFullTurn(_ t: Track) -> Bool {
         for l in Look.allCases { #expect(Choreography.entrance(l, reduceMotion: true).isEmpty) }
     }
 
-    /// 颜色和眼形 0.15s 淡入淡出；朝向直接设值
+    /// Color and eye shapes fade in/out in 0.15s; orientation set directly
     @Test func change() {
         let c = Choreography.change(reduceMotion: true)
         #expect(c.eyeMorph == 0.15 && c.colorFade == 0.15 && c.pose == nil && c.decoPop == nil && c.loopDelay == 0)
@@ -82,7 +82,7 @@ private func isFullTurn(_ t: Track) -> Bool {
 }
 
 @Suite struct LookChangeTests {
-    /// docs/mascot.md §5「换造型」
+    /// docs/mascot.md §5 "Change Look"
     @Test func numbers() {
         let c = Choreography.change(reduceMotion: false)
         #expect(c.eyeMorph == 0.38 && c.colorFade == 0.4)
@@ -94,7 +94,7 @@ private func isFullTurn(_ t: Track) -> Bool {
 }
 
 @Suite struct Breathing {
-    /// 所有造型都呼吸，周期 4.6s，scaleY +0.03、scaleX −0.01
+    /// All looks breathe, period 4.6s, scaleY +0.03, scaleX -0.01
     @Test func everyLookBreathes() {
         for l in Look.allCases where l != .sleeping {
             let y = loop(l, .body, .scaleY), x = loop(l, .body, .scaleX)
@@ -103,7 +103,7 @@ private func isFullTurn(_ t: Track) -> Bool {
         }
     }
 
-    /// 睡着：6s，scaleY +0.045
+    /// Sleeping: 6s, scaleY +0.045
     @Test func sleeping() {
         let y = loop(.sleeping, .body, .scaleY)
         #expect(y?.duration == 6 && near(y?.values, [0, 0.045, 0]))
@@ -111,7 +111,7 @@ private func isFullTurn(_ t: Track) -> Bool {
 }
 
 @Suite struct HeadLoops {
-    /// docs/mascot.md §5「身体和头」
+    /// docs/mascot.md §5 "Body and Head"
     @Test func working() {
         let t = loop(.working, .yaw, .rotationY)
         #expect(t?.duration == 1.4 && t?.phase == 0.45 && near(t?.values, [-7 * deg, 7 * deg, -7 * deg, -7 * deg]))
@@ -133,7 +133,7 @@ private func isFullTurn(_ t: Track) -> Bool {
 }
 
 @Suite struct DecoLoops {
-    /// 编排里点名的装饰部件都得真的存在
+    /// Decorative parts referenced in choreography must actually exist
     @Test func referencedPartsExist() {
         for l in Look.allCases {
             let n = l.decoration.count
@@ -143,28 +143,28 @@ private func isFullTurn(_ t: Track) -> Bool {
         }
     }
 
-    /// 三个 Z 每秒一个：周期 3s，相位 0、2、1
+    /// Three Z's, one per second: period 3s, phases 0, 2, 1
     @Test func zzz() {
         let phases = (0..<3).map { loop(.sleeping, .decoPart($0), .translationY)?.phase }
         #expect(phases == [0, 2, 1])
         #expect(near(loop(.sleeping, .decoPart(0), .opacity)?.values, [-1, 0, 0, -1]))
     }
 
-    /// 不透明度都换算成叠加量：小星静止 0.6，闪到 1、暗到 0.25
+    /// Opacity is converted to additive delta: small star rests at 0.6, flashes to 1, dims to 0.25
     @Test func opacityIsAdditive() {
         #expect(near(loop(.finished, .decoPart(1), .opacity)?.values, [0, 0.4, -0.35, 0]))
         #expect(near(loop(.offline, .decoPart(0), .opacity)?.values, [-0.75, 0, -0.75, -0.75]))
-        #expect(loop(.offline, .decoPart(3), .opacity) == nil, "斜杠不动")
+        #expect(loop(.offline, .decoPart(3), .opacity) == nil, "Slash does not move")
     }
 
-    /// 两个 ! 轮流跳，第二个错开 0.24s
+    /// Two !'s bounce alternately, second staggered by 0.24s
     @Test func dangerAlternates() {
         #expect(loop(.danger, .decoPart(0), .translationY)?.phase == 0)
         let p = loop(.danger, .decoPart(1), .translationY)?.phase ?? 0
         #expect(abs(p - 0.66) < 1e-9)
     }
 
-    /// 右耳三蓝点依次亮：周期 1.2s，相邻错开 0.2s
+    /// Three blue ear dots light up in sequence: period 1.2s, adjacent dots staggered by 0.2s
     @Test func earDots() {
         let t = Choreography.earDots(reduceMotion: false)
         #expect(t.count == 3 && t.allSatisfy { $0.duration == 1.2 && $0.property == .opacity })
@@ -173,7 +173,7 @@ private func isFullTurn(_ t: Track) -> Bool {
 }
 
 @Suite struct Motions {
-    /// docs/mascot.md §5「动作」：只出现有动的分量
+    /// docs/mascot.md §5 "Motions": only animated components appear
     @Test func channels() {
         let spin = Choreography.tracks(for: .spinAround, reduceMotion: false)
         #expect(spin.count == 1 && spin[0].part == .yaw && near(spin[0].values, [0, 2 * .pi]) && spin[0].duration == 0.9)
@@ -184,7 +184,7 @@ private func isFullTurn(_ t: Track) -> Bool {
         #expect(near(jump.first { $0.part == .stage }?.values, [0, 1, -4, 0, 0]))
     }
 
-    /// 进 finished 跳、进 working 点头、进 danger 横向抖三下
+    /// Entering finished jumps, entering working nods, entering danger shakes horizontally 3 times
     @Test func entrances() {
         #expect(Choreography.entrance(.finished, reduceMotion: false) == Choreography.tracks(for: .finishJump, reduceMotion: false))
         #expect(Choreography.entrance(.working, reduceMotion: false) == Choreography.tracks(for: .nod, reduceMotion: false))
@@ -195,25 +195,25 @@ private func isFullTurn(_ t: Track) -> Bool {
 }
 
 @Suite struct Retarget {
-    /// 静止值已经改成 new，叠加动画从 old − new 回到 0：画面从 old 连贯地过渡到 new
+    /// Rest value is already updated to new, additive animation goes from old - new back to 0: visual smoothly transitions from old to new
     @Test func springStartsAtOldAndSettles() {
         let t = Choreography.retarget(.yaw, .rotationY, from: 0.1, to: 0.3, Choreography.followSpring)
         #expect(t.values == [0.1 - 0.3, 0] && t.timings == [.spring(response: 0.3, damping: 0.85)] && t.duration == 0.3)
     }
 
-    /// 鼠标停下后回正：0.8s 正弦
+    /// Return to center after mouse stops: 0.8s sine
     @Test func sineTakesGivenDuration() {
         let t = Choreography.retarget(.pitch, .rotationX, from: 0.2, to: 0, Choreography.gazeReturn)
         #expect(t.values == [0.2, 0] && t.duration == 0.8 && t.timings == [.sineInOut])
     }
 }
 
-/// 循环在某一刻自己叠了多少：撤循环时只把这一份补间收尾，不碰同一层上还在跑的弹簧
+/// How much a loop adds at a given time: removing a loop only finishes its own tween without touching active springs on the same layer
 @Suite struct TrackValue {
     @Test func linearInterpolation() {
         let t = Track.keys(.yaw, .rotationY, [(0, 0), (2, 4)], timing: .linear, repeats: true)
         #expect(abs(t.value(at: 0.5) - 1) < 1e-6)
-        #expect(abs(t.value(at: 2.5) - 1) < 1e-6, "循环：过了一圈接着算")
+        #expect(abs(t.value(at: 2.5) - 1) < 1e-6, "Loop: continues calculation past one cycle")
     }
 
     @Test func phaseShiftsStart() {
@@ -221,7 +221,7 @@ private func isFullTurn(_ t: Track) -> Bool {
         #expect(abs(t.value(at: 0) - 1) < 1e-6)
     }
 
-    /// 正弦缓动：一半时刻正好一半，四分之一时刻不到四分之一
+    /// Sine easing: half progress at half time, less than a quarter progress at quarter time
     @Test func easing() {
         let t = Track.keys(.yaw, .rotationY, [(0, 0), (1, 1)], repeats: true)
         #expect(abs(t.value(at: 0.5) - 0.5) < 1e-4)

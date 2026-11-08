@@ -4,31 +4,31 @@ import Testing
 
 private let t0 = Date(timeIntervalSince1970: 1_800_000_000)
 
-/// pid 1 的会话在 `t0 + at` 秒进入 `state`；sessionId 是 "s<pid>"
+/// Session with pid 1 enters state at t0 + at seconds; sessionId is "s<pid>"
 private func session(_ state: AgentState, at: TimeInterval = 0, pid: Int32 = 1, started: TimeInterval = -3600, id: String? = nil) -> Session {
     Session(pid: pid, processStart: t0.addingTimeInterval(started), sessionId: id ?? "s\(pid)", cwd: "/p\(pid)",
             state: state, stateSince: t0.addingTimeInterval(at))
 }
 
-/// mod 写的回合文件：pid 对应的会话最近一次结束的主回合，在 `t0 + at` 秒结束
+/// Mod turn file: latest finished main turn for session corresponding to pid, ending at t0 + at seconds
 private func report(_ turnId: String, _ outcome: TurnOutcome, at: TimeInterval = 1, pid: Int32 = 1, background: Int = 0) -> TurnReport {
     TurnReport(sessionId: "s\(pid)", ended: EndedTurn(turnId: turnId, outcome: outcome, backgroundAgents: background, at: t0.addingTimeInterval(at)))
 }
 
-/// 依次喂进去（每份在它的 stateSince 读到），返回每一步的事件
+/// Feeds sessions in sequence (each read at its stateSince), returning events at each step
 private func feed(_ board: inout AgentBoard, _ sessions: Session...) -> [AgentEvent?] {
     sessions.map { board.update($0, at: $0.stateSince) }
 }
 
-/// 依次喂回合文件，都在 `t0 + at` 读到
+/// Feeds turn reports in sequence, all read at t0 + at
 private func feed(_ board: inout AgentBoard, at: TimeInterval = 2, _ reports: TurnReport...) -> [AgentEvent?] {
     reports.map { board.update($0, at: t0.addingTimeInterval(at)) }
 }
 
-/// App 在 t0 开始看
+/// App starts watching at t0
 private func makeBoard() -> AgentBoard { AgentBoard(since: t0) }
 
-/// 回合结束只看 mod 的回合文件（docs/agent-integration.md「回合怎么结束的」）
+/// Turn completion only checks mod turn files (docs/agent-integration.md "How turns end")
 @Suite struct TurnEnds {
     @Test func doneTurnIsReported() {
         var board = makeBoard()
@@ -48,49 +48,49 @@ private func makeBoard() -> AgentBoard { AgentBoard(since: t0) }
         #expect(feed(&board, report("t1", .canceled)) == [nil])
     }
 
-    /// 结束时还有后台 agent 在跑：不提醒；它们完成后送进来的通知回合结束才提醒
+    /// Background agents still running on completion: silent; notifies turn done only when the turn reporting their completion finishes
     @Test func doneWithBackgroundAgentsWaitsForTheNextTurn() {
         var board = makeBoard()
         _ = feed(&board, session(.working))
         #expect(feed(&board, report("t1", .done, background: 1), report("t2", .done, at: 5)) == [nil, .turnDone(pid: 1)])
     }
 
-    /// 出错不管后台 agent
+    /// Errors ignore background agents
     @Test func failedWithBackgroundAgentsStillFails() {
         var board = makeBoard()
         _ = feed(&board, session(.working))
         #expect(feed(&board, report("t1", .failed, background: 2)) == [.turnFailed(pid: 1)])
     }
 
-    /// 同一份结束的回合读到两次，只提醒一次
+    /// Same finished turn read twice, notifies only once
     @Test func sameEndedTurnOnce() {
         var board = makeBoard()
         _ = feed(&board, session(.working))
         #expect(feed(&board, report("t1", .done), report("t1", .done)) == [.turnDone(pid: 1), nil])
     }
 
-    /// 排队的消息：上一回合结束、下一回合紧接着开始，上一回合照常提醒
+    /// Queued messages: previous turn finishes, next turn starts immediately; previous turn notifies normally
     @Test func eachEndedTurnIsReported() {
         var board = makeBoard()
         _ = feed(&board, session(.working))
         #expect(feed(&board, report("t1", .done), report("t2", .done, at: 3)) == [.turnDone(pid: 1), .turnDone(pid: 1)])
     }
 
-    /// 中途接手：App 开始看之前就结束的回合不补提醒
+    /// Mid-session takeover: turns ended before watching started do not trigger retroactive notification
     @Test func turnEndedBeforeWatchingIsQuiet() {
         var board = makeBoard()
         _ = feed(&board, session(.stopped))
         #expect(feed(&board, report("t1", .done, at: -5)) == [nil])
     }
 
-    /// 第一次看到的回合文件、但回合是开始看之后结束的（新会话、`/clear` 之后的第一个回合）：照常提醒
+    /// First time seeing a turn file, but turn ended after watching started (new session, or first turn after /clear): notifies normally
     @Test func firstReportAfterWatchingIsReported() {
         var board = makeBoard()
         _ = feed(&board, session(.working))
         #expect(feed(&board, report("t1", .done, at: 1)) == [.turnDone(pid: 1)])
     }
 
-    /// 回合文件比 sessions 文件先到（`/clear` 后 sessionId 还没换过来）：先不记，会话对上后再读到照常提醒
+    /// Turn file arrives before sessions file (/clear hasn't updated sessionId yet): deferred, notifies normally once session matches
     @Test func reportBeforeSessionIsNotLost() {
         var board = makeBoard()
         #expect(feed(&board, report("t1", .done)) == [nil])
@@ -98,13 +98,13 @@ private func makeBoard() -> AgentBoard { AgentBoard(since: t0) }
         #expect(feed(&board, report("t1", .done)) == [.turnDone(pid: 1)])
     }
 
-    /// 对不上任何看着的会话（VS Code 里的会话）：不提醒
+    /// Does not match any tracked session (e.g. VS Code session): silent
     @Test func reportWithoutSessionIsQuiet() {
         var board = makeBoard()
         #expect(feed(&board, report("t1", .done, pid: 9)) == [nil])
     }
 
-    /// `/clear` 换了 id、进程退出，同一次运行里又用 `claude --resume <旧 id>` 回来：旧回合文件读过了，不补弹
+    /// /clear changed id, process exited, resumed via claude --resume <old id> in same run: old turn file already read, does not re-notify
     @Test func resumedSessionDoesNotReplayOldTurn() {
         var board = makeBoard()
         _ = feed(&board, session(.working))
@@ -115,23 +115,23 @@ private func makeBoard() -> AgentBoard { AgentBoard(since: t0) }
         #expect(feed(&board, at: 6, report("t1", .done)) == [nil])
     }
 
-    /// 回合文件里还没有结束的回合
+    /// Turn file with no ended turn yet
     @Test func noEndedTurnIsQuiet() {
         var board = makeBoard()
         _ = feed(&board, session(.working))
         #expect(board.update(TurnReport(sessionId: "s1", ended: nil), at: t0) == nil)
     }
 
-    /// sessions 文件变成已停止不是回合结束（实测出错、取消、后台 agent 完成时都会闪一下 idle）
+    /// Transition to stopped in sessions file is not turn completion (errors, cancellations, and background agent finishes all briefly flicker idle)
     @Test func stoppingIsNotATurnEnd() {
         var board = makeBoard()
         #expect(feed(&board, session(.stopped), session(.working, at: 1), session(.stopped, at: 9)) == [nil, nil, nil])
     }
 }
 
-/// 需要你介入（sessions 文件）
+/// Needs you (sessions file)
 @Suite struct NeedingYou {
-    /// 回到工作中时介入结束（介入卡要撤）
+    /// Returning to working ends intervention (intervention card is dismissed)
     @Test func needsYouThenWorking() {
         var board = makeBoard()
         #expect(feed(&board, session(.stopped), session(.working, at: 1), session(.needsYou(.approval), at: 2),
@@ -139,7 +139,7 @@ private func makeBoard() -> AgentBoard { AgentBoard(since: t0) }
                 == [nil, nil, .needsYou(.approval, pid: 1), nil, .needsYouEnded(pid: 1)])
     }
 
-    /// 在批准框按 Esc、空闲时弹的对话框关掉：变成已停止也是介入结束
+    /// Pressing Esc in approval prompt, or closing idle dialog: transition to stopped also ends intervention
     @Test func stoppingWhileNeedingYouEndsNeed() {
         var board = makeBoard()
         #expect(feed(&board, session(.working), session(.needsYou(.question), at: 2), session(.stopped, at: 3))
@@ -149,7 +149,7 @@ private func makeBoard() -> AgentBoard { AgentBoard(since: t0) }
                 == [nil, .needsYou(.question, pid: 1), .needsYouEnded(pid: 1)])
     }
 
-    /// 从等你批准换成等你回答，还在需要你介入里，不再响
+    /// Switching from approval to question remains in needsYou, does not ping again
     @Test func switchingNeedDoesNotPingAgain() {
         var board = makeBoard()
         #expect(feed(&board, session(.stopped), session(.needsYou(.approval), at: 1), session(.needsYou(.question), at: 2))
@@ -157,15 +157,15 @@ private func makeBoard() -> AgentBoard { AgentBoard(since: t0) }
     }
 }
 
-/// App 启动时、或第一次看到某个文件时，它已经在回合里（docs/agent-integration.md「中途接手」）
+/// When App starts or first discovers a file, it is already mid-turn (docs/agent-integration.md "Mid-turn takeover")
 @Suite struct PickingUpMidTurn {
-    /// 已经在等你：不补响 Ping，之后照常结束介入
+    /// Already waiting for you: does not ping, ends intervention normally afterwards
     @Test func needingYouAtFirstSightDoesNotPing() {
         var board = makeBoard()
         #expect(feed(&board, session(.needsYou(.approval)), session(.working, at: 3)) == [nil, .needsYouEnded(pid: 1)])
     }
 
-    /// 工作开始取文件里的 `statusUpdatedAt`，不是 App 读到的时刻
+    /// Work start uses statusUpdatedAt from file, not time read by App
     @Test func pickedUpTurnStartsWhenFileSays() {
         var board = makeBoard()
         _ = board.update(session(.working), at: t0.addingTimeInterval(590))
@@ -178,7 +178,7 @@ private func makeBoard() -> AgentBoard { AgentBoard(since: t0) }
     }
 }
 
-/// 进程没了：从列表里去掉，不算已停止，不提醒（docs/agent-integration.md「进程没了」）
+/// Process gone: removed from list, not considered stopped, does not notify (docs/agent-integration.md "Processes exiting")
 @Suite struct SessionsGoing {
     @Test func removedSessionIsForgotten() {
         var board = makeBoard()
@@ -188,7 +188,7 @@ private func makeBoard() -> AgentBoard { AgentBoard(since: t0) }
         #expect(feed(&board, report("t1", .done)) == [nil])
     }
 
-    /// pid 被复用：启动时刻不同就是另一个进程，从头算工作开始
+    /// pid reused: differing start time indicates distinct process, resets work start baseline
     @Test func reusedPidIsANewSession() {
         var board = makeBoard()
         _ = feed(&board, session(.working, at: -590), session(.working, at: 5, started: 4))
@@ -196,7 +196,7 @@ private func makeBoard() -> AgentBoard { AgentBoard(since: t0) }
     }
 }
 
-/// docs/mascot.md §2「优先级」的 agent 一档；干了很久 10 分钟出自 docs/agent-integration.md，完成 5.2s 出自 docs/mascot.md §2
+/// docs/mascot.md §2 "Priority" agent tier; long turn at 10 minutes from docs/agent-integration.md, finished for 5.2s from docs/mascot.md §2
 @Suite struct Activity {
     @Test func nothingTrackedIsNil() {
         #expect(makeBoard().activity(at: t0) == nil)
@@ -208,7 +208,7 @@ private func makeBoard() -> AgentBoard { AgentBoard(since: t0) }
         #expect(board.activity(at: t0.addingTimeInterval(1)) == nil)
     }
 
-    /// 满 10 分钟就算（到点即变，`nextChange` 才能给准确时刻），等你的时间也算进去
+    /// Triggers at 10 minutes exactly (instant transition at time boundary ensures nextChange accuracy); waiting time is included
     @Test func longTurnAfterTenMinutesSinceWorkStart() {
         var board = makeBoard()
         _ = feed(&board, session(.stopped, at: -1), session(.working), session(.needsYou(.approval), at: 100), session(.working, at: 500))
@@ -222,7 +222,7 @@ private func makeBoard() -> AgentBoard { AgentBoard(since: t0) }
         #expect(board.activity(at: t0.addingTimeInterval(1)) == .question)
     }
 
-    /// 回合做完后 5.2s 内是完成，之后什么都不加
+    /// Finished persists for 5.2s after turn completion, then clears
     @Test func finishedLastsFivePointTwoSeconds() {
         var board = makeBoard()
         _ = feed(&board, session(.working), session(.stopped, at: 10))
@@ -231,7 +231,7 @@ private func makeBoard() -> AgentBoard { AgentBoard(since: t0) }
         #expect(board.activity(at: t0.addingTimeInterval(15.2)) == nil)
     }
 
-    /// 出错不画完成
+    /// Failed turns do not show finished
     @Test func failedIsNotFinished() {
         var board = makeBoard()
         _ = feed(&board, session(.working), session(.stopped, at: 10))
@@ -239,7 +239,7 @@ private func makeBoard() -> AgentBoard { AgentBoard(since: t0) }
         #expect(board.activity(at: t0.addingTimeInterval(11)) == nil)
     }
 
-    /// 多个会话取最高的
+    /// Highest session priority wins among multiple sessions
     @Test func highestSessionWins() {
         var board = makeBoard()
         _ = feed(&board, session(.working, pid: 1), session(.needsYou(.question), pid: 2), session(.needsYou(.approval), pid: 3),
@@ -255,7 +255,7 @@ private func makeBoard() -> AgentBoard { AgentBoard(since: t0) }
     }
 }
 
-/// 不来新文件时，activity 会因为时间走到哪一刻而变：App 只挂这一个定时器
+/// When no new files arrive, activity changes at future timestamps due to elapsed time: App schedules only this single timer
 @Suite struct NextChange {
     @Test func nothingPendingIsNil() {
         var board = makeBoard()
@@ -280,7 +280,7 @@ private func makeBoard() -> AgentBoard { AgentBoard(since: t0) }
     }
 }
 
-/// 面板的会话列表：只有活着的、要看的会话；按进程启动先后排，状态变了行不挪位置
+/// Panel session list: only active tracked sessions; sorted by process start time, stable row order across state changes
 @Suite struct SessionList {
     @Test func listsTrackedSessionsByProcessStart() {
         var board = makeBoard()
@@ -294,7 +294,7 @@ private func makeBoard() -> AgentBoard { AgentBoard(since: t0) }
         #expect(board.sessions.map(\.pid) == [5, 3])
     }
 
-    /// procStart 只精确到秒：同一秒起的按 pid，顺序才稳定
+    /// procStart has second precision: ordered by pid when started in same second for stable sorting
     @Test func sameSecondOrdersByPid() {
         var board = makeBoard()
         _ = feed(&board, session(.working, pid: 9, started: -5), session(.working, pid: 2, started: -5))
@@ -302,7 +302,7 @@ private func makeBoard() -> AgentBoard { AgentBoard(since: t0) }
     }
 }
 
-/// 介入结束：需要你介入的会话回到工作中、变成已停止或进程没了（docs/ubiquitous-language.md）
+/// Intervention ended: session needing you returns to working, stopped, or process exits (docs/ubiquitous-language.md)
 @Suite struct NeedsYouEnds {
     @Test func processGoneWhileNeedingYouEndsNeed() {
         var board = makeBoard()
@@ -317,7 +317,7 @@ private func makeBoard() -> AgentBoard { AgentBoard(since: t0) }
         #expect(board.remove(pid: 1) == nil)
     }
 
-    /// pid 被复用：旧进程正在需要你介入，就是介入结束
+    /// pid reused: if previous process was in needsYou, emits intervention ended
     @Test func reusedPidEndsOldNeed() {
         var board = makeBoard()
         _ = feed(&board, session(.working), session(.needsYou(.approval), at: 1))

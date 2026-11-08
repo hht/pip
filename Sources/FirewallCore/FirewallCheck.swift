@@ -1,18 +1,18 @@
-/// 回答：开着的防火墙此刻真的在拦吗（docs/firewall.md §4「核对」、§5「fail-open」）。
-/// 任何一项不过，App 都不能显示「已保护」。只解析 pfctl / ifconfig 的输出，不知道它们怎么来的。
+/// Answers: whether the active firewall is truly blocking traffic right now (docs/firewall.md §4 "Verification", §5 "fail-open").
+/// If any check fails, the App cannot display "Protected". Parses pfctl / ifconfig output only, unaware of how they are invoked.
 public struct FirewallCheck: Codable, Equatable, Sendable {
-    /// pf 开着（`pfctl -s info` 是 `Status: Enabled`）：有人 pfctl -d 后规则还在 anchor 里也不生效。
-    /// `nil` 是读不出：和明确停了分开，停了说明所有引用都被作废了
+    /// pf is enabled (`pfctl -s info` shows `Status: Enabled`): if someone runs pfctl -d, rules remaining in the anchor do not take effect.
+    /// `nil` means unreadable: distinct from definitively disabled; disabled indicates all references were revoked.
     public var pfEnabled: Bool?
-    /// 主规则集里还有 `anchor "com.apple/*"`：有人 `pfctl -f` 换掉主规则集，本 anchor 就不再被求值
+    /// Main ruleset contains `anchor "com.apple/*"`: if someone replaces main ruleset via `pfctl -f`, this anchor is no longer evaluated.
     public var anchorPointPresent: Bool
-    /// 本 anchor 里有规则
+    /// This anchor has rules loaded
     public var rulesLoaded: Bool
-    /// 本 anchor 各条规则 Evaluations 的和；读不出数字时 `nil`
+    /// Sum of Evaluations across all rules in this anchor; `nil` if count cannot be parsed
     public var evaluations: UInt64?
-    /// 比上一轮涨了：本 anchor 真的在被求值。`nil` 是没有上一轮可比（刚装上、刚重装、读不出数字）
+    /// Increased compared to last round: this anchor is actively being evaluated. `nil` means no previous round to compare against (freshly loaded, reloaded, or unreadable count)
     public var evaluationsGrowing: Bool?
-    /// TUN 网卡在：网卡名写错或 Clash 改了名，规则会把所有流量都拦掉（往安全方向出错），要让人看得出来
+    /// TUN interface is present: if interface name is wrong or Clash changed name, rules will block all traffic (failing closed/safely), which must be visible to the user.
     public var tunnelPresent: Bool
 
     public init(pfEnabled: Bool?, anchorPointPresent: Bool, rulesLoaded: Bool, evaluations: UInt64?, evaluationsGrowing: Bool?, tunnelPresent: Bool) {
@@ -25,12 +25,12 @@ public struct FirewallCheck: Codable, Equatable, Sendable {
     }
 
     /// - Parameters:
-    ///   - mainRules: `pfctl -sr` 的 stdout，anchor 点是一行 `anchor "com.apple/*" all`（本机实测）；比到右引号，`anchor "com.apple.internet-sharing"` 不算
-    ///   - anchorRules: `pfctl -a <anchor> -vsr` 的 stdout，每条规则下一行是 `[ Evaluations: <n> … ]`
-    ///   - info: `pfctl -s info` 的 stdout，第一行是 `Status: Enabled …` 或 `Status: Disabled …`（本机实测）
-    ///   - interfaces: `ifconfig -l` 的 stdout
-    ///   - previousEvaluations: 上一轮的 `evaluations`
-    /// 哪一条命令失败了，调用方传空串：每一项都判不过
+    ///   - mainRules: stdout of `pfctl -sr`, anchor point is line `anchor "com.apple/*" all` (verified on macOS); matches up to closing quote so `anchor "com.apple.internet-sharing"` does not match
+    ///   - anchorRules: stdout of `pfctl -a <anchor> -vsr`, each rule is followed by line `[ Evaluations: <n> ... ]`
+    ///   - info: stdout of `pfctl -s info`, first line is `Status: Enabled ...` or `Status: Disabled ...` (verified on macOS)
+    ///   - interfaces: stdout of `ifconfig -l`
+    ///   - previousEvaluations: previous round's `evaluations`
+    /// If any command fails, caller passes empty string: all checks will fail.
     public init(mainRules: String, anchorRules: String, info: String, interfaces: String, tunnel: String, previousEvaluations: UInt64?) {
         pfEnabled = info.hasPrefix("Status: Enabled") ? true : info.hasPrefix("Status: Disabled") ? false : nil
         anchorPointPresent = mainRules.split(separator: "\n").contains { $0.hasPrefix(#"anchor "com.apple/*""#) }
@@ -41,25 +41,25 @@ public struct FirewallCheck: Codable, Equatable, Sendable {
             return words.firstIndex(of: "Evaluations:").flatMap { words.indices.contains($0 + 1) ? UInt64(words[$0 + 1]) : nil }
         }
         rulesLoaded = ruleCount > 0
-        // 每条规则都要有一个读得出的数，少一个都不算；&+ 不会因溢出让 root 守护进程崩掉
+        // Every rule must have a readable number, missing even one invalidates the sum; &+ will not crash the root daemon on overflow
         evaluations = rulesLoaded && counts.count == ruleCount ? counts.reduce(0, &+) : nil
         evaluationsGrowing = evaluations.flatMap { now in previousEvaluations.map { now > $0 } }
         tunnelPresent = interfaces.split(whereSeparator: \.isWhitespace).contains { $0 == tunnel }
     }
 
-    /// 都过了才算在拦。没有上一轮可比（`evaluationsGrowing == nil`）不算不过：刚装上的那一轮不该报异常；
-    /// 读不出 Evaluations 的数字算不过，否则格式变了就永远比不出来、永远「过」
+    /// All must pass to be considered active blocking. No previous round to compare (`evaluationsGrowing == nil`) is not a failure: the round immediately after loading should not report anomaly;
+    /// unreadable Evaluations numbers count as failure, otherwise format changes would permanently pass without verification.
     public var passed: Bool { tunnelPresent && passedApartFromTunnel }
 
-    /// 规则真的在被求值，只差隧道网卡：这时是全拦（往安全方向出错）。pf 停了、anchor 空了时什么都没在拦，不能这么说
+    /// Rules are actively being evaluated, missing only the tunnel interface: in this case everything is blocked (fails safe). When pf is stopped or anchor is empty, nothing is blocked, which is distinct.
     public var passedApartFromTunnel: Bool {
         pfEnabled == true && anchorPointPresent && rulesLoaded && evaluations != nil && evaluationsGrowing != false
     }
 }
 
-/// 回答：pfctl 命令的输出里认出什么。格式按本机实测（docs/firewall.md §6）
+/// Answers: parsing pfctl command output. Formats based on local macOS testing (docs/firewall.md §6)
 public enum PFOutput {
-    /// `pfctl -E` 的 stderr 里恰好一行 `Token : <数字>`；认不出（没有、不是数字、不止一行）是 `nil`
+    /// Stderr of `pfctl -E` contains exactly one line `Token : <digits>`; returns `nil` if unrecognized (missing, non-digit, or multiple lines).
     public static func token(fromEnable stderr: String) -> String? {
         let tokens = stderr.split(separator: "\n").compactMap { line -> Substring? in
             guard line.hasPrefix("Token : ") else { return nil }
@@ -71,8 +71,8 @@ public enum PFOutput {
 }
 
 extension PFOutput {
-    /// `pfctl -s References` 的 stdout 里有哪些 token。每行是 PID、进程名、token、`<n> days HH:MM:SS`；
-    /// 进程名可能带空格，所以 token 从行尾往前数第 4 列。认不出格式（没有表头、某行对不上）是 `nil`，不是「一个都没有」
+    /// Extracts tokens present in stdout of `pfctl -s References`. Each line has PID, process name, token, `<n> days HH:MM:SS`;
+    /// process name may contain spaces, so token is 4th column from end of line. Returns `nil` if format unrecognized (no header or line mismatch), rather than empty set.
     public static func tokens(fromReferences stdout: String) -> Set<String>? {
         let lines = stdout.split(separator: "\n")
         guard let header = lines.firstIndex(where: { $0.hasPrefix("PID") }) else { return nil }

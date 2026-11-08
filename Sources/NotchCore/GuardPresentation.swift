@@ -2,29 +2,29 @@ import Foundation
 import GuardCore
 import MascotCore
 
-/// 回答：守卫最近这一轮的结果，加上用户关掉的是哪一次违规，界面该画成什么、要不要红卡。
-/// 纯函数，不知道文案和颜色（App 按 `status`、`tone` 去取），规则见 docs/egress-guard.md「怎么画」。
+/// Answers: How the UI should draw and whether a red card is needed, given the guard's latest round and any user-dismissed violation.
+/// Pure function, agnostic of copy and colors (App looks up via `status` and `tone`), rules in docs/egress-guard.md "Visual Rendering".
 public struct GuardPresentation: Equatable, Sendable {
-    /// 界面上说的那句话（docs/egress-guard.md「怎么画」）
+    /// Status message shown in UI (docs/egress-guard.md "Visual Rendering")
     public enum Status: Equatable, Sendable {
-        /// App 刚启动，第一轮还没查完
+        /// App just launched, initial round still checking
         case checking
         case healthy
         case mismatch
         case offline
-        /// 探针没结果：不改造型，收起时右耳显示灰环
+        /// Probe failed: look unchanged, gray ring on right ear when collapsed
         case probeFailed
         case violated
     }
 
-    /// 状态点：healthy 绿、mismatch 琥珀实心、unknown 灰色空心环、violated 红
+    /// Status dot: healthy green, mismatch solid amber, unknown gray hollow ring, violated red
     public enum Tone: Equatable, Sendable { case healthy, mismatch, unknown, violated }
 
     public let status: Status
-    /// 要不要红卡（不代表撤卡：撤卡只看 healthy）。违规中、用户还没关掉这一次时才要
+    /// Whether a red card is requested (does not imply dismissal: dismissal checks healthy only). Active only when violated and user has not dismissed this instance
     public let wantsAlert: Bool
 
-    /// - dismissedViolationSince: nil = 没关掉过；.some(x) = 用户关掉了 violatedSince 为 x 的那次
+    /// - dismissedViolationSince: nil = never dismissed; .some(x) = user dismissed violation with violatedSince == x
     public init(_ d: GuardDisplay, dismissedViolationSince: Date??) {
         wantsAlert = d.verdict == .violated && dismissedViolationSince != .some(d.violatedSince)
         switch d.verdict {
@@ -49,7 +49,7 @@ public struct GuardPresentation: Equatable, Sendable {
         }
     }
 
-    /// Pip 画成哪个守卫造型；没有守卫的事时是 idle（docs/mascot.md §2）
+    /// Mascot look for guard state; defaults to idle when guard is nominal (docs/mascot.md §2)
     public var look: Look {
         switch status {
         case .checking, .healthy, .probeFailed: return .idle

@@ -1,7 +1,7 @@
 import Testing
 @testable import FirewallCore
 
-/// `pfctl -sr`：主规则集，macOS 26.5、系统默认 /etc/pf.conf 下的实际输出（stdout，docs/firewall.md §6）
+/// pfctl -sr: main ruleset actual stdout on macOS 26.5 under default /etc/pf.conf (docs/firewall.md §6)
 private let mainRules = """
 scrub-anchor "com.apple/*" all fragment reassemble
 scrub-anchor "com.apple.internet-sharing" all fragment reassemble
@@ -10,7 +10,7 @@ anchor "com.apple.internet-sharing" all
 
 """
 
-/// `pfctl -a com.apple/300.Notchkeeper -vsr`，格式照 macOS 26.5 上演练时的实际输出
+/// pfctl -a com.apple/300.Notchkeeper -vsr, format based on actual output during rehearsal on macOS 26.5
 private func anchorRules(_ evaluations: [Int]) -> String {
     evaluations.map {
         """
@@ -23,7 +23,7 @@ private func anchorRules(_ evaluations: [Int]) -> String {
 }
 
 private let interfaces = "lo0 gif0 stf0 en0 awdl0 utun0 utun1024 bridge100\n"
-/// `pfctl -s info` 的第一行，照 macOS 26.5 上演练时的实际输出
+/// First line of pfctl -s info, formatted based on rehearsal on macOS 26.5
 private let info = "Status: Enabled for 18 days 12:22:58          Debug: Urgent\n\n"
 
 @Suite struct Check {
@@ -40,8 +40,8 @@ private let info = "Status: Enabled for 18 days 12:22:58          Debug: Urgent\
         FirewallCheck(mainRules: main, anchorRules: anchor, info: i, interfaces: ifs, tunnel: "utun1024", previousEvaluations: previous)
     }
 
-    /// fail-open：有人 pfctl -d 停了 pf，规则还在 anchor 里也不生效；读不出（输出空）同样不算过。
-    /// 停了和读不出分开：前者说明我们的引用一定被作废了，后者什么都说明不了
+    /// fail-open: if pfctl -d disabled pf, rules in anchor do not take effect; unreadable output (empty) also fails.
+    /// Disabled vs unreadable are separated: former means our reference was definitely revoked, latter proves nothing.
     @Test(arguments: [("Status: Disabled          Debug: Urgent\n", false), ("", nil)] as [(String, Bool?)])
     func pfNotEnabled(_ info: String, enabled: Bool?) {
         let c = check(info: info)
@@ -49,7 +49,7 @@ private let info = "Status: Enabled for 18 days 12:22:58          Debug: Urgent\
         #expect(!c.passed)
     }
 
-    /// fail-open：有人 pfctl -f 换掉了主规则集，本 anchor 不再被求值
+    /// fail-open: if pfctl -f replaced main ruleset, this anchor is no longer evaluated
     @Test func anchorPointGone() {
         let c = check(main: "anchor \"com.apple.internet-sharing\" all\npass all\n")
         #expect(!c.anchorPointPresent)
@@ -63,28 +63,28 @@ private let info = "Status: Enabled for 18 days 12:22:58          Debug: Urgent\
         #expect(!c.passed)
     }
 
-    /// 计数不涨：规则在、却没被求值
+    /// Evaluations not growing: rules present, but not evaluated
     @Test func evaluationsNotGrowing() {
         let c = check(previous: 326)
         #expect(c.evaluationsGrowing == false)
         #expect(!c.passed)
     }
 
-    /// 网卡名写错或 Clash 改了名：往安全方向出错，但要报出来
+    /// Interface name misspelled or Clash changed name: fails safe, but must be reported
     @Test func tunnelMissing() {
         let c = check(interfaces: "lo0 en0 utun0 utun10240\n")
         #expect(!c.tunnelPresent)
         #expect(!c.passed)
     }
 
-    /// 刚装上、没有上一轮可比：不算不过
+    /// Freshly loaded without previous round to compare: does not count as failure
     @Test func firstRoundAfterLoadPasses() {
         let c = check(previous: nil)
         #expect(c.evaluationsGrowing == nil)
         #expect(c.passed)
     }
 
-    /// 格式变了读不出数：不能永远「过」
+    /// Format changed and number unreadable: must not permanently pass
     @Test func unreadableEvaluationsFail() {
         let c = check(anchor: anchorRules([300]) + "pass out all\n  [ Evaluations: lots ]\n", previous: nil)
         #expect(c.evaluations == nil)
@@ -93,7 +93,7 @@ private let info = "Status: Enabled for 18 days 12:22:58          Debug: Urgent\
 }
 
 @Suite struct EnableOutput {
-    /// macOS 26.5 上演练时 `pfctl -E` 的实际输出：stdout 空，token 在 stderr
+    /// Actual output of pfctl -E during rehearsal on macOS 26.5: stdout empty, token in stderr
     @Test func readsTheToken() {
         let stderr = "No ALTQ support in kernel\nALTQ related functions disabled\npf enabled\nToken : 1864012227745836441\n"
         #expect(PFOutput.token(fromEnable: stderr) == "1864012227745836441")
@@ -106,7 +106,7 @@ private let info = "Status: Enabled for 18 days 12:22:58          Debug: Urgent\
 }
 
 @Suite struct ReferencesOutput {
-    /// macOS 26.5 上演练时 `pfctl -s References` 的实际输出（stdout）
+    /// Actual stdout of pfctl -s References during rehearsal on macOS 26.5
     @Test func readsTokens() {
         let out = """
         TOKENS:
@@ -118,7 +118,7 @@ private let info = "Status: Enabled for 18 days 12:22:58          Debug: Urgent\
         #expect(PFOutput.tokens(fromReferences: out) == ["1864012227745836441", "12184426722627826779"])
     }
 
-    /// 进程名里有空格也认得出：token 是时间戳（三列）前面那一列
+    /// Process name containing spaces parsed correctly: token is column before timestamp (3 columns)
     @Test func processNameWithSpaces() {
         let out = "TOKENS:\nPID      Process Name                 TOKEN                    TIMESTAMP\n812      Internet Sharing             42                       1 days 01:02:03\n"
         #expect(PFOutput.tokens(fromReferences: out) == ["42"])
@@ -128,7 +128,7 @@ private let info = "Status: Enabled for 18 days 12:22:58          Debug: Urgent\
         #expect(PFOutput.tokens(fromReferences: "TOKENS:\nPID      Process Name                 TOKEN                    TIMESTAMP\n") == [])
     }
 
-    /// 认不出格式（没有表头、某行对不上）就是读不出，不能当成「一个都没有」：那样会让守护进程每轮重新 -E
+    /// Unrecognized format (missing header, mismatched line) is unreadable, not "empty": treating as empty would cause daemon to re-run -E every round
     @Test(arguments: ["", "pfctl: DIOCGETSTARTERS: Permission denied\n",
                       "TOKENS:\nPID      Process Name                 TOKEN                    TIMESTAMP\ngarbage line\n",
                       "TOKENS:\nPID      Process Name                 TOKEN                    TIMESTAMP\n91055    pfctl    1864012227745836441    0 hours 00:00:12\n"])

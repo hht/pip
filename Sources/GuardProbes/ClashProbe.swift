@@ -1,14 +1,14 @@
 import Darwin
 
-/// 回答：Clash 内核进程在不在。
-/// 结果只决定 healthy 还是 unknown，不会判 violated（规则见 `EgressGuard`）。
-/// 按可执行文件名整名匹配，不按子串 grep：GUI（`clash-verge`）和特权服务（`clash-verge-service`）
-/// 在、内核没起来时流量并不经过 Clash。
+/// Answers: whether the Clash core process is running.
+/// The result only determines healthy vs. unknown; it does not verdict violated (see `EgressGuard` for rules).
+/// Matches exact executable name, not substring grep: when GUI (`clash-verge`) and privileged service (`clash-verge-service`)
+/// are running but the core has not started, traffic does not go through Clash.
 public enum ClashProbe {
-    /// Clash Verge Rev 自带的内核名（实测）。换别的 Clash 再按实测加。
+    /// Clash core name bundled with Clash Verge Rev (verified). Add others based on testing if switching Clash variants.
     static let coreNames: Set<String> = ["verge-mihomo"]
 
-    /// 列不出进程表时返回 nil（未知），不当作「不在」。
+    /// Returns nil (unknown) when process list cannot be enumerated, not treated as "not running".
     public static func current() -> Bool? {
         executablePaths().map(isRunning(executablePaths:))
     }

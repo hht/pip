@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import GuardCore
 
-// 测试只用 TEST-NET-2（198.51.100.0/24，RFC 5737）地址
+// Tests use TEST-NET-2 (198.51.100.0/24, RFC 5737) addresses exclusively
 private let allowedA = IPv4("198.51.100.10")!
 private let allowedB = IPv4("198.51.100.11")!
 private let outsideX = IPv4("198.51.100.9")!
@@ -26,7 +26,7 @@ private func state(_ o: Observation, path: NetworkPath? = up) -> GuardDisplay {
     return state(o, guard: &g, path: path)
 }
 
-/// 面板显示的出口 IP 和判定同源：这一轮观测到的出口 IP 放进 `GuardDisplay.egressIP`（完整地址，界面完整显示）
+/// Egress IP in panel shares derivation with verdict: observed egress IP in round populates `GuardDisplay.egressIP`
 @Suite struct EgressIPInDisplay {
     @Test func healthyRoundWritesTheObservedIP() {
         let s = state(obs(ips: [allowedA, allowedA]))
@@ -34,30 +34,30 @@ private func state(_ o: Observation, path: NetworkPath? = up) -> GuardDisplay {
         #expect(s.egressIP == "198.51.100.10")
     }
 
-    /// 出口不符时显示的是不在允许列表的那个，不是碰巧对上的那个
+    /// Mismatch prefers displaying the IP outside allowlist, not accidentally matched IP
     @Test func mismatchPrefersTheIPOutsideTheAllowlist() {
         let s = state(obs(ips: [allowedA, outsideX, allowedB]))
         #expect(s.verdict == .egressMismatch)
         #expect(s.egressIP == "198.51.100.9")
     }
 
-    /// 回显服务说法不一时：取出现次数最多的；一样多取数值最小的。和探针返回的先后顺序无关
+    /// On probe divergence: picks most frequent, ties broken by lowest numeric value; invariant to arrival order
     @Test func pickIsDeterministicRegardlessOfProbeOrder() {
         for ips in [[outsideY, outsideX, outsideY], [outsideX, outsideY, outsideY], [outsideY, outsideY, outsideX]] {
             #expect(obs(ips: ips).shownEgressIP(allowlist: allowlist) == outsideY)
         }
         for ips in [[outsideY, outsideX], [outsideX, outsideY]] {
-            #expect(obs(ips: ips).shownEgressIP(allowlist: allowlist) == outsideX) // .9 < .200 按数值比，不按字符串
+            #expect(obs(ips: ips).shownEgressIP(allowlist: allowlist) == outsideX) // Numeric comparison .9 < .200
         }
         #expect(obs(ips: [allowedB, allowedA]).shownEgressIP(allowlist: allowlist) == allowedA)
     }
 
-    /// 允许列表为空（配置问题）：verdict 是 unknown，但出口确实观测到了，照样写
+    /// Empty allowlist (config issue): verdict is unknown, but observed IP is still populated
     @Test func emptyAllowlistStillReportsTheObservedIP() {
         #expect(obs(ips: [outsideX]).shownEgressIP(allowlist: []) == outsideX)
     }
 
-    /// 这一轮没观测到出口（断网、探针全失败或超时）就是 nil，界面显示「—」
+    /// Unobserved egress (offline, probes failed or timed out) evaluates to nil, displayed as "-"
     @Test(arguments: [up, down, nil] as [NetworkPath?])
     func noObservedEgressIsNil(_ path: NetworkPath?) {
         let s = state(obs(ips: []), path: path)
@@ -65,14 +65,14 @@ private func state(_ o: Observation, path: NetworkPath? = up) -> GuardDisplay {
         #expect(s.egressIP == nil)
     }
 
-    /// 绝不沿用上一轮的 IP：上一轮拿到了，这一轮探针失败，就写 nil
+    /// Never carries over previous round's IP: if previous succeeded and current failed, writes nil
     @Test func neverCarriesOverThePreviousRoundsIP() {
         var g = EgressGuard()
         #expect(state(obs(ips: [allowedA]), guard: &g).egressIP == "198.51.100.10")
         #expect(state(obs(ips: []), guard: &g, at: t0.addingTimeInterval(5)).egressIP == nil)
     }
 
-    /// 粘住的 violated 期间，IP 照样是这一轮的观测（verdict 粘，IP 不粘）
+    /// Sticky violated continues reporting current round's observation (verdict sticky, IP unsticky)
     @Test func stickyViolatedReportsThisRoundsIP() {
         var g = EgressGuard()
         let first = state(obs(iface: "en0", ips: [outsideX]), guard: &g)

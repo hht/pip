@@ -2,7 +2,8 @@ import Foundation
 import FirewallCore
 @testable import firewalld
 
-/// 假的 pf：照本机实测的输出格式（docs/firewall.md §6）回应 pfctl、ifconfig、launchctl，记下每一次调用
+/// Fake pf: responds to pfctl, ifconfig, launchctl according to actual observed machine output (docs/firewall.md §6),
+/// recording every invocation
 final class FakePF: @unchecked Sendable {
     var anchor = ""
     var references: [String] = []
@@ -12,13 +13,13 @@ final class FakePF: @unchecked Sendable {
     var interfaces = "lo0 en0 utun1024\n"
     var calls: [[String]] = []
     var enabled = true
-    /// `false`：References 里不列我们拿的引用（模拟 -E 给的号码和列表对不上）
+    /// `false`: References does not list our acquired token (simulating -E token not matching list)
     var listsOurReferences = true
-    /// 让某条命令失败：参数里含这个串的那次调用返回 1
+    /// Make command fail: invocation whose arguments contain this substring returns 1
     var failing: String?
-    /// 每次调用前看一眼（测「拿到 token 后立刻落盘」用）
+    /// Inspection hook before each invocation (used to test "persisting immediately after token acquisition")
     var onCall: ([String]) -> Void = { _ in }
-    /// dig 向 127.0.0.1:7874 查 A 记录时的答案；不在表里的名字没有答案
+    /// Answers when dig queries A records against 127.0.0.1:7874; unlisted names have no answer
     var dns: [String: [String]] = ["node.example": ["198.51.100.1"]]
 
     func run(_ executable: String, _ arguments: [String], _ input: String?) -> Output {
@@ -74,7 +75,7 @@ final class FakePF: @unchecked Sendable {
     }
 }
 
-/// 临时目录 + 假 pf + 手动拨的时钟
+/// Temporary directory + fake pf + manually controlled clock
 final class Rig: @unchecked Sendable {
     let pf = FakePF()
     let directory: URL
@@ -89,7 +90,7 @@ final class Rig: @unchecked Sendable {
     }
     let rules = FirewallRules(tunnel: "utun1024", directory: FirewallPaths.directory.path)!
 
-    /// 假的 Clash Verge 目录：一个域名节点、一个 IP 上游；国内段是 0.0.0.0/8
+    /// Fake Clash Verge directory: 1 domain node, 1 IP upstream; domestic subnet is 0.0.0.0/8
     let clash: URL
 
     init() throws {
@@ -118,8 +119,8 @@ final class Rig: @unchecked Sendable {
         (try? Data(contentsOf: directory.appendingPathComponent("\(name).table"))).map { String(decoding: $0, as: UTF8.self) }
     }
 
-    /// IPv4 mmdb：0.0.0.0/`prefix` 是 CN，别处没有数据（格式见 FirewallCoreTests 的 CountryDatabaseTests）。
-    /// 一条左链 `prefix` 个节点，最后一个的左边指向数据区偏移 0，其余右边都是「没有数据」（等于 node_count）
+    /// IPv4 mmdb: 0.0.0.0/`prefix` is CN, no data elsewhere (see CountryDatabaseTests in FirewallCoreTests for format).
+    /// A left-chain of `prefix` nodes; left child of last node points to data offset 0, remaining right children are "no data" (= node_count)
     static func countryDatabase(prefix: Int) -> [UInt8] {
         let string = { (s: String) in [UInt8(2 << 5 | s.utf8.count)] + Array(s.utf8) }
         let map = { (n: Int) in [UInt8(7 << 5 | n)] }

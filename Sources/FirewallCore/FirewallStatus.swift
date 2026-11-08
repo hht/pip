@@ -1,24 +1,24 @@
 import Foundation
 
-/// 回答：守护进程这一轮看到的防火墙是什么样，以什么格式交给 App（`firewall-status.json`，root 0644，docs/firewall.md §4）。
-/// App 只读它，不常驻特权代码；新不新鲜、算不算「已保护」由读的一方按 `checkedAt` 判。不知道文件放在哪、怎么写。
+/// Answers: what the firewall state looks like to the daemon in this round, formatted for the App (`firewall-status.json`, root 0644, docs/firewall.md §4).
+/// App only reads this, with no resident privileged code; freshness and "protected" status are judged by reader via `checkedAt`. Unaware of file locations or write mechanisms.
 public struct FirewallStatus: Codable, Equatable, Sendable {
     public static let fileName = "firewall-status.json"
 
     public enum Mode: String, Codable, Sendable {
         case off, trial, on
-        /// 防火墙状态文件读不出来：按 off 办（清规则、不覆盖原文件），要报出来
+        /// Firewall state file unreadable: treated as off (flush rules, do not overwrite state file), reported as error
         case stateUnreadable
     }
 
     public var mode: Mode
-    /// 装的是哪种规则；`nil` 是不知道。只有 `.everyone` 才算真的在拦（测试规则只拦去测试表的流量），App 据此决定能不能显示「已保护」
+    /// Loaded rules scope; `nil` if unknown. Only `.everyone` represents real blocking (test rules only block traffic to test tables); App uses this to determine if "Protected" can be displayed.
     public var scope: FirewallRules.Scope?
-    /// 试运行到几点结束（墙上时间，只给界面倒计时用；真正的截止按单调时钟，见 `FirewallState`）
+    /// Trial end wall-clock time (for UI countdown only; true deadline uses monotonic clock, see `FirewallState`)
     public var trialEndsAt: Date?
-    /// 只有开着时才核对
+    /// Verified only when enabled
     public var check: FirewallCheck?
-    /// 这一轮做失败的 pf 动作，下一轮会重做
+    /// pf steps that failed in this round; retried in the next round
     public var failedSteps: [PFStep]
     public var checkedAt: Date
 
@@ -32,7 +32,7 @@ public struct FirewallStatus: Codable, Equatable, Sendable {
         self.checkedAt = checkedAt
     }
 
-    /// 缺字段用默认值，多的字段忽略（CLAUDE.md「配置与状态文件」）；`checkedAt` 没有就解不开：没有它判断不了新鲜
+    /// Missing fields use defaults, extra fields are ignored (CLAUDE.md "Configuration and state files"); fails if `checkedAt` missing: freshness cannot be evaluated without it.
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         mode = try c.decodeIfPresent(Mode.self, forKey: .mode) ?? .off

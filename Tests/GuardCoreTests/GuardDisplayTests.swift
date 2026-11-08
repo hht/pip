@@ -20,7 +20,7 @@ private func display(clash: Bool? = true, iface: String? = "utun1024", ips: [IPv
         #expect(display() == GuardDisplay(verdict: .healthy, checkedAt: t0, egressIP: allowed.description))
     }
 
-    /// violatedSince 只跟着 violated 走；unknown 原因只跟着 unknown 走
+    /// violatedSince attaches only to violated; unknown reason attaches only to unknown
     @Test func fieldsFollowTheVerdict() {
         #expect(display(iface: "en0") == GuardDisplay(verdict: .violated, checkedAt: t0, violatedSince: t0, egressIP: allowed.description))
         #expect(display(ips: []) == GuardDisplay(verdict: .unknown, checkedAt: t0, unknownReason: .probeFailed))
@@ -28,7 +28,7 @@ private func display(clash: Bool? = true, iface: String? = "utun1024", ips: [IPv
         #expect(GuardDisplay(verdict: .healthy, observation: o, allowlist: allowlist, networkPath: up, violatedSince: t0, checkedAt: t0).violatedSince == nil)
     }
 
-    /// 还没查完第一轮：unknown，没有原因、没有时间
+    /// Before first round finishes: unknown, without reason or timestamp
     @Test func checkingHasNothingYet() {
         #expect(GuardDisplay.checking == GuardDisplay(verdict: .unknown))
     }
@@ -45,7 +45,7 @@ private func display(clash: Bool? = true, iface: String? = "utun1024", ips: [IPv
         #expect(o(iface: nil).routeOnTunnel == nil)
     }
 
-    /// 没拿到 IP、或允许列表为空，都是「不知道」，不是「对上了」
+    /// Missing IP or empty allowlist evaluates as unknown, not matched
     @Test func egressMatchIsUnknownWithoutEvidence() {
         #expect(o(ips: [allowed, leaked]).egressMatches(allowlist) == false)
         #expect(o(ips: []).egressMatches(allowlist) == nil)

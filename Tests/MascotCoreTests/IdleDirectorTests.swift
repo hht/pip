@@ -1,7 +1,7 @@
 import Testing
 @testable import MascotCore
 
-/// 从 start 起一直取到 end，记下每个提示和它的时刻
+/// Collect cues from start to end, recording each cue and its timestamp
 private func run(seed: UInt64, from start: Double = 0, to end: Double) -> [(at: Double, cue: Cue)] {
     var d = IdleDirector(seed: seed, now: start)
     var out: [(Double, Cue)] = []
@@ -27,7 +27,7 @@ private func blinks(_ log: [(at: Double, cue: Cue)]) -> [(at: Double, double: Bo
         #expect(run(seed: 43, to: 600).map(\.at) != a.map(\.at))
     }
 
-    /// docs/mascot.md §5：小动作每 8–20s 一个，不连续重复
+    /// docs/mascot.md §5: Idle motions occur every 8-20s, never repeating consecutively
     @Test func idleMotionsSpacedAndNeverRepeat() {
         for seed in UInt64(1)...20 {
             let m = motions(run(seed: seed, to: 3600))
@@ -39,7 +39,7 @@ private func blinks(_ log: [(at: Double, cue: Cue)]) -> [(at: Double, double: Bo
         }
     }
 
-    /// 眨眼间隔 2.5–6s，约 15% 连眨两次
+    /// Blink interval 2.5-6s, ~15% double blinks
     @Test func blinkSpacingAndDoubleRate() {
         let b = (UInt64(1)...20).flatMap { blinks(run(seed: $0, to: 3600)) }
         for seed in UInt64(1)...5 {
@@ -47,22 +47,22 @@ private func blinks(_ log: [(at: Double, cue: Cue)]) -> [(at: Double, double: Bo
             for (x, y) in zip(one, one.dropFirst()) { #expect(y.at - x.at >= 2.5 - 1e-9 && y.at - x.at <= 6 + 1e-9) }
         }
         let rate = Double(b.filter(\.double).count) / Double(b.count)
-        #expect(abs(rate - 0.15) < 0.02, "连眨比例 \(rate)")
+        #expect(abs(rate - 0.15) < 0.02, "Double blink rate \(rate)")
     }
 
-    /// docs/mascot.md §5：左右转圈、上下翻圈各约 5%，其余等概率；完成跳转不是空闲小动作
+    /// docs/mascot.md §5: Spin around and flip ~5% each, remaining motions equally likely; finish jump is not an idle motion
     @Test func spinsAreRare() {
         let m = (UInt64(1)...20).flatMap { motions(run(seed: $0, to: 3600)) }
         for rare in [Motion.spinAround, .flip] {
             let rate = Double(m.filter { $0.motion == rare }.count) / Double(m.count)
-            #expect(rate > 0.02 && rate < 0.08, "\(rare) 比例 \(rate)")
+            #expect(rate > 0.02 && rate < 0.08, "\(rare) rate \(rate)")
         }
         let nod = Double(m.filter { $0.motion == .nod }.count) / Double(m.count)
-        #expect(abs(nod - 0.1125) < 0.03, "点头比例 \(nod)")
+        #expect(abs(nod - 0.1125) < 0.03, "Nod rate \(nod)")
         #expect(Set(m.map(\.motion)) == Set(Motion.allCases).subtracting([.finishJump]))
     }
 
-    /// 鼠标在动时不做小动作；停下以后至少再等一个完整间隔
+    /// Do not perform idle motions while mouse is moving; wait at least one full interval after stopping
     @Test func postponeWhileMouseMoves() {
         var d = IdleDirector(seed: 7, now: 0)
         d.postponeMotions(until: 100)
@@ -74,7 +74,7 @@ private func blinks(_ log: [(at: Double, cue: Cue)]) -> [(at: Double, double: Bo
         #expect(first! >= 108)
     }
 
-    /// 看不见一段时间后回来：不补发攒下的提示，从现在重新排
+    /// Returning after being invisible for a while: do not replay accumulated cues, reschedule from now
     @Test func resumeReschedulesFromNow() {
         var d = IdleDirector(seed: 7, now: 0)
         d.resume(at: 1000)

@@ -1,19 +1,19 @@
 import Testing
 @testable import FirewallCore
 
-/// MaxMind DB 格式：搜索树 + 16 字节 0 + 数据区 + 元数据标记 + 元数据。
+/// MaxMind DB format: search tree + 16 zero bytes + data section + metadata marker + metadata.
 /// @see https://maxmind.github.io/MaxMind-DB/
 @Suite struct CountryNetworks {
     @Test func collectsTheCountrysNetworksAndMergesNeighbours() throws {
         let db = MMDB(ipVersion: 6)
         let cnA = db.record(country: "CN")
-        let cnB = db.record(countryPointer: cnA) // 同是 CN、数据不同（GeoLite2 按城市等细节拆开），相邻就合并
+        let cnB = db.record(countryPointer: cnA) // Both CN, different data (GeoLite2 splits by city details), merged when adjacent
         let us = db.record(country: "US")
         db.insert("::198.51.100.0/121", cnA)
         db.insert("::198.51.100.128/121", cnB)
         db.insert("::203.0.113.0/120", us)
         db.insert("2001:db8::/32", cnA)
-        // IPv4 子树在 IPv6 库里还挂在 ::ffff:0:0/96 下（别名），只走一遍、按 IPv4 写
+        // In IPv6 DB, IPv4 subtree is also mounted under ::ffff:0:0/96 (alias), traversed once and recorded as IPv4
         db.alias("::ffff:0:0/96", to: "::/96")
         #expect(try CountryDatabase.networks(country: "CN", in: db.bytes())
             == ["198.51.100.0/24", "2001:db8::/32"].map { IPNetwork($0)! })
@@ -26,7 +26,7 @@ import Testing
         #expect(try CountryDatabase.networks(country: "CN", in: db.bytes()) == [IPNetwork("198.51.100.0/24")!])
     }
 
-    /// mihomo 按 `country.iso_code` 转小写和规则里的国家比，大小写不敏感
+    /// mihomo matches country.iso_code lowercased against rule country, case-insensitive
     @Test func matchesTheCodeCaseInsensitively() throws {
         let db = MMDB(ipVersion: 4)
         db.insert("198.51.100.0/24", db.record(country: "CN"))
@@ -38,7 +38,7 @@ import Testing
         #expect(throws: CountryDatabaseError.self) { try CountryDatabase.networks(country: "CN", in: bytes) }
     }
 
-    /// 截断的文件：树里的记录指到数据区外，报错，不越界
+    /// Truncated file: tree records point outside data section, throws error without out-of-bounds access
     @Test func rejectsATruncatedDataSection() throws {
         let db = MMDB(ipVersion: 4)
         db.insert("198.51.100.0/24", db.record(country: "CN"))
@@ -46,33 +46,32 @@ import Testing
         #expect(throws: CountryDatabaseError.self) { try CountryDatabase.networks(country: "CN", in: db.bytes()) }
     }
 
-    /// 构造过的库：每个节点的两个子节点都指向下一个节点。不去重就要走 2^40 条路，开启命令永远不返回
+    /// Crafted database: both child nodes of every node point to the next node. Without deduplication it would traverse 2^40 paths, hanging the enable command indefinitely
     @Test func rejectsATreeThatRevisitsANode() {
         let db = MMDB(ipVersion: 4)
         let count = 40
         db.rawTree = (count, (0..<count).flatMap { n -> [UInt8] in
-            let next = n + 1 // 最后一个指到 node_count：没有数据
+            let next = n + 1 // Last points to node_count: no data
             return [0, 0, UInt8(next), 0, 0, UInt8(next)]
         })
         #expect(throws: CountryDatabaseError.malformed) { try CountryDatabase.networks(country: "CN", in: db.bytes()) }
     }
 
-    /// 规范不许指针指向指针；允许的话一个记录能套出指数级的解码量
+    /// Specification forbids pointers pointing to pointers; allowing it could expand into exponential decoding work
     @Test func rejectsPointersToPointers() {
         let db = MMDB(ipVersion: 4)
         let cn = db.record(country: "CN")
-        let hop = db.raw([UInt8(1 << 5), UInt8(cn)])            // 指向 cn 记录的指针
+        let hop = db.raw([UInt8(1 << 5), UInt8(cn)])            // Pointer to cn record
         let record = db.raw([UInt8(7 << 5 | 1)] + [UInt8(2 << 5 | 7)] + Array("country".utf8) + [UInt8(1 << 5), UInt8(hop)])
         db.insert("198.51.100.0/24", record)
         #expect(throws: CountryDatabaseError.malformed) { try CountryDatabase.networks(country: "CN", in: db.bytes()) }
     }
 
-    /// 构造过的库：很多叶子各指向一个不同的指针，指针都指向同一个大 map（没有 country 键）。每个叶子都扫一遍它，
-    /// 耗时是叶子数乘条目数，9 MB 的文件能跑几个小时。解码总量有上限，超了就报错
+    /// Crafted database: many leaves each point to a distinct pointer, all pointing to the same large map (without country key). Scanning it for each leaf would take O(leaves * entries), running for hours on a 9MB file. Total decoding budget is capped; exceeds budget throws error
     @Test func rejectsADatabaseThatMakesLookupsMultiply() {
         let db = MMDB(ipVersion: 4)
         let entries = 20_000
-        // map，大小 285 + 后两字节；每个值是布尔 false（扩展类型 14：控制字节 0，扩展字节 14 - 7）
+        // map, size 285 + next 2 bytes; each value is boolean false (extended type 14: control byte 0, extended byte 14 - 7)
         var big: [UInt8] = [UInt8(7 << 5 | 30), UInt8((entries - 285) >> 8), UInt8((entries - 285) & 0xFF)]
         for i in 0..<entries {
             let key = Array(String(format: "k%05d", i).utf8)
@@ -80,13 +79,12 @@ import Testing
         }
         let target = db.raw(big)
         for octet in 0..<256 {
-            db.insert("\(octet).0.0.0/8", db.raw([UInt8(1 << 5 | target >> 8), UInt8(target & 0xFF)])) // 各自一个指向大 map 的指针
+            db.insert("\(octet).0.0.0/8", db.raw([UInt8(1 << 5 | target >> 8), UInt8(target & 0xFF)])) // Each a pointer to the large map
         }
         #expect(throws: CountryDatabaseError.malformed) { try CountryDatabase.networks(country: "CN", in: db.bytes()) }
     }
 
-    /// 构造过的库：很多条记录的 iso_code 都指向同一个大字符串，每条记录都要把它解一遍。额度只按值头次数算挡不住，
-    /// 按字节扣，处理的总字节数就不超过文件大小（真库的值只有几个字节）。键名逐字节比、不解字符串，同样的手法用在键上本来就拖不住
+    /// Crafted database: iso_code of many records points to the same huge string, decoding it for every record. Capping header count alone is insufficient; deducting by bytes ensures total processed bytes <= file size (real DB values are only a few bytes). Keys are compared byte-by-byte without decoding strings, preventing this attack on keys
     @Test func rejectsRecordsThatAllPointAtOneHugeString() {
         let db = MMDB(ipVersion: 4)
         let size = 20_000
@@ -100,23 +98,23 @@ import Testing
         #expect(throws: CountryDatabaseError.malformed) { try CountryDatabase.networks(country: "CN", in: db.bytes()) }
     }
 
-    /// 段数有上限（pf 的表项是全系统共用的，也给内存和耗时封顶）：合并之后还超过就报错，走到一半就停
+    /// Subnets have an upper bound (pf table entries are system-wide shared, capping memory and execution time): exceeding limit even after merging throws error, stopping midway
     @Test func rejectsTooManyNetworks() throws {
         let db = MMDB(ipVersion: 4)
-        for third in [0, 2, 4] { db.insert("198.51.\(third).0/24", db.record(country: "CN")) } // 不相邻，合并不起来
+        for third in [0, 2, 4] { db.insert("198.51.\(third).0/24", db.record(country: "CN")) } // Non-adjacent, cannot be merged
         #expect(try CountryDatabase.networks(country: "CN", in: db.bytes(), limit: 3).count == 3)
         #expect(throws: CountryDatabaseError.tooManyNetworks) { try CountryDatabase.networks(country: "CN", in: db.bytes(), limit: 2) }
     }
 
-    /// node_count 是外部数据：大到装不进 Int、乘起来溢出，都报错而不是崩
+    /// node_count is external data: values too large for Int or overflowing multiplication throw errors rather than crashing
     @Test func rejectsAHugeNodeCount() {
         let db = MMDB(ipVersion: 4)
         db.insert("198.51.100.0/24", db.record(country: "CN"))
-        db.nodeCountOverride = [0x08, 0x02] + [UInt8](repeating: 0xFF, count: 8) // uint64（扩展类型 9）的最大值
+        db.nodeCountOverride = [0x08, 0x02] + [UInt8](repeating: 0xFF, count: 8) // uint64 (extended type 9) maximum value
         #expect(throws: CountryDatabaseError.malformed) { try CountryDatabase.networks(country: "CN", in: db.bytes()) }
     }
 
-    /// mihomo 认的另两种库（sing-geoip、Meta-geoip0）记录不是 GeoLite2 的样子，这里不支持
+    /// Two other database types recognized by mihomo (sing-geoip, Meta-geoip0) do not follow GeoLite2 record format and are unsupported here
     @Test func rejectsOtherMihomoDatabaseTypes() throws {
         let db = MMDB(ipVersion: 4)
         db.databaseType = "sing-geoip"
@@ -127,43 +125,43 @@ import Testing
     }
 }
 
-/// 放行表的国内段像不像一个国家：真库（Clash Verge Rev 自带 mihomo v1.19.21 时目录里的 Country.mmdb）IPv4 覆盖 8.26%、最短 /10，IPv6 最短 /20
+/// Whether allow-table domestic CIDRs resemble a plausible country: real DB (Country.mmdb included with mihomo v1.19.21 in Clash Verge Rev) covers 8.26% IPv4, shortest /10; IPv6 shortest /20
 @Suite struct CountryPlausibility {
     @Test func acceptsARealisticCountry() {
         #expect(CountryDatabase.isPlausible(["1.0.1.0/24", "36.0.0.0/10", "240e::/20"].map { IPNetwork($0)! }))
     }
 
-    /// 被改成大半个互联网都算 CN，正式规则就等于什么都不拦：一个大段，或者拼出来的很多段，都不行
+    /// If modified so most of the Internet is CN, production rules block nothing: single huge block or many stitched blocks are both rejected
     @Test func rejectsTooMuchOfTheInternet() {
         #expect(!CountryDatabase.isPlausible([IPNetwork("0.0.0.0/1")!]))
         #expect(!CountryDatabase.isPlausible((0..<33).map { IPNetwork("\($0).0.0.0/8")! }))
         #expect(CountryDatabase.isPlausible((0..<32).map { IPNetwork("\($0).0.0.0/8")! }))
         #expect(!CountryDatabase.isPlausible([IPNetwork("2000::/13")!]))
-        // 错开的 /16 合并不起来，每段前缀都不短，合起来却很大：按总量算
+        // Staggered /16 subnets cannot be merged; none have short prefixes individually, but combined volume is large: computed by total volume
         #expect(!CountryDatabase.isPlausible(stride(from: 0, to: 10, by: 2).map { IPNetwork("24\(String($0, radix: 16))0::/16")! }))
         #expect(CountryDatabase.isPlausible([IPNetwork("2400::/16")!]))
-        // IPv6 上限 2^-14：中国已分配的 IPv6 约 2^-15.9（推断），收全了的库也要能过
+        // IPv6 upper bound 2^-14: allocated IPv6 in China is ~2^-15.9 (inferred), complete databases must pass
         #expect(CountryDatabase.isPlausible(stride(from: 0, to: 6, by: 2).map { IPNetwork("24\(String($0, radix: 16))0::/16")! }))
     }
 }
 
-/// 测试用的最小 mmdb 写入器：24 位记录，数据区只写这里用到的 map、字符串、指针、uint
+/// Minimal mmdb writer for tests: 24-bit records, data section only encodes maps, strings, pointers, and uints used here
 private final class MMDB {
     let ipVersion: Int
     var databaseType = "GeoLite2-Country"
     var truncateData = false
-    /// 直接给搜索树的字节和节点数，不用 `insert` 建
+    /// Directly provides search tree bytes and node count without building via insert
     var rawTree: (count: Int, bytes: [UInt8])?
-    /// 元数据里 node_count 的值，编码好的
+    /// Encoded node_count value override in metadata
     var nodeCountOverride: [UInt8]?
     private var data: [UInt8] = []
-    /// 二叉树，节点 0 是根；`.data` 存数据区偏移
+    /// Binary tree, node 0 is root; .data stores data section offset
     private enum Child { case empty, node(Int), data(Int) }
     private var nodes: [[Child]] = [[.empty, .empty]]
 
     init(ipVersion: Int) { self.ipVersion = ipVersion }
 
-    /// `{"country": {"iso_code": code}}`，返回数据区偏移
+    /// {"country": {"iso_code": code}}, returns data section offset
     func record(country code: String) -> Int {
         let offset = data.count
         data += map(1) + string("country")
@@ -171,7 +169,7 @@ private final class MMDB {
         return offset
     }
 
-    /// `{"continent": {"code": "AS"}, "country": <指向 `other` 里 country 值的指针>}`
+    /// {"continent": {"code": "AS"}, "country": <pointer to country value in other>}
     func record(countryPointer other: Int) -> Int {
         let offset = data.count
         data += map(2) + string("continent") + map(1) + string("code") + string("AS")
@@ -184,14 +182,14 @@ private final class MMDB {
 
     func insert(_ network: String, _ offset: Int) { set(network, .data(offset)) }
 
-    /// 原样追加到数据区，返回偏移
+    /// Appends raw bytes to data section, returns offset
     func raw(_ bytes: [UInt8]) -> Int {
         defer { data += bytes }
         return data.count
     }
 
     func alias(_ network: String, to target: String) {
-        guard case .node(let n) = walk(target) else { preconditionFailure("别名指向的得是节点") }
+        guard case .node(let n) = walk(target) else { preconditionFailure("Alias must point to a node") }
         set(network, .node(n))
     }
 

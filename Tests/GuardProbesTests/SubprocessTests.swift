@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import GuardProbes
 
-/// 路由探针的子进程：每轮有 8 秒截止，超时被取消时必须把子进程结束掉，不能让它拖住一轮。
+/// Route probe child process: each round has an 8s deadline; when cancelled on timeout, the child process must be terminated so it doesn't hold up a round.
 @Suite struct SubprocessOutput {
     private let clock = ContinuousClock()
 
@@ -23,7 +23,7 @@ import Testing
         #expect(clock.now - begin < .seconds(2))
     }
 
-    /// 已经取消的任务不再启动子进程
+    /// Tasks that are already cancelled do not launch a child process
     @Test func cancelledBeforeLaunchNeverRuns() async {
         let begin = clock.now
         let task = Task {

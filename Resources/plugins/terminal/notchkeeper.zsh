@@ -1,12 +1,12 @@
-# Pip 终端插件：命令跑了 10 秒以上，结束时在刘海上弹一张卡（跑完了 / 失败了），点了跳回这个终端。
-# 在 ~/.zshrc 里 source 这个文件（Pip 设置 › 终端「安装」后会给出这一行）。不改 shell 的其他行为。
-# 只把命令名（第一个词）交出 shell，参数不出去；目录和退出码作为卡上的键值。
-# 照 zsh-auto-notify、ntfy shell-integration：preexec 记开始时刻和命令名，precmd 第一行取 $?。
+# Pip terminal plugin: pops a card (finished / failed) under the notch when a command runs for > 10s; click jumps back to terminal.
+# Source this file in ~/.zshrc (provided after clicking "Install" in Pip Settings › Terminal). Leaves other shell behaviors untouched.
+# Forwards command name (first word) only, never arguments; directory and exit code are passed as card facts.
+# Modeled after zsh-auto-notify and ntfy shell-integration: preexec records start time and command name, precmd first line grabs $?.
 # @see https://zsh.sourceforge.io/Doc/Release/Functions.html#Hook-Functions
 #
-# 可以在 source 之前改：
-#   notchkeeper_min_seconds  至少跑多久才弹（默认 10）
-#   notchkeeper_ignore       不弹的命令名（全屏的、交互式的）
+# Configurable before source:
+#   notchkeeper_min_seconds  minimum execution seconds to trigger alert (default: 10)
+#   notchkeeper_ignore       command names to ignore (fullscreen, interactive)
 
 [[ -o interactive ]] || return 0
 zmodload zsh/datetime || return 0
@@ -16,15 +16,15 @@ typeset -g notchkeeper_min_seconds=${notchkeeper_min_seconds:-10}
 (( ${+notchkeeper_ignore} )) || typeset -ga notchkeeper_ignore=(
   vim nvim vi nano emacs less more man ssh mosh top htop btop watch tmux screen claude lazygit tig fzf k9s yazi ranger
 )
-# 这个文件在 <Notchkeeper>/plugins/terminal/，pipctl 在 <Notchkeeper>/bin/
+# This file lives in <Notchkeeper>/plugins/terminal/, pipctl in <Notchkeeper>/bin/
 typeset -g _notchkeeper_pipctl=${${(%):-%x}:A:h:h:h}/bin/pipctl
 typeset -g _notchkeeper_started _notchkeeper_command
 
 _notchkeeper_preexec() {
-  emulate -L zsh  # 不受用户 shell 选项影响（shwordsplit、ksharrays 之类）
+  emulate -L zsh  # Unaffected by user shell options (shwordsplit, ksharrays, etc.)
   local word opts valued= skip=0 i
   _notchkeeper_command=
-  # 跳过环境变量赋值、括号和 sudo 这类前缀，以及它们的选项；带值的选项连值一起跳过（值也是参数，不能交出去）
+  # Skip environment variable assignments, parentheses, and prefixes like sudo and their options; options with values skip the value as well
   for word in ${(z)1}; do
     if (( skip )); then skip=0; continue; fi
     case $word in
@@ -35,7 +35,7 @@ _notchkeeper_preexec() {
       env) valued=uSPC; continue ;;
       nice) valued=n; continue ;;
       -*)
-        # 合写的选项（-iu）：第一个带值的字母在最后，值是下一个词；不在最后，值贴在后面（-ualice）
+        # Combined options (-iu): option taking value at end takes next word; within option, value is attached (-ualice)
         opts=${word#-}
         for (( i = 1; i <= $#opts; i++ )); do
           [[ $valued == *"${opts[i]}"* ]] || continue
@@ -51,7 +51,7 @@ _notchkeeper_preexec() {
 }
 
 _notchkeeper_precmd() {
-  local exit_code=$?  # 必须是第一行：之后的任何命令（包括下一行）都会改 $?
+  local exit_code=$?  # Must be first line: any subsequent command overwrites $?
   emulate -L zsh
   [[ -n $_notchkeeper_started && -n $_notchkeeper_command ]] || return 0
   local -F elapsed=$(( EPOCHREALTIME - _notchkeeper_started ))
@@ -61,21 +61,21 @@ _notchkeeper_precmd() {
   (( ${notchkeeper_ignore[(Ie)$command]} )) && return 0
   [[ -x $_notchkeeper_pipctl ]] || return 0
 
-  local -i seconds=$(( elapsed ))  # 整数变量赋值时截断小数
+  local -i seconds=$(( elapsed ))  # Truncate fraction on integer assignment
   local took
-  if (( seconds >= 3600 )); then took="$(( seconds / 3600 )) 小时 $(( seconds % 3600 / 60 )) 分"
-  elif (( seconds >= 60 )); then took="$(( seconds / 60 )) 分 $(( seconds % 60 )) 秒"
-  else took="$seconds 秒"
+  if (( seconds >= 3600 )); then took="$(( seconds / 3600 )) h $(( seconds % 3600 / 60 )) m"
+  elif (( seconds >= 60 )); then took="$(( seconds / 60 )) m $(( seconds % 60 )) s"
+  else took="$seconds s"
   fi
   local title=$command outcome
-  if (( exit_code == 0 )); then title+=" 跑完了"; outcome=done
-  else title+=" 失败了"; outcome=failed
+  if (( exit_code == 0 )); then title+=" finished"; outcome=done
+  else title+=" failed"; outcome=failed
   fi
   local -a args=(notify --plugin terminal --title $title --value $took --outcome $outcome
-                 --fact "退出码=$exit_code" --fact "目录=${(%):-%~}")
-  # 同一个终端只留最新一张；点了跳回这个终端。不是 macOS 伪终端（/dev/ttysN）时只弹卡：pipctl 不收别的 tty
+                 --fact "exit_code=$exit_code" --fact "cwd=${(%):-%~}")
+  # Keep latest per terminal; click jumps back to this terminal. Only pop card if not macOS pseudo-terminal (/dev/ttysN)
   [[ $TTY == /dev/ttys<-> ]] && args+=(--group "tty:$TTY" --tty $TTY --pid $$ --cwd $PWD)
-  # 后台跑、不进作业表，不拖慢提示符
+  # Background execution without entering jobs table, avoiding prompt lag
   "$_notchkeeper_pipctl" $args &>/dev/null &!
 }
 

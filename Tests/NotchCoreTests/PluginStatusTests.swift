@@ -9,7 +9,7 @@ private func guardStatus(_ verdict: Verdict, unknown: UnknownReason? = nil) -> P
     PluginStatus(guard: GuardPresentation(display(verdict, unknown: unknown), dismissedViolationSince: nil))
 }
 
-/// 每个插件报一个带紧急程度的状态（照灵动岛 relevanceScore）：收起时 Pip 和右耳显示最急的那个
+/// Each plugin reports status with urgency (following Dynamic Island relevanceScore): collapsed state shows Pip and right ear for most urgent
 @Suite struct PluginStatusUrgencies {
     @Test func guardUrgencies() {
         #expect(guardStatus(.healthy).urgency == .calm)
@@ -20,7 +20,7 @@ private func guardStatus(_ verdict: Verdict, unknown: UnknownReason? = nil) -> P
         #expect(guardStatus(.violated).urgency == .critical)
     }
 
-    /// 探针没结果不改造型，只在右耳画灰环
+    /// Probe failed does not change look, shows gray ring on right ear only
     @Test func probeFailedShowsRing() {
         let s = guardStatus(.unknown, unknown: .probeFailed)
         #expect(s.look == .idle && s.indicator == .ring)
@@ -33,20 +33,20 @@ private func guardStatus(_ verdict: Verdict, unknown: UnknownReason? = nil) -> P
         #expect(s.plugin == PluginID.claudeCode && s.urgency == urgency && s.look == look)
     }
 
-    /// 外部插件的造型由紧急程度定：进行中是 working，要你看是 question
+    /// External plugin look determined by urgency: active is working, attention is question
     @Test func externalLooks() {
         #expect(PluginStatus(external: "dl", urgency: .active).look == .working)
         #expect(PluginStatus(external: "dl", urgency: .attention).indicator == .dot(.question))
         #expect(PluginStatus(external: "dl", urgency: .calm).indicator == EarIndicator.none)
     }
 
-    /// 严重只有守卫能报（CLAUDE.md 硬规则「插件」）
+    /// Critical can only be reported by guard (CLAUDE.md hard rule "Plugins")
     @Test func onlyGuardIsCritical() {
         #expect(PluginStatus(external: "dl", urgency: .critical).urgency == .attention)
     }
 }
 
-/// 谁上位：最急的；一样急按顺序（守卫在前，其余按面板段的顺序）；都平静时是常驻插件，不常驻就没有
+/// Precedence: most urgent leads; ties broken by order (guard first, remaining by section order); falls back to resident when all calm, none if no resident
 @Suite struct LeadingStatus {
     private let calmGuard = guardStatus(.healthy)
     private let working = PluginStatus(agent: .working)
@@ -70,7 +70,7 @@ private func guardStatus(_ verdict: Verdict, unknown: UnknownReason? = nil) -> P
         #expect(PluginStatus.lead([calmGuard, calmAgent], resident: nil) == nil)
     }
 
-    /// 常驻插件关掉了（不在列表里）：和不常驻一样
+    /// Resident plugin disabled (not in list): behaves like no resident
     @Test func disabledResidentIsNone() {
         #expect(PluginStatus.lead([PluginStatus(agent: nil)], resident: PluginID.exitGuard) == nil)
     }
@@ -84,7 +84,7 @@ private func guardStatus(_ verdict: Verdict, unknown: UnknownReason? = nil) -> P
     }
 }
 
-/// 面板的行模板（docs/ui.md「面板布局」）：Claude 会话也走它
+/// Panel row template (docs/ui.md "Panel Layout"): Claude sessions also use it
 @Suite struct SessionRows {
     private let since = Date(timeIntervalSince1970: 1_800_000_000)
     private func session(_ state: AgentState) -> Session {
@@ -104,7 +104,7 @@ private func guardStatus(_ verdict: Verdict, unknown: UnknownReason? = nil) -> P
         #expect(PanelRow(session(state)).indicator == indicator)
     }
 
-    /// 已停止：不画指示，图标和路径变暗
+    /// Stopped: no indicator, icon and path dimmed
     @Test func stoppedIsDimmed() {
         let row = PanelRow(session(.stopped))
         #expect(row.indicator == PanelRow.Indicator.none && row.dimmed)

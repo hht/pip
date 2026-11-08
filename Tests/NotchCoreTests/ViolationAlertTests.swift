@@ -11,7 +11,7 @@ private let checking = GuardDisplay.checking
 private let violated = display(.violated)
 private let laterViolation = display(.violated, since: violatedAt + 60)
 
-/// 从刚启动开始，依次查完每一轮，返回每一步的动作
+/// Sequential check rounds starting from launch, returns actions for each step
 private func run(_ reads: [GuardDisplay], autoAlert: Bool = true, on alert: inout ViolationAlert) -> [ViolationAlert.Action] {
     reads.map { alert.read($0, autoAlert: autoAlert) }
 }
@@ -20,7 +20,7 @@ private func run(_ reads: [GuardDisplay], autoAlert: Bool = true) -> [ViolationA
     return run(reads, autoAlert: autoAlert, on: &alert)
 }
 
-/// docs/egress-guard.md、docs/ui.md「卡片」：红卡什么时候挂上、撤掉，恢复了弹不弹恢复卡
+/// docs/egress-guard.md, docs/ui.md "Cards": when red card is raised/cleared, whether recovery card pops on recovery
 @Suite struct ViolationAlertTests {
     @Test func violationRaisesOnceUntilHealthy() {
         #expect(run([violated, offline, violated, probeFailed, violated, healthy])
@@ -44,7 +44,7 @@ private func run(_ reads: [GuardDisplay], autoAlert: Bool = true) -> [ViolationA
         #expect(a.presentation.tone == .violated && !a.presentation.wantsAlert)
         #expect(run([violated, offline], on: &a) == [.none, .none])
         #expect(a.presentation.tone == .unknown)
-        // 新的一次违规不经过 healthy 也再弹
+        // New violation instance raises again even without passing through healthy
         #expect(a.read(laterViolation, autoAlert: true) == .raise)
     }
 
@@ -53,11 +53,11 @@ private func run(_ reads: [GuardDisplay], autoAlert: Bool = true) -> [ViolationA
         _ = a.read(violated, autoAlert: true)
         a.dismiss()
         #expect(a.read(healthy, autoAlert: true) == .clear(recovered: true))
-        // healthy 清掉关掉的记录：同一个 violatedSince 也再弹
+        // Healthy clears dismissal record: same violatedSince raises again
         #expect(a.read(violated, autoAlert: true) == .raise)
     }
 
-    /// 只在违规还挂着时记：没有违规时关掉（演示红卡）不算
+    /// Recorded only while violation persists: dismissal without violation (demo red card) does not count
     @Test func dismissWithoutViolationIsNotRemembered() {
         var a = ViolationAlert(checking)
         a.dismiss()
@@ -84,7 +84,7 @@ private func run(_ reads: [GuardDisplay], autoAlert: Bool = true) -> [ViolationA
     #endif
 }
 
-/// 旧 --selftest 的「任何以 healthy 结尾的序列都没有红卡」
+/// Former --selftest invariant: "Any sequence ending in healthy leaves no active red card"
 @Suite struct ViolationAlertEndings {
     @Test(arguments: [
         [violated, healthy], [violated, offline, healthy], [violated, probeFailed, healthy], [violated, offline, probeFailed, healthy],
@@ -94,7 +94,7 @@ private func run(_ reads: [GuardDisplay], autoAlert: Bool = true) -> [ViolationA
         #expect(run(reads).last == .clear(recovered: true))
     }
 
-    /// 红卡挂着时关掉「出口异常时弹出红卡」：不再动它，回到 healthy 照样撤、照样弹恢复卡
+    /// Disabling "Pop red card on egress anomaly" while red card active: leaves it alone, clears on healthy and pops recovery card as usual
     @Test func autoAlertTurnedOffWhileShown() {
         var a = ViolationAlert(checking)
         _ = a.read(violated, autoAlert: true)
@@ -103,7 +103,7 @@ private func run(_ reads: [GuardDisplay], autoAlert: Bool = true) -> [ViolationA
     }
 }
 
-/// 关掉出口守卫插件（设置）：关的是提醒，不是判定。红卡撤掉、不弹恢复卡；再打开按最近一轮再判一次（docs/egress-guard.md）
+/// Disabling egress guard plugin (Settings): disables alerts, not checks. Red card dismissed without recovery card; re-enabling evaluates with latest round (docs/egress-guard.md)
 @Suite struct DisabledGuard {
     @Test func disablingClearsAlertWithoutRecoveredCard() {
         var alert = ViolationAlert(checking)
@@ -116,7 +116,7 @@ private func run(_ reads: [GuardDisplay], autoAlert: Bool = true) -> [ViolationA
         var alert = ViolationAlert(checking)
         #expect(alert.setEnabled(false, autoAlert: true) == .none)
         #expect(run([violated, offline, healthy], on: &alert) == [.none, .none, .none])
-        // 判定照旧：设置页还看得到真实状态
+        // Evaluation continues: Settings view still displays actual state
         _ = alert.read(violated, autoAlert: true)
         #expect(alert.presentation.status == .violated)
     }
@@ -136,7 +136,7 @@ private func run(_ reads: [GuardDisplay], autoAlert: Bool = true) -> [ViolationA
         #expect(alert.setEnabled(true, autoAlert: true) == .none)
     }
 
-    /// 关掉期间用户关红卡的记录不该留着：关之前点过 ×，再打开同一次违规也不再挂（这一次已经关掉了）
+    /// User dismissal preserved across disable/enable: dismissed before disable, re-enabling does not re-raise same violation
     @Test func dismissedViolationStaysDismissed() {
         var alert = ViolationAlert(checking)
         _ = alert.read(violated, autoAlert: true)

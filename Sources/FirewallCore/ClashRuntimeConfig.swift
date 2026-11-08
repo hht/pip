@@ -1,30 +1,30 @@
 import Foundation
 
-/// 回答：Clash Verge 的运行时配置（mihomo 用 `-f` 加载的 `clash-verge.yaml`）里，mihomo 自己会直连哪些地址、节点域名该向谁查。
-/// 只读这几样，别的字段（含密码）一概不看、不留；不知道文件在哪、怎么解析域名（docs/firewall.md §4「开启时拍放行表的快照」）。
+/// Answers: in Clash Verge's runtime config (`clash-verge.yaml` loaded by mihomo with `-f`), which addresses will mihomo connect to directly, and whom should node domains be queried against.
+/// Reads only these fields; other fields (including passwords) are strictly ignored and not retained; unaware of file locations or domain resolution details (docs/firewall.md §4 "Snapshot allow tables on enable").
 ///
-/// 不是通用的 YAML 解析：Clash Verge 写出的是块状 YAML，列表和父键同一缩进，顶层键顶格、`dns` 下的键缩进两格。
-/// 读到的几个键写成别的样子（一行的 `[…]`、`{…}`）就拒绝，宁可开不了也不当成没有
+/// Not a general-purpose YAML parser: Clash Verge produces block YAML where lists share indentation with parent keys, top-level keys are flush left, and keys under `dns` are indented by 2 spaces.
+/// Rejects keys formatted differently (single-line `[...]`, `{...}`) rather than assuming absence, preferring failure over silent omission.
 public struct ClashRuntimeConfig: Equatable, Sendable {
-    /// 节点的 `server`，按出现顺序去重：IP 或域名
+    /// Node `server` entries, deduplicated preserving order of appearance: IP or domain
     public var servers: [String]
-    /// mihomo 查节点域名用的上游：`proxy-server-nameserver` 里明文 UDP、写成 IP 的那些
+    /// Upstream resolvers used by mihomo for node domains: plain UDP IP addresses in `proxy-server-nameserver`
     public var nodeResolvers: [DNSServer]
-    /// mihomo 直连的 DNS 上游里写成 IP 的那些（写成域名的不在内）。`nameserver-policy` 里的不读：漏了只是那些域名查不了，不会漏流量
+    /// DNS upstreams directly connected by mihomo formatted as IPs (domains excluded). Does not read `nameserver-policy`: omissions only affect querying those domains, without leaking traffic.
     public var upstreamAddresses: [IPNetwork]
-    /// 查回来落在这里的是 fake-ip，不是真地址
+    /// Resolved IPs falling into this range are fake-ip, not real addresses
     public var fakeIPRange: IPNetwork
 
-    /// 域名节点最多几个。真实订阅几十到几百个；每个开启时要问两次 DNS
+    /// Maximum allowed domain nodes. Real subscriptions range from dozens to hundreds; each requires two DNS queries on startup.
     public static let maxDomainNodes = 2000
 
-    /// mihomo 没写 `fake-ip-range` 时用的。@see https://wiki.metacubex.one/config/dns/#fake-ip-range
+    /// Used when mihomo does not specify `fake-ip-range`. @see https://wiki.metacubex.one/config/dns/#fake-ip-range
     static let defaultFakeIPRange = IPNetwork("198.18.0.1/16")!
-    /// mihomo 会直连的 DNS 上游列表。@see https://wiki.metacubex.one/config/dns/
+    /// DNS upstream list directly connected by mihomo. @see https://wiki.metacubex.one/config/dns/
     private static let upstreamKeys: Set<Substring> = ["default-nameserver", "nameserver", "fallback", "proxy-server-nameserver", "direct-nameserver"]
 
     public init(yaml: String) throws(ClashConfigError) {
-        // 去重用 Set：外部文件，节点可能很多，数组 contains 是平方的
+        // Deduplicate using Set: external file could have many nodes, Array.contains is quadratic
         var servers: [String] = [], seenServers: Set<String> = []
         var resolvers: [DNSServer] = []
         var upstreams: [IPNetwork] = [], seenUpstreams: Set<IPNetwork> = []
@@ -32,7 +32,7 @@ public struct ClashRuntimeConfig: Equatable, Sendable {
         var providers = false
         var section: Substring?
         var dnsKey: Substring?
-        // 按 isNewline 切：Swift 把 "\r\n" 当成一个字符，按 "\n" 切不开 CRLF 文件
+        // Split by isNewline: Swift treats "\r\n" as a single character, splitting on "\n" fails for CRLF files
         for (index, line) in yaml.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).enumerated() {
             let unsupported = ClashConfigError.unsupported(line: index + 1)
             let indent = line.prefix { $0 == " " }.count
@@ -54,8 +54,8 @@ public struct ClashRuntimeConfig: Equatable, Sendable {
             case "proxy-providers":
                 providers = true
             case "proxies":
-                // 每个节点是一个 `- ` 开头的 map，字段比 `- ` 多缩进两格；更深的是 plugin-opts 之类，里面的 server 不是节点。
-                // 字段里的列表项（缩进两格的 `- `）只有 WireGuard 的 peers 带 server。写成一行的节点读不出 server，拒绝
+                // Each node is a map starting with `- `, fields indented 2 spaces further than `- `; deeper levels like plugin-opts do not represent node servers.
+                // List items in fields (indented 2 spaces with `- `) only include servers in WireGuard peers. Reject nodes written as single lines where server cannot be extracted.
                 if indent == 0, item, body.dropFirst(2).first == "{" { throw unsupported }
                 let (field, level) = (indent == 0 || indent == 2) && item ? (body.dropFirst(2), 2) : (body, indent)
                 guard level == 2, let (key, value) = Self.keyValue(field), key == "server" else { continue }
@@ -71,7 +71,7 @@ public struct ClashRuntimeConfig: Equatable, Sendable {
                     throw unsupported
                 }
             case "dns" where indent > 2 && item:
-                // 上游列表缩进得比键深：这里只认和键同一缩进的，认不出就拒绝，免得漏掉上游
+                // Upstream list indented deeper than key: only recognizes same indentation level as key; reject unrecognized formatting to avoid missing upstreams.
                 if let key = dnsKey, Self.upstreamKeys.contains(key) { throw unsupported }
             case "dns" where indent == 2 && item:
                 guard let key = dnsKey, Self.upstreamKeys.contains(key) else { continue }
@@ -91,7 +91,7 @@ public struct ClashRuntimeConfig: Equatable, Sendable {
         self.fakeIPRange = fakeIPRange ?? Self.defaultFakeIPRange
     }
 
-    /// `key: value` 或 `key:`；键不带引号（读的这几个键都不带）
+    /// `key: value` or `key:`; unquoted keys (all target keys are unquoted)
     private static func keyValue(_ s: Substring) -> (Substring, Substring)? {
         guard let colon = s.firstIndex(of: ":") else { return nil }
         let rest = s[s.index(after: colon)...]
@@ -99,7 +99,7 @@ public struct ClashRuntimeConfig: Equatable, Sendable {
         return (s[..<colon], rest.drop { $0 == " " })
     }
 
-    /// 单引号、不带转义的双引号、裸值（去掉 ` #` 起的注释）；认不出返回 `nil`
+    /// Single quotes, unescaped double quotes, bare values (stripping comments starting with ` #`); returns `nil` if unrecognized.
     private static func scalar(_ s: Substring) -> String? {
         let v = s.drop { $0 == " " }
         if v.first == "'" {
@@ -116,26 +116,26 @@ public struct ClashRuntimeConfig: Equatable, Sendable {
 }
 
 public enum ClashConfigError: Error, Equatable {
-    /// 订阅没展开在文件里（`proxy-providers`），节点地址拿不到
+    /// Subscription not expanded in file (`proxy-providers`), node addresses unavailable
     case proxyProviders
     case noNodes
-    /// 这一行写成了认不出的样子；不报内容，免得把配置里的密钥带进日志
+    /// Line formatted in an unrecognized way; does not report content to avoid leaking secrets into logs
     case unsupported(line: Int)
 }
 
-/// 一个明文 UDP 的 DNS 服务器
+/// A plain UDP DNS server
 public struct DNSServer: Equatable, Sendable {
     public var address: IPNetwork
     public var port: Int
     public init(address: IPNetwork, port: Int) { (self.address, self.port) = (address, port) }
 }
 
-/// mihomo 的一条 DNS 上游：`223.5.5.5`、`198.51.100.53:5353`、`udp://…`、`tls://…`、`https://[2001:db8::53]/dns-query`、带 `#…` 参数的
+/// A DNS upstream in mihomo: `223.5.5.5`, `198.51.100.53:5353`, `udp://...`, `tls://...`, `https://[2001:db8::53]/dns-query`, or with `#...` parameters
 /// @see https://wiki.metacubex.one/config/dns/
 struct DNSUpstream {
-    /// 写成 IP 的主机；写成域名（或 `system`、`dhcp://…`）是 `nil`
+    /// Host formatted as IP; `nil` if domain (or `system`, `dhcp://...`)
     let address: IPNetwork?
-    /// 明文 UDP（没写协议或 `udp://`）时的服务器
+    /// Server when using plain UDP (omitted scheme or `udp://`)
     let plainUDP: DNSServer?
 
     init(_ entry: String) {
@@ -149,13 +149,13 @@ struct DNSUpstream {
         var host = authority
         var port: Int? = 53
         if authority.first == "[" {
-            // [v6] 或 [v6]:端口
+            // [v6] or [v6]:port
             guard let close = authority.firstIndex(of: "]") else { (address, plainUDP) = (nil, nil); return }
             host = authority[authority.index(after: authority.startIndex)..<close]
             let tail = authority[authority.index(after: close)...]
             if !tail.isEmpty { port = tail.first == ":" ? Int(tail.dropFirst()) : nil }
         } else if authority.filter({ $0 == ":" }).count == 1, let colon = authority.firstIndex(of: ":") {
-            // v4:端口；不带括号、多个冒号的是裸 IPv6
+            // v4:port; bare IPv6 without brackets has multiple colons
             host = authority[..<colon]
             port = Int(authority[authority.index(after: colon)...])
         }
@@ -166,9 +166,9 @@ struct DNSUpstream {
 }
 
 extension ClashRuntimeConfig {
-    /// `<clash>` 表：节点地址（域名用 `resolve` 依次问 `nodeResolvers`，问到为止）加写成 IP 的 DNS 上游，去重、按出现顺序。
-    /// 有一个节点查不到、或答案落在 fake-ip 段里就报错：放行表漏了节点，开着防火墙时 Clash 连不上它。
-    /// `resolve` 返回 `nil` 是那个上游没回应：之后不再问它，免得每个节点都空等一遍超时。超过 `limit` 项报错：pf 装不下
+    /// `<clash>` table: node addresses (domain names queried against `nodeResolvers` in order using `resolve` until resolved) plus DNS upstreams written as IPs, deduplicated in order of appearance.
+    /// Fails if any node cannot be resolved or resolves to a fake-ip: missing nodes in allow table would prevent Clash from connecting while firewall is active.
+    /// `resolve` returning `nil` indicates upstream timeout: does not re-query it for subsequent nodes to avoid waiting through timeout repeatedly. Fails if exceeding `limit`: pf cannot hold them.
     public func clashTable(limit: Int = CountryDatabase.maxTableEntries, resolve: (String, DNSServer) -> [IPNetwork]?) throws(AllowTableError) -> [IPNetwork] {
         guard servers.count(where: { IPNetwork($0) == nil }) <= Self.maxDomainNodes else { throw .tooManyNodes }
         var table: [IPNetwork] = [], seen: Set<IPNetwork> = []
@@ -198,7 +198,7 @@ extension ClashRuntimeConfig {
         return table
     }
 
-    /// 字母、数字、`-`、`_`、`.`，字母或数字开头。会原样交给 root 跑的 dig，`-`、`+` 开头会被当成选项
+    /// Letters, digits, `-`, `_`, `.`, starting with letter or digit. Passed directly to dig run as root; `-` or `+` at start would be parsed as flags.
     static func isDomain(_ s: String) -> Bool {
         let alphanumeric = { (c: Unicode.Scalar) in c.isASCII && CharacterSet.alphanumerics.contains(c) }
         guard let first = s.unicodeScalars.first, alphanumeric(first) else { return false }
@@ -206,13 +206,13 @@ extension ClashRuntimeConfig {
     }
 }
 
-/// 拍 `<clash>` 表失败；按节点在配置里的序号（从 1 起）报，不报域名和地址
+/// Failure to snapshot `<clash>` table; reports node 1-based index in config, without exposing domain or address.
 public enum AllowTableError: Error, Equatable {
-    /// 域名节点多得不像真的订阅：每个要问两次 DNS，开启会拖很久，表也可能装不进 pf
+    /// Too many domain nodes to resemble a realistic subscription: each requires 2 DNS queries, slowing startup and risking overflowing pf table.
     case tooManyNodes
-    /// 表项超过留给它的名额：pf 装不下
+    /// Entries exceed allocated capacity: pf cannot hold them.
     case tooManyEntries
-    /// 节点写的是域名，配置里却没有能直接问的明文 UDP 上游（`proxy-server-nameserver`）
+    /// Node is a domain name, but config lacks plain UDP upstreams (`proxy-server-nameserver`) to query directly.
     case noResolver
     case unresolved(node: Int)
     case fakeAnswer(node: Int)

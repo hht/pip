@@ -1,9 +1,9 @@
 import Testing
 @testable import MascotCore
 
-/// 所有 Pip 共用的时钟：除了眨眼和小动作（IdleDirectorTests），还管注视回正、犯困、晕（docs/mascot.md §2、§5）
+/// Shared clock for all Pips: besides blinks and idle motions (IdleDirectorTests), manages gaze re-centering, drowsiness, dizziness (docs/mascot.md §2, §5)
 @Suite struct MascotClockTests {
-    /// 鼠标 120s 没靠近刘海就睡着；一靠近就醒
+    /// Falls asleep when mouse stays away from notch for 120s; wakes immediately upon approach
     @Test func drowsyAfterMouseStaysAway() {
         var c = MascotClock(seed: 1, now: 0)
         #expect(c.nextWake <= MascotClock.drowsyAfter)
@@ -13,12 +13,12 @@ import Testing
         #expect(c.drowsy)
         c.mouseMoved(near: true, looking: false, now: 200)
         #expect(!c.drowsy)
-        // 醒来后从这一刻重新算
+        // Rescheduled from waking moment
         _ = c.tick(now: 200 + MascotClock.drowsyAfter - 1, mouseNear: false)
         #expect(!c.drowsy)
     }
 
-    /// 鼠标一直停在刘海旁边不动（没有移动事件）也不算走开
+    /// Stationary mouse resting near notch (no move events) still keeps awake
     @Test func stillMouseNearNotchKeepsAwake() {
         var c = MascotClock(seed: 1, now: 0)
         _ = c.tick(now: MascotClock.drowsyAfter, mouseNear: true)
@@ -26,7 +26,7 @@ import Testing
         #expect(c.nextWake <= 2 * MascotClock.drowsyAfter)
     }
 
-    /// 远处动鼠标不算靠近
+    /// Distant mouse moves do not count as approach
     @Test func farMovesDoNotCount() {
         var c = MascotClock(seed: 1, now: 0)
         c.mouseMoved(near: false, looking: true, now: 100)
@@ -34,7 +34,7 @@ import Testing
         #expect(c.drowsy)
     }
 
-    /// 睡着以后不再为犯困醒来
+    /// Does not wake for drowsiness while already asleep
     @Test func noDrowsyWakeWhileAsleep() {
         var c = MascotClock(seed: 1, now: 0)
         _ = c.tick(now: MascotClock.drowsyAfter, mouseNear: false)
@@ -42,7 +42,7 @@ import Testing
         #expect(c.drowsy)
     }
 
-    /// 在看鼠标时：停下 4s 后回正；这期间不做小动作
+    /// When tracking mouse: re-centers 4s after stopping; suppresses idle motions during this time
     @Test func gazeRestsAfterMouseStops() {
         var c = MascotClock(seed: 1, now: 0)
         c.mouseMoved(near: false, looking: true, now: 1)
@@ -51,11 +51,11 @@ import Testing
         let t = c.tick(now: 1 + Choreography.gazeRestAfter, mouseNear: false)
         #expect(t.gazeRested)
         #expect(!t.cues.contains { if case .idle = $0 { true } else { false } })
-        // 回正只发一次
+        // Re-center emitted only once
         #expect(!c.tick(now: 1 + Choreography.gazeRestAfter + 0.1, mouseNear: false).gazeRested)
     }
 
-    /// 关掉跟随鼠标：不再等回正
+    /// Disable mouse tracking: cancels waiting for re-center
     @Test func endGazeCancelsRest() {
         var c = MascotClock(seed: 1, now: 0)
         c.mouseMoved(near: false, looking: true, now: 1)
@@ -63,7 +63,7 @@ import Testing
         #expect(!c.tick(now: 1 + Choreography.gazeRestAfter, mouseNear: false).gazeRested)
     }
 
-    /// 点一下 Pip 晕 1.6s
+    /// Poking Pip makes it dizzy for 1.6s
     @Test func pokeMakesDizzyForAWhile() {
         var c = MascotClock(seed: 1, now: 0)
         c.poke(now: 10)
@@ -75,7 +75,7 @@ import Testing
         #expect(!c.dizzy)
     }
 
-    /// 晕的时候再点：从这一下重新算
+    /// Poking again while dizzy: resets from this poke
     @Test func pokeAgainExtends() {
         var c = MascotClock(seed: 1, now: 0)
         c.poke(now: 10)
@@ -84,7 +84,7 @@ import Testing
         #expect(c.dizzy)
     }
 
-    /// 晕着时 Pip 都看不见了（收起时不画左耳的 Pip）：时钟停掉前晕就算过去，不留到下次看得见时还盖着别的造型
+    /// When all Pips become invisible while dizzy (e.g. left ear Pip omitted when collapsed): dizziness ends before clock suspends, not persisting to mask other looks when restored
     @Test func suspendEndsDizzy() {
         var c = MascotClock(seed: 1, now: 0)
         c.poke(now: 10)
@@ -92,7 +92,7 @@ import Testing
         #expect(!c.dizzy)
     }
 
-    /// 时钟按 nextWake 醒，眨眼照常发
+    /// Clock wakes per nextWake, blinks emitted normally
     @Test func blinksStillCome() {
         var c = MascotClock(seed: 1, now: 0)
         var blinks = 0
@@ -103,7 +103,7 @@ import Testing
     }
 }
 
-/// 晕、睡着叠在插件给的造型上（docs/mascot.md §2「优先级」）：守卫 > 晕 > agent > 睡着 > 空闲
+/// Dizzy and sleeping overlay on plugin looks (docs/mascot.md §2 "Priority"): guard > dizzy > agent > sleeping > idle
 @Suite struct MascotOverlay {
     @Test func dizzyBeatsAgentAndSleep() {
         for look in [Look.idle, .working, .longTurn, .question, .approval, .finished] {
@@ -111,14 +111,14 @@ import Testing
         }
     }
 
-    /// 告示造型（守卫的、出错卡上的）不被晕盖掉
+    /// Sign looks (guard alerts, error cards) are not masked by dizziness
     @Test func signsBeatDizzy() {
         for look in [Look.danger, .shielded, .mismatch, .stale, .offline, .error] {
             #expect(look.shown(drowsy: true, dizzy: true) == look)
         }
     }
 
-    /// 只有空闲时才睡着
+    /// Only idle look falls asleep
     @Test func onlyIdleFallsAsleep() {
         #expect(Look.idle.shown(drowsy: true, dizzy: false) == .sleeping)
         #expect(Look.working.shown(drowsy: true, dizzy: false) == .working)

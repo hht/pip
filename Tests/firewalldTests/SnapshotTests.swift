@@ -3,7 +3,7 @@ import Testing
 import FirewallCore
 @testable import firewalld
 
-/// 开启时拍放行表的快照（docs/firewall.md §4）：只有开启读用户目录，守护进程只装 root 目录里的两个表文件
+/// Snapshot allow tables on enable (docs/firewall.md §4): only enable reads user directory; daemon only loads two table files from root directory
 @Suite struct Snapshot {
     @Test func enableWritesBothAllowTables() throws {
         let rig = try Rig()
@@ -12,11 +12,11 @@ import FirewallCore
         #expect(rig.table("cn") == "0.0.0.0/8\n")
         let mode = try FileManager.default.attributesOfItem(atPath: rig.directory.appendingPathComponent("cn.table").path)[.posixPermissions]
         #expect(mode as? Int == 0o644)
-        // 节点域名问 mihomo 查节点用的那个上游，A 和 AAAA 都问
+        // Node domain queries mihomo's node DNS upstream for both A and AAAA records
         #expect(rig.pf.calls.filter { $0.first == "/usr/bin/dig" }.map { $0[8] } == ["A", "AAAA"])
     }
 
-    /// 开启把两张表交回去，命令行据此打印各多少条给人核对（mmdb 被人改过时看得出来）
+    /// Enable returns both tables; CLI uses this to print counts for user verification (detects tampered mmdb)
     @Test func enableReturnsTheTables() throws {
         let rig = try Rig()
         let tables = try Helper.command(.enable(clash: rig.clash), rig.system)
@@ -24,7 +24,7 @@ import FirewallCore
         #expect(tables?.cn.count == 1)
     }
 
-    /// 库里一段 CN 都没有（库换了样子）：拒绝开启，否则正式规则下 DIRECT 全不通
+    /// Database contains zero CN subnets (format changed): refuse to enable, otherwise all DIRECT traffic blocked under production rules
     @Test func enableRefusesAnEmptyCountryTable() throws {
         let rig = try Rig()
         var mmdb = Rig.countryDatabase(prefix: 8)
@@ -35,14 +35,14 @@ import FirewallCore
         #expect(throws: Helper.Failure.snapshot(.noCountryNetworks)) { try rig.enable() }
     }
 
-    /// 库被改成大半个互联网都算 CN：拒绝开启，否则正式规则等于什么都不拦、核对却全过（判定见 `CountryDatabase.isPlausible`）
+    /// Database tampered so most of the internet is CN: refuse to enable, otherwise production rules block nothing while verification passes (see `CountryDatabase.isPlausible`)
     @Test func enableRefusesImplausiblyWideCountryNetworks() throws {
         let rig = try Rig()
         try Data(Rig.countryDatabase(prefix: 1)).write(to: rig.clash.appendingPathComponent("Country.mmdb"))
         #expect(throws: Helper.Failure.snapshot(.implausibleCountryNetwork)) { try rig.enable() }
     }
 
-    /// 答案是 fake-ip：拒绝开启，状态不动、不写表
+    /// Answer is fake-ip: refuse to enable, state untouched, tables not written
     @Test func enableRefusesFakeIPAnswers() throws {
         let rig = try Rig()
         rig.pf.dns["node.example"] = ["198.18.0.3"]
@@ -59,7 +59,7 @@ import FirewallCore
         #expect(rig.state == .missing)
     }
 
-    /// root 读用户可写的目录：符号链接（可能指向只有 root 能读的文件、/dev/zero）和 FIFO（读了就一直等）都不读
+    /// root reading user-writable directory: refuses symlinks (could point to root-only files or /dev/zero) and FIFOs (hangs on read)
     @Test func enableRefusesLinksAndPipes() throws {
         let rig = try Rig()
         let mmdb = rig.clash.appendingPathComponent("Country.mmdb")
@@ -71,7 +71,7 @@ import FirewallCore
         #expect(throws: Helper.Failure.snapshot(.unreadable("Country.mmdb"))) { try rig.enable() }
     }
 
-    /// 已经开着时再开启：报「已经开着」，正在用的表不换
+    /// Re-enabling while already on: reports already enabled, currently active tables untouched
     @Test func enableWhileOnLeavesTheTablesAlone() throws {
         let rig = try Rig()
         try rig.enable()
@@ -82,7 +82,7 @@ import FirewallCore
     }
 }
 
-/// 守护进程：trial / on 时一轮接一轮，回到 off 跑完那一轮就退出（docs/firewall.md §2）
+/// Daemon: round after round during trial / on, exits after completing the round that returns to off (docs/firewall.md §2)
 @Suite struct Serve {
     private let config = Helper.RoundConfig(tunnel: "utun1024", scope: .everyone)!
 
@@ -100,7 +100,7 @@ import FirewallCore
         #expect(rig.status?.mode == .off)
     }
 
-    /// 试运行到期那一轮回到 off，进程跟着退出：到期回滚不靠别的
+    /// The round where trial expires returns to off, and process exits accordingly; expiration rollback relies solely on this
     @Test func stopsWhenTheTrialExpires() throws {
         let rig = try Rig()
         try rig.enable()
@@ -109,11 +109,12 @@ import FirewallCore
             pauses += 1
             rig.seconds += 30
         }
-        #expect(pauses == 4) // 30、60、90 秒时还在试运行，120 秒那一轮到期
+        #expect(pauses == 4) // 30, 60, 90s still in trial; expires in round at 120s
         #expect(rig.pf.anchor == "")
     }
 
-    /// 回到 off 那一轮清规则失败：不退出，下一轮重做，清掉了才退出。退出了就没人再清，整机拦截规则会一直挂着
+    /// If rule flush fails in round returning to off: do not exit, retry next round, exit only once cleaned up.
+    /// Nobody else cleans up after exit, leaving host-wide block rule hanging.
     @Test func keepsGoingUntilOffIsCleanedUp() throws {
         let rig = try Rig()
         try rig.enable()
@@ -130,21 +131,21 @@ import FirewallCore
         #expect(rig.pf.references.isEmpty)
     }
 
-    /// 回到 off、只有释放引用失败：照样退出。多留一个引用不影响上网，为它每 10 秒跑一轮就成了 off 时的轮询
+    /// Returning to off where only release fails: exits normally. An extra reference does not break internet, running every 10s for it would constitute polling while off
     @Test func stopsEvenIfOnlyTheReleaseFails() throws {
         let rig = try Rig()
         try rig.enable()
         _ = rig.round()
         try Helper.command(.disable, rig.system)
         rig.pf.failing = "-X"
-        Helper.serve(rig.system, config) { Issue.record("只是释放失败，不该再等下一轮") }
+        Helper.serve(rig.system, config) { Issue.record("Only release failed, should not wait for next round") }
         #expect(rig.pf.anchor == "")
     }
 
     @Test func offRunsOneRoundAndStops() throws {
         let rig = try Rig()
         rig.pf.anchor = "pass all\n"
-        Helper.serve(rig.system, config) { Issue.record("off 时不该再等下一轮") }
+        Helper.serve(rig.system, config) { Issue.record("Should not wait for next round when off") }
         #expect(rig.pf.anchor == "")
     }
 }

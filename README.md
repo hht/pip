@@ -1,6 +1,6 @@
 # Pip
 
-Haitao's personal notch app for macOS (SwiftPM, macOS 14+), without a menu bar icon. App display name is Pip, sharing the same name as the mascot; repository, bundle ID, configuration directory, and labels remain notchkeeper. Developed locally with ad-hoc signing, requiring no paid developer account.
+Haitao's personal notch app for macOS (SwiftPM, macOS 14+), without a menu bar icon. App display name is Pip, sharing the same name as the mascot; the repository is `pip`; package, bundle ID, configuration directory, and labels remain notchkeeper. Developed locally with ad-hoc signing, requiring no paid developer account.
 
 Currently undergoing a rewrite: the App layer and Pip animations will be completely redone, along with a new one-click firewall toggle. Progress and todos are in `HANDOFF.md`.
 
@@ -10,7 +10,7 @@ Try in this order:
 
 1. Do nothing: if "Keep" is not clicked within 2 minutes after enabling, it will automatically roll back.
 2. Settings › Firewall: turn off the toggle, or click "Uninstall" (runs the rescue script from step 3 below). Both require administrator password, no network needed.
-3. In terminal execute **`cd ~/Documents/Projects/notchkeeper && sudo scripts/firewall-rescue.sh`**: uninstalls firewall daemon, rules, and files; requires no network or App; repeated execution is safe and idempotent.
+3. In terminal execute **`cd ~/Documents/Projects/pip && sudo scripts/firewall-rescue.sh`**: uninstalls firewall daemon, rules, and files; requires no network or App; repeated execution is safe and idempotent.
 4. If still unresolved: `sudo scripts/firewall-rescue.sh --disable-pf`, stopping the entire pf subsystem (AirDrop, Internet Sharing, and other pf-dependent features will need to be re-enabled).
 
 If "Keep" was already clicked, rebooting will not rescue you (rules will reload on startup); run step 3 first.

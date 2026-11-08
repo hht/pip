@@ -1,4 +1,0 @@
-{
-  "description": "Notchkeeper turn file",
-  "modules": ["./register.js"]
-}

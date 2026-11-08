@@ -1,0 +1,4 @@
+{
+  "description": "Pip turn file",
+  "modules": ["./register.js"]
+}

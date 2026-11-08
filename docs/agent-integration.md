@@ -7,7 +7,7 @@ Only integrates with Claude Code (user decision; local Grok only provides `infli
 | Source | Written by | Concerns |
 |---|---|---|
 | `~/.claude/sessions/<pid>.json` | Claude Code | Active sessions, current state, process liveness, `sessionId` |
-| `~/Library/Application Support/Notchkeeper/turns/<sessionId>.json` | Built-in mod ("Notchkeeper mod") | Most recently ended primary turn |
+| `~/Library/Application Support/Notchkeeper/turns/<sessionId>.json` | Built-in mod ("Pip mod") | Most recently ended primary turn |
 
 Matched by `sessionId`. **Turn completion is determined solely by mod**; session files only reflect current state: unable to distinguish API errors, Esc, and rejected approvals (all become `idle`), and briefly flashes `idle` when background agents complete or queued messages begin ("Real-Device Testing" 7).
 
@@ -65,7 +65,7 @@ A turn end occurs when `turnId` changes in turn file:
 - Query launch time using `proc_pidinfo(PROC_PIDTBSDINFO)`: if query fails or mismatches `procStart`, session is considered dead, removed from list, and suppressed from alerting.
 - After `kill -9`, file remains and directory mtime unchanged ("Real-Device Testing" 4), so attach process exit notification (`DispatchSource.makeProcessSource(.exit)`) per pid without polling.
 
-## Notchkeeper Mod
+## Pip Mod
 
 Official Claude Code plugin JS module (enabled by default since 2.1.287), invoked on events (<https://code.claude.com/docs/en/plugins/mods/overview>). Source in `ClaudeMod/` (local marketplace), tested offline via `claude plugin test`. mod API evolves with versions without backward compatibility (user decision): re-run tests and "Real-Device Testing" 8 after upgrading Claude Code.
 
@@ -93,8 +93,8 @@ Overwritten completely on every main turn completion. `$.fs.write` is non-atomic
 
 Single toggle in Settings; App executes `claude` commands without manual config edits:
 
-1. **Install**: copies App's `ClaudeMod/` to `~/Library/Application Support/Notchkeeper/ClaudeMod/`, running `claude plugin install notchkeeper --marketplace <dir> --json`. Claude Code updates `extraKnownMarketplaces` and `enabledPlugins`; plugins in local marketplace load in place (<https://code.claude.com/docs/en/plugins/loading#in-place-and-copied-plugins>).
-2. **Uninstall**: `claude plugin marketplace remove notchkeeper` (removes `enabledPlugins`), deletes directory. Leaves empty `"extraKnownMarketplaces": {}`, harmless.
+1. **Install**: copies App's `ClaudeMod/` to `~/Library/Application Support/Notchkeeper/ClaudeMod/`, running `claude plugin install pip --marketplace <dir> --json`. Claude Code updates `extraKnownMarketplaces` and `enabledPlugins`; plugins in local marketplace load in place (<https://code.claude.com/docs/en/plugins/loading#in-place-and-copied-plugins>).
+2. **Uninstall**: `claude plugin marketplace remove pip` (removes `enabledPlugins`), deletes directory. Leaves empty `"extraKnownMarketplaces": {}`, harmless.
 3. **Update**: App replaces directory on launch if present; loads in place, taking effect next session without bumping version. Open sessions require `/reload-plugins` or restart.
 4. `claude` searched only in `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`, ignoring shell config; runs with `DISABLE_AUTOUPDATER=1` (prevents child process holding output pipe), SIGKILL on 60s timeout.
 

@@ -224,7 +224,7 @@ Check lines starting with "plugin:" in `~/Library/Logs/Notchkeeper/notchkeeper.l
 
 ### Bundled Terminal Plugin
 
-Settings › Terminal "Install", adding the provided `source …` line to `~/.zshrc`. Commands running > 10 seconds in zsh pop cards upon completion, clicking jumps back to terminal; suppressed if focused on that terminal. Exposes command name only, never parameters. Implemented as an external plugin: `notchkeeper.zsh` in `plugins/terminal/` invoking `pipctl notify`.
+Settings › Terminal "Install", adding the provided `source …` line to `~/.zshrc`. Commands running > 10 seconds in zsh pop cards upon completion, clicking jumps back to terminal; suppressed if focused on that terminal. Exposes command name only, never parameters. Implemented as an external plugin: `pip.zsh` in `plugins/terminal/` invoking `pipctl notify`.
 
 ## File Locations
 

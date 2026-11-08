@@ -50,7 +50,7 @@ let package = Package(
         // External plugin CLI: pipctl notify …, pipctl send writes a card to inbox (writes to tmp/ then renames to new/), format validated by PluginCore
         .executableTarget(name: "pipctl", dependencies: ["NotchCore", "PluginCore", "PluginStore"]),
         .testTarget(name: "pipctlTests", dependencies: ["pipctl", "PluginCore", "NotchCore"]),
-        // Terminal plugin (Resources/plugins/terminal/notchkeeper.zsh): runs in real zsh, mock pipctl records arguments
+        // Terminal plugin (Resources/plugins/terminal/pip.zsh): runs in real zsh, mock pipctl records arguments
         .testTarget(name: "TerminalPluginTests"),
     ]
 )

@@ -1,8 +1,8 @@
-// Notchkeeper Claude Code mod: writes most recently completed primary turn to a small JSON for notch app to read.
+// Pip Claude Code mod: writes most recently completed primary turn to a small JSON for notch app to read.
 // Reports facts only (turnId, reason, final step stopReason, active background agent count at completion, completion timestamp);
 // turn outcome calculation is delegated to App's AgentCore;
 // Writes metadata only: never prompts, answers, or tool parameters.
-// Rules and file format detailed in docs/agent-integration.md "Notchkeeper mod".
+// Rules and file format detailed in docs/agent-integration.md "Pip mod".
 // @see https://code.claude.com/docs/en/plugins/mods/events (turn.start / turn.step / turn.complete / agent.spawn)
 
 /** Write only in interactive sessions: claude -p and SDK are omitted (session.start isInteractive; refires on mod reload) */

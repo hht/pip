@@ -53,12 +53,12 @@ extension AppDelegate {
     static var demoBlocks: [Card] {
         let source = Card.Source.plugin(id: "demo", name: "Demo", symbol: "sparkles")
         return [
-            Card(source: source, title: "npm finished", subtitle: "~/Projects/notchkeeper", value: "2m 13s", outcome: .done,
+            Card(source: source, title: "npm finished", subtitle: "~/Projects/pip", value: "2m 13s", outcome: .done,
                  block: .facts([.init(title: "Exit code", value: "0"), .init(title: "Branch", value: "design/panel"),
                                 .init(title: "Duration", value: "2:13"), .init(title: "Tests", value: "373")]),
                  buttons: [.init(title: "Open Finder", action: .activate(bundleID: "com.apple.finder")),
                            .init(title: "View Swift Docs", action: .open(URL(string: "https://www.swift.org/documentation/")!))]),
-            Card(source: source, title: "swift test failed", subtitle: "~/Projects/notchkeeper", value: "41s", outcome: .failed,
+            Card(source: source, title: "swift test failed", subtitle: "~/Projects/pip", value: "41s", outcome: .failed,
                  block: .log(["✘ Test cardGrowsWithBlock() failed", "Expectation failed: 156 <= 150", "NotchLayoutTests.swift:21"]),
                  // Both card and button use intercepted schemes (different ones): clicking button logs ftp once, clicking blank area logs http once.
                  action: .open(URL(string: "http://example.com")!),

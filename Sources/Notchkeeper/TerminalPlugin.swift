@@ -7,7 +7,7 @@ import PluginCore
 /// Never modifies `~/.zshrc` or reads shell configurations (CLAUDE.md hard rule): the `source` line is added by the user manually.
 enum TerminalPlugin {
     static let directory = PluginPaths.plugins.appendingPathComponent("terminal", isDirectory: true)
-    private static let script = directory.appendingPathComponent("notchkeeper.zsh")
+    private static let script = directory.appendingPathComponent("pip.zsh")
 
     /// The line user adds to `~/.zshrc`: uses `$HOME`, valid across machines and usernames; if user forgets to remove after uninstalling, new shells won't error.
     static var sourceLine: String {

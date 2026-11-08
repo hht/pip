@@ -20,7 +20,7 @@ Each concept has exactly one name: code, UI, and documentation follow the Englis
 | agent activity | What should be drawn for the agent tier across all aggregated sessions |
 | mod | JS module inside official Claude Code plugin, source in `ClaudeMod/`. Not called "hook" or "plugin script" |
 | mascot | Pip: the mascot (named by user on 10-31, formerly Shieldy/Dundun). Code prefix unified as `Mascot` (user decision); "Pip" only used in UI and docs |
-| app | Pip: the display name of the App, same as the mascot (user decision on 10-31). Code, bundle ID, paths, and labels still use `Notchkeeper` / `notchkeeper` |
+| app | Pip: the display name of the App, same as the mascot (user decision on 10-31). Code, bundle ID, paths, and labels still use `Notchkeeper` / `notchkeeper`; the repository, Claude Code plugin, and terminal plugin script are named `pip` |
 | look | Mascot appearance at this moment: gradient, eye shape, gaze, decoration, ear indicator |
 | motion | Keyframe sequence layered over a look, e.g. jump completion |
 | mood / sign | Mood decoration / sign: mood decoration is part of character, stays on left ear when collapsed; sign indicates an event, moves to right ear when collapsed |

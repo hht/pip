@@ -43,7 +43,7 @@ public enum TurnFileError: Error, Equatable {
     case badSessionId(String)
 }
 
-/// Answers: which turn most recently finished and how it finished, per turns/<sessionId>.json written by Notchkeeper mod.
+/// Answers: which turn most recently finished and how it finished, per turns/<sessionId>.json written by Pip mod.
 /// Does not read files; unaware of sessions, processes, or cards.
 public enum TurnFile {
     public static func parse(_ data: Data) throws -> TurnReport {

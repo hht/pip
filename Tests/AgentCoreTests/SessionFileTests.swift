@@ -5,7 +5,7 @@ import Testing
 /// Constructed modeled after real session files observed (docs/agent-integration.md "Observations"), only mutating tested fields
 private func file(_ overrides: [String: Any?] = [:]) -> Data {
     var json: [String: Any] = [
-        "pid": 31301, "sessionId": "5d0c7c2e-0000-4000-8000-000000000000", "cwd": "/Users/u/Documents/Projects/notchkeeper",
+        "pid": 31301, "sessionId": "5d0c7c2e-0000-4000-8000-000000000000", "cwd": "/Users/u/Documents/Projects/pip",
         "startedAt": 1793296492153, "procStart": "Thu Oct 29 17:54:51 2026", "version": "2.1.296", "peerProtocol": 1,
         "kind": "interactive", "entrypoint": "cli", "pidDomain": "darwin", "name": "session name", "nameSource": "user",
         "status": "busy", "statusUpdatedAt": 1793304005799, "updatedAt": 1793304005799,
@@ -21,7 +21,7 @@ private let procStart = Date(timeIntervalSince1970: 1_793_296_491)
     @Test func busyCLISession() throws {
         #expect(try SessionFile.parse(file()) == Session(
             pid: 31301, processStart: procStart, sessionId: "5d0c7c2e-0000-4000-8000-000000000000",
-            cwd: "/Users/u/Documents/Projects/notchkeeper",
+            cwd: "/Users/u/Documents/Projects/pip",
             state: .working, stateSince: Date(timeIntervalSince1970: 1_793_304_005.799)))
     }
 }

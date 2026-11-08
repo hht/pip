@@ -1,7 +1,7 @@
 {
-  "name": "notchkeeper",
+  "name": "pip",
   "owner": { "name": "Pip" },
   "plugins": [
-    { "name": "notchkeeper", "source": "./plugins/notchkeeper", "description": "Writes how Claude Code primary turns end to notch app Pip (metadata only)" }
+    { "name": "pip", "source": "./plugins/pip", "description": "Writes how Claude Code primary turns end to notch app Pip (metadata only)" }
   ]
 }

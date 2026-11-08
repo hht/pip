@@ -9,11 +9,11 @@ private func list(_ entries: [(id: String, enabled: Bool)]) -> Data {
 
 @Suite struct ClaudeModStatus {
     @Test func installedWhenListedAndEnabled() throws {
-        #expect(try ClaudeMod.status(fromList: list([("swift-lsp@claude-plugins-official", true), ("notchkeeper@notchkeeper", true)])) == .installed)
+        #expect(try ClaudeMod.status(fromList: list([("swift-lsp@claude-plugins-official", true), ("pip@pip", true)])) == .installed)
     }
 
     @Test func disabledWhenListedButOff() throws {
-        #expect(try ClaudeMod.status(fromList: list([("notchkeeper@notchkeeper", false)])) == .disabled)
+        #expect(try ClaudeMod.status(fromList: list([("pip@pip", false)])) == .disabled)
     }
 
     @Test func notInstalledWhenAbsent() throws {

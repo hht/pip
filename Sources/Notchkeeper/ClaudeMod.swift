@@ -15,8 +15,8 @@ enum ClaudeMod {
         case unknown(String)
     }
 
-    private static let pluginID = "notchkeeper@notchkeeper"
-    private static let marketplace = "notchkeeper"
+    private static let pluginID = "pip@pip"
+    private static let marketplace = "pip"
     /// Fixed marketplace location: plugin loads in-place from here, resilient to App relocation.
     static let directory = GuardPaths.directory.appendingPathComponent("ClaudeMod", isDirectory: true)
     /// Bundled copy in App bundle; absent when running directly via `swift run`.
@@ -51,7 +51,7 @@ enum ClaudeMod {
     static func install() async throws {
         guard let claude else { throw Failure(errorDescription: String(localized: "Can't find claude")) }
         try copyBundled()
-        _ = try await run(claude, ["plugin", "install", "notchkeeper", "--marketplace", directory.path, "--json"])
+        _ = try await run(claude, ["plugin", "install", "pip", "--marketplace", directory.path, "--json"])
         Log.write("Claude Code mod: installed")
     }
 

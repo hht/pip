@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-/// A single zsh session: sets up `plugins/terminal/notchkeeper.zsh` and a mock `bin/pipctl` in temp dir (writing arguments per line to `calls/`).
+/// A single zsh session: sets up `plugins/terminal/pip.zsh` and a mock `bin/pipctl` in temp dir (writing arguments per line to `calls/`).
 /// Interactive zsh reads commands from stdin. Wraps with `script` under `pty` for terminal access and `$TTY`.
 private struct Session {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent("terminal-plugin-\(UUID().uuidString)")
@@ -13,8 +13,8 @@ private struct Session {
         try fm.createDirectory(at: plugin, withIntermediateDirectories: true)
         try fm.createDirectory(at: calls, withIntermediateDirectories: true)
         try fm.createDirectory(at: root.appendingPathComponent("bin"), withIntermediateDirectories: true)
-        let source = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../Resources/plugins/terminal/notchkeeper.zsh")
-        try fm.copyItem(at: source.standardized, to: plugin.appendingPathComponent("notchkeeper.zsh"))
+        let source = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../Resources/plugins/terminal/pip.zsh")
+        try fm.copyItem(at: source.standardized, to: plugin.appendingPathComponent("pip.zsh"))
         let pipctl = root.appendingPathComponent("bin/pipctl")
         try "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$(dirname \"$0\")/../calls/$(date +%s%N)-$$\"\n".write(to: pipctl, atomically: true, encoding: .utf8)
         try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: pipctl.path)
@@ -22,7 +22,7 @@ private struct Session {
 
     /// Run commands and wait until mock pipctl has been invoked `expecting` times, returning args for each call.
     func run(_ commands: [String], expecting: Int, pty: Bool = true) throws -> [[String]] {
-        let script = (["notchkeeper_min_seconds=0.3", "source \(root.path)/plugins/terminal/notchkeeper.zsh"] + commands + ["exit"])
+        let script = (["pip_min_seconds=0.3", "source \(root.path)/plugins/terminal/pip.zsh"] + commands + ["exit"])
             .joined(separator: "\n") + "\n"
         let p = Process()
         p.executableURL = URL(fileURLWithPath: pty ? "/usr/bin/script" : "/bin/zsh")

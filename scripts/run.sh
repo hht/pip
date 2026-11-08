@@ -15,7 +15,7 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Notchkeeper"
 cp Support/Info.plist "$APP/Contents/Info.plist"
-# Claude Code mod (docs/agent-integration.md "Notchkeeper mod"): copied from here during Settings install. Excludes tests and types.
+# Claude Code mod (docs/agent-integration.md "Pip mod"): copied from here during Settings install. Excludes tests and types.
 rsync -a --exclude tests --exclude types --exclude tsconfig.json ClaudeMod/ "$APP/Contents/Resources/ClaudeMod/"
 # Terminal plugin (Resources/plugins/terminal): copied from here during Settings install.
 rsync -a Resources/plugins/ "$APP/Contents/Resources/plugins/"

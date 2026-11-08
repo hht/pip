@@ -1,6 +1,6 @@
 # Pip
 
-Haitao's personal notch app for macOS (SwiftPM, macOS 14+), without a menu bar icon. App display name is Pip, sharing the same name as the mascot; the repository is `pip`; package, bundle ID, configuration directory, and labels remain notchkeeper. Developed locally with ad-hoc signing, requiring no paid developer account.
+Haitao's personal notch app for macOS (SwiftPM, macOS 14+), without a menu bar icon. App display name is Pip, sharing the same name as the mascot; the repository, Claude Code plugin, and terminal plugin script are `pip`; package, bundle ID, configuration directory, and labels remain notchkeeper. Developed locally with ad-hoc signing, requiring no paid developer account.
 
 Currently undergoing a rewrite: the App layer and Pip animations will be completely redone, along with a new one-click firewall toggle. Progress and todos are in `HANDOFF.md`.
 

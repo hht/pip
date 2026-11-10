@@ -25,6 +25,7 @@
 - **Stickiness**: once entered violated, can only be cleared by a full round of healthy; network disconnects, timeouts, and egress mismatches never degrade it. Stickiness applies only within the current run: after App restarts, begins at unknown, and if route still bypasses utun, the first round becomes violated again.
 - **Before first round finishes** (first few seconds after launch) displays "Checking egress": status dot is gray ring, Pip look unchanged, right ear empty, no cards popped.
 - Guard is monitoring itself, not UI animation: checks run every 5 seconds even when collapsed, screen locked, or screen off (exempt from "never schedule when invisible").
+- **Default on only with Clash Verge Rev** (user decision): when `config.json` is first created, the guard plugin is turned off if the Clash Verge Rev directory is absent, because every round would be violated; afterwards only the Settings toggle changes it (`ConfigStore`). Turning it off silences alerts, checks keep running.
 - **Allowed list** is retrieved each round from config in App memory, discarding invalid entries; an empty list cannot evaluate egress and results in unknown.
 
 ## 3. What Each Round Provides to App

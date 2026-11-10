@@ -19,8 +19,28 @@ private func edit(_ url: URL, _ json: String, minutesLater: Double = 1) throws {
 
 /// Tests do not write real logs.
 private final class Lines { var all: [String] = [] }
-@MainActor private func store(_ url: URL, _ lines: Lines = Lines()) -> ConfigStore {
-    ConfigStore(url: url, log: { lines.all.append($0) })
+@MainActor private func store(_ url: URL, _ lines: Lines = Lines(), clashVergeInstalled: Bool = true) -> ConfigStore {
+    ConfigStore(url: url, clashVergeInstalled: clashVergeInstalled, log: { lines.all.append($0) })
+}
+
+/// Egress guard only means something with Clash Verge Rev: without it every route bypasses utun and the first round raises a red card.
+/// Decided once, when config.json is first created; an existing file keeps whatever it says.
+@MainActor @Suite struct ConfigStoreFirstLaunchGuard {
+    @Test(arguments: [true, false])
+    func newConfigEnablesGuardOnlyWithClashVerge(_ installed: Bool) throws {
+        let url = try tempConfig(nil)
+        let store = store(url, clashVergeInstalled: installed)
+        #expect(store.config.isEnabled(PluginID.exitGuard) == installed)
+        let saved = try JSONDecoder().decode(Config.self, from: Data(contentsOf: url))
+        #expect(saved.isEnabled(PluginID.exitGuard) == installed)
+    }
+
+    @Test func existingConfigIsNotChanged() throws {
+        let url = try tempConfig(#"{"soundEnabled":false}"#)
+        let store = store(url, clashVergeInstalled: false)
+        #expect(store.config.isEnabled(PluginID.exitGuard))
+        #expect(try Data(contentsOf: url) == Data(#"{"soundEnabled":false}"#.utf8))
+    }
 }
 
 /// CLAUDE.md Principle 5: Degrade gracefully on unparseable external data; never overwrite original file.

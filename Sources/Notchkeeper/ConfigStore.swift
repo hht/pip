@@ -22,7 +22,9 @@ final class ConfigStore: ObservableObject {
     private var saveWork: DispatchWorkItem?
     private var directory: WatchedDirectory?
 
-    init(url: URL = GuardPaths.configFile, log: @escaping (String) -> Void = Log.write) {
+    init(url: URL = GuardPaths.configFile,
+         clashVergeInstalled: Bool = FileManager.default.fileExists(atPath: FirewallInstaller.clashVerge.path),
+         log: @escaping (String) -> Void = Log.write) {
         self.url = url
         self.log = log
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -30,6 +32,9 @@ final class ConfigStore: ObservableObject {
         config = Config()
         switch read() {
         case .missing:
+            // Without Clash Verge Rev every route bypasses utun, so the guard would greet a new user with a red card.
+            // Decided once here and written to the file; afterwards only the Settings toggle changes it.
+            if !clashVergeInstalled { config.setEnabled(false, for: PluginID.exitGuard) }
             saveNow()
         case .unreadable:
             break

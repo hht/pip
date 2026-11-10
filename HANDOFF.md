@@ -41,8 +41,6 @@ Plugin architecture verified on real device 10-31: Settings › Plugins page (to
 - Install script prints test address to stdout (both review rounds deemed acceptable to keep).
 
 *Before opening the project to others* (11-10, awaiting user decision):
-- No `LICENSE`: without one others may read but not legally use, modify, or redistribute the code.
-- Egress guard is enabled by default (`Config.isEnabled`), and a route outside utun is violated (`EgressGuard` rule 1): a user without Clash gets a red card and Basso on first launch (inference from code, not run). README and user guide tell them to turn the guard off in Settings › Plugins; changing the default or adding a first-run choice is a product decision.
 
 ## Awaiting Real-Device Verification
 

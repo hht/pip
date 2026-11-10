@@ -40,10 +40,6 @@ Plugin architecture verified on real device 10-31: Settings › Plugins page (to
 *Awaiting user decision* (asked 10-31, unanswered):
 - Install script prints test address to stdout (both review rounds deemed acceptable to keep).
 
-*Before opening the project to others* (11-10, awaiting user decision):
-- No `LICENSE`: without one others may read but not legally use, modify, or redistribute the code.
-- Egress guard is enabled by default (`Config.isEnabled`), and a route outside utun is violated (`EgressGuard` rule 1): a user without Clash gets a red card and Basso on first launch (inference from code, not run). README and user guide tell them to turn the guard off in Settings › Plugins; changing the default or adding a first-run choice is a product decision.
-
 ## Awaiting Real-Device Verification
 
 - **Plugins and pipctl** (tested by agent on CLI side on evening of 10-31: install, bad icon rejected, upgrade moves to backup, self-replace rejected, `terminal` rejected, uninstall moves to backup, cards after uninstall dropped, `notify` / `send` / `activity` accepted, argument errors and oversized payload exit 64; stuffed random bytes, oversized messages, FIFOs, symlinks into inbox, corrupted manifest into plugin dir, App never crashed, logged line by line). Still needs user clicking and observing: Settings › Plugins "New Plugin…", "Install Plugin…", drag folder (dashed border), "Uninstall…", link button in "Command Line" section; how cards and activities look on notch (this session lacks screen recording permission, cannot take screenshots). Sheets and confirmation dialogs attached to Sections in Form, move to Form if not showing (inference). Uninstalling a plugin that still has cards queued (send several while red card is active, then uninstall), those cards should not pop after red card dismissed. Old `bin/nk` deleted evening of 10-31: terminals open before deletion must restart for terminal plugin to invoke `bin/pipctl`.
@@ -61,7 +57,6 @@ Plugin architecture verified on real device 10-31: Settings › Plugins page (to
 
 ## Known Issues
 
-- Settings › General: the footer under "Quit Pip…" and the quit confirmation message (`Settings.swift`) still say the background Egress Guard keeps running after quitting and point to an uninstall script: stale since guardd was removed; the guard stops with the App. Needs new English text, Chinese translation, and `scripts/strings.sh`.
 - **Done card while Claude keeps working** (user saw it in a live session, 11-07): unexplained. Ruled out: mid-turn user message (Claude Code 2.1.316 folds it into the same turn), external plugins (only the unsourced terminal plugin is installed). Card display itself is not logged, so pops can't be matched to sources: log card source/outcome in `Notch.present` (no text) and have the user report times.
 - `swift test` writes "pipctl: symlinked / removed symlink" into the real `~/Library/Logs/Notchkeeper/notchkeeper.log`: `CommandLineTool` tests inject paths but not the log.
 - `Look.stale` (guard not responding, hourglass) has no event source after guard merged into App, temporarily unwired, kept awaiting user decision to delete or keep.

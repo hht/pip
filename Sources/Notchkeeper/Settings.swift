@@ -225,14 +225,14 @@ private struct GeneralPane: View {
                     Button("Quit Pip…") { confirmQuit = true }
                 }
             } footer: {
-                Text("Quitting stops the notch and pop-up cards; the background Egress Guard continues running. To stop the guard, run the uninstall script.")
+                Text("Quitting stops the notch, cards, and the Egress Guard. If the firewall is on, it keeps blocking.")
             }
         }
         .onAppear { loginStatus = LoginItem.status } // May have just been approved in System Settings
         .confirmationDialog("Quit Pip?", isPresented: $confirmQuit) {
             Button("Quit", role: .destructive) { AppDelegate.quit(reason: "quit clicked in settings") }
         } message: {
-            Text("Quitting stops the notch and pop-up cards; the background Egress Guard continues running. To stop the guard, run the uninstall script.")
+            Text("Quitting stops the notch, cards, and the Egress Guard. If the firewall is on, it keeps blocking.")
         }
     }
 

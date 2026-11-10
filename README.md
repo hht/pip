@@ -42,7 +42,7 @@ If "Keep" was already clicked, rebooting does not help (the rules load again at 
 | Click a card or session to jump back to the terminal | [Ghostty](https://ghostty.org) 1.3 or later (other terminals: Pip only brings Ghostty forward) |
 | Cards for long-running shell commands | zsh |
 
-**Not using Clash?** Turn off "Egress Guard" in Settings › Plugins right after the first launch. Otherwise the guard sees traffic bypassing the tunnel and shows a red card. This turns off its alerts; the checks themselves keep running while Pip is open (see "Privacy").
+**Not using Clash?** If Clash Verge Rev is not installed when Pip first starts, the Egress Guard plugin starts turned off, since without Clash all traffic bypasses the tunnel and the guard would only show a red card. Turn it on later in Settings › Plugins. Turning it off silences its alerts; the checks themselves keep running while Pip is open (see "Privacy").
 
 ## Install
 
@@ -109,3 +109,7 @@ NOTCHKEEPER_LIVE_PROBES=1 swift test --filter LiveProbes   # Read-only probe smo
 - Each target's responsibility is described in `Package.swift`; project rules in `CLAUDE.md`; open work in `HANDOFF.md`.
 - Only one instance runs at a time. If the UI hangs: `pkill -x Notchkeeper`.
 - Config `~/Library/Application Support/Notchkeeper/config.json` hot-reloads; missing fields use defaults, and a file that cannot be decoded is left untouched while defaults apply until it is fixed.
+
+## License
+
+[0BSD](LICENSE): use, copy, modify, and distribute freely, with or without attribution.

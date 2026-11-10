@@ -18,7 +18,7 @@ If you lose internet connection, see "Lost Connection? Firewall Emergency Rescue
 
 ## Egress Guard
 
-The guard and firewall expect [Clash Verge Rev](https://github.com/clash-verge-rev/clash-verge-rev) with TUN mode on. Without Clash, traffic always bypasses the tunnel and the guard shows a red card: turn off "Egress Guard" in Settings › Plugins.
+The guard and firewall expect [Clash Verge Rev](https://github.com/clash-verge-rev/clash-verge-rev) with TUN mode on. Without Clash, traffic always bypasses the tunnel and the guard can only show a red card, so if Clash Verge Rev is not installed when Pip first starts, the "Egress Guard" plugin starts turned off; turn it on in Settings › Plugins.
 
 Add your egress IP in Settings › Egress Guard first (allowed list defaults to empty). Without adding it, the guard cannot evaluate green or amber: when Clash is healthy, it displays gray "Unknown"; however, if any route bypasses Clash, it evaluates red and pops a red card regardless of the allowed list.
 

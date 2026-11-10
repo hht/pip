@@ -109,3 +109,7 @@ NOTCHKEEPER_LIVE_PROBES=1 swift test --filter LiveProbes   # Read-only probe smo
 - Each target's responsibility is described in `Package.swift`; project rules in `CLAUDE.md`; open work in `HANDOFF.md`.
 - Only one instance runs at a time. If the UI hangs: `pkill -x Notchkeeper`.
 - Config `~/Library/Application Support/Notchkeeper/config.json` hot-reloads; missing fields use defaults, and a file that cannot be decoded is left untouched while defaults apply until it is fixed.
+
+## License
+
+[0BSD](LICENSE): use, copy, modify, and distribute freely, with or without attribution.

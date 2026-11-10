@@ -40,8 +40,6 @@ Plugin architecture verified on real device 10-31: Settings › Plugins page (to
 *Awaiting user decision* (asked 10-31, unanswered):
 - Install script prints test address to stdout (both review rounds deemed acceptable to keep).
 
-*Before opening the project to others* (11-10, awaiting user decision):
-
 ## Awaiting Real-Device Verification
 
 - **Plugins and pipctl** (tested by agent on CLI side on evening of 10-31: install, bad icon rejected, upgrade moves to backup, self-replace rejected, `terminal` rejected, uninstall moves to backup, cards after uninstall dropped, `notify` / `send` / `activity` accepted, argument errors and oversized payload exit 64; stuffed random bytes, oversized messages, FIFOs, symlinks into inbox, corrupted manifest into plugin dir, App never crashed, logged line by line). Still needs user clicking and observing: Settings › Plugins "New Plugin…", "Install Plugin…", drag folder (dashed border), "Uninstall…", link button in "Command Line" section; how cards and activities look on notch (this session lacks screen recording permission, cannot take screenshots). Sheets and confirmation dialogs attached to Sections in Form, move to Form if not showing (inference). Uninstalling a plugin that still has cards queued (send several while red card is active, then uninstall), those cards should not pop after red card dismissed. Old `bin/nk` deleted evening of 10-31: terminals open before deletion must restart for terminal plugin to invoke `bin/pipctl`.

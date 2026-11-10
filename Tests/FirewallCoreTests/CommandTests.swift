@@ -13,7 +13,7 @@ func at(_ seconds: Int64, boot session: String? = boot) -> Moment {
         #expect(s.mode == .trial(deadline: MonotonicTime(milliseconds: 220_000)))
     }
 
-    /// 状态机只有 off → trial 这一条开启的路：试运行中再点开启不能把截止时间往后推
+    /// State machine only allows off -> trial for enabling: clicking enable during trial cannot postpone the deadline
     @Test func enableOnlyFromOff() throws {
         var s = FirewallState(bootSession: boot)
         try s.enable(at: at(100))
@@ -28,7 +28,7 @@ func at(_ seconds: Int64, boot session: String? = boot) -> Moment {
         #expect(s.mode == .on)
     }
 
-    /// 到期必回滚：守护进程还没来得及跑这一轮时点「保留」，也不能救回过期的试运行
+    /// Must rollback on expiry: clicking "Keep" before daemon runs the round cannot salvage an expired trial
     @Test func keepAtDeadlineIsRefusedAndRollsBack() throws {
         var s = FirewallState(bootSession: boot)
         try s.enable(at: at(100))
@@ -42,7 +42,7 @@ func at(_ seconds: Int64, boot session: String? = boot) -> Moment {
         #expect(s.mode == .off)
     }
 
-    /// 开机时 trial 一律当 off：上一次开机的试运行，截止时间按新开机的单调时钟看可能还没到，也不能保留
+    /// At boot, trial is always treated as off: trial from previous boot cannot be kept, even if deadline hasn't elapsed against new monotonic clock
     @Test func keepATrialFromThePreviousBootIsRefused() throws {
         var s = FirewallState(bootSession: boot)
         try s.enable(at: at(100))
@@ -51,7 +51,7 @@ func at(_ seconds: Int64, boot session: String? = boot) -> Moment {
         #expect(s.bootSession == "OTHER-BOOT")
     }
 
-    /// 命令不读引用列表：开机后旧 token 一律作废，不能配上新的开机标识落盘（关闭时释放失败、重启后再开启就会这样）
+    /// Commands do not read reference list: old token is always revoked across boots, and must not be saved to disk paired with the new boot ID (which happens when release fails on shutdown and re-enabled after reboot)
     @Test func commandAfterBootDropsTheOldToken() throws {
         var s = FirewallState(bootSession: boot)
         s.reference = .held(token: "1864012227745836441")
@@ -59,8 +59,8 @@ func at(_ seconds: Int64, boot session: String? = boot) -> Moment {
         #expect(s.reference == nil)
     }
 
-    /// 读不出开机标识时开启、保留都报错（下一轮反正会把试运行当 off，悄悄回滚用户看不出为什么）；
-    /// 不动引用和记下的开机标识：还活着的引用丢了就再也释放不了
+    /// Enable and keep both throw error when boot ID is unreadable (the next round would treat trial as off anyway, silently rolling back without explaining why);
+    /// references and recorded boot ID are preserved: losing an active reference means it can never be released
     @Test func commandsRefuseAnUnreadableBootSession() throws {
         var s = FirewallState(bootSession: boot)
         s.reference = .held(token: "1864012227745836441")

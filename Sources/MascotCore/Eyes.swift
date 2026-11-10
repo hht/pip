@@ -1,23 +1,24 @@
 import CoreGraphics
 
-/// 闭合多边形的顶点，画布单位
+/// Vertices of a closed polygon, canvas units
 public typealias EyeOutline = [CGPoint]
 
-/// Pip 的眼睛长什么样，以及两种眼形之间怎么逐点补间。
-/// 不知道眼睛贴在球面上怎么转（`Sphere`、App 的图层树），也不知道什么时候换（App）。
+/// Appearance of Pip's eyes and point-by-point interpolation between eye shapes.
+/// Unaware of how eyes rotate when projected on a sphere (`Sphere`, App layer tree), or when eye looks change (App).
 ///
-/// Core Animation 只在两条路径点数、结构完全相同时才能逐点补间，所以所有眼形（实心的、描边的）都化成
-/// `pointCount` 个点、绕向一致的闭合多边形；换形前再旋转起点对齐上一个形状，补间时不打转（docs/mascot.md §3）。
+/// Core Animation interpolates point-by-point only when two paths have identical point counts and structure.
+/// All eye shapes (filled and stroked) are converted to closed polygons with `pointCount` points and consistent winding;
+/// before morphing, start points are rotated to align with the previous shape, preventing twisting during interpolation (docs/mascot.md §3).
 /// @see https://github.com/veltman/flubber
 /// @see https://developer.apple.com/documentation/quartzcore/cashapelayer/path
 public enum Eyes {
     public static let pointCount = 120
-    /// 眼睛整体放大倍数，以各自的静止中心为原点（docs/mascot.md §1）
+    /// Eye scale factor, centered on respective rest origins (docs/mascot.md §1)
     public static let scale: CGFloat = 1.35
 
-    /// 旋转起点，让 p 和上一个形状 q 对应点的平方距离之和最小
+    /// Rotates start point to minimize sum of squared distances between corresponding points in p and previous shape q
     public static func aligned(_ p: EyeOutline, to q: EyeOutline) -> EyeOutline {
-        precondition(p.count == q.count, "点数不同不能对齐")
+        precondition(p.count == q.count, "Point counts must match to align")
         let n = p.count
         func cost(_ k: Int) -> CGFloat {
             (0..<n).reduce(0) { s, i in let d = p[(i + k) % n] - q[i]; return s + d.x * d.x + d.y * d.y }
@@ -26,7 +27,7 @@ public enum Eyes {
         return Array(p[k...] + p[..<k])
     }
 
-    /// 眨眼闭上的样子：以自己的竖直中心为轴压到 0.1 倍高
+    /// Closed eye shape during blink: compressed to 0.1x height along vertical center axis
     public static func shut(_ p: EyeOutline) -> EyeOutline {
         let ys = p.map(\.y)
         guard let lo = ys.min(), let hi = ys.max() else { return p }
@@ -34,7 +35,7 @@ public enum Eyes {
         return p.map { CGPoint(x: $0.x, y: mid + ($0.y - mid) * 0.1) }
     }
 
-    /// 任意折线化成标准的闭合多边形：按弧长等距重采样到 pointCount 点，统一绕向
+    /// Converts arbitrary polyline to standardized closed polygon: equidistant arc-length resampling to pointCount points, unified winding
     static func ring(_ raw: EyeOutline) -> EyeOutline {
         var p = resample(raw, closed: true, count: pointCount)
         let area = p.indices.reduce(CGFloat(0)) { s, i in let a = p[i], b = p[(i + 1) % p.count]; return s + a.x * b.y - b.x * a.y }
@@ -42,7 +43,7 @@ public enum Eyes {
         return p
     }
 
-    /// 路径拍平成折线的顶点
+    /// Flattens path into polyline vertices
     static func points(_ path: CGPath) -> EyeOutline {
         var out: EyeOutline = []
         path.flattened(threshold: 0.004).applyWithBlock { e in
@@ -51,9 +52,9 @@ public enum Eyes {
         return out
     }
 
-    /// 按弧长等距重采样
+    /// Equidistant arc-length resampling
     static func resample(_ pts: EyeOutline, closed: Bool, count: Int) -> EyeOutline {
-        guard let first = pts.first else { preconditionFailure("空折线") }
+        guard let first = pts.first else { preconditionFailure("Empty polyline") }
         let line = closed ? pts + [first] : pts
         var acc: [CGFloat] = [0]
         for i in 1..<line.count { acc.append(acc[i - 1] + hypot(line[i].x - line[i - 1].x, line[i].y - line[i - 1].y)) }
@@ -68,7 +69,7 @@ public enum Eyes {
         }
     }
 
-    /// 圆头描边化成轮廓：中线 64 点，左侧去、半圆头、右侧回、半圆头
+    /// Converts round-capped stroke to outline: 64 centerline points, left contour, half-circle cap, right contour return, half-circle cap
     static func outline(_ center: CGPath, width: CGFloat) -> EyeOutline {
         let c = resample(points(center), closed: false, count: 64)
         let h = width / 2
@@ -91,13 +92,13 @@ public enum Eyes {
 }
 
 extension Look {
-    /// 左右眼，各自以静止中心为原点，放大 ×1.35 之前（docs/mascot.md §3）
+    /// Left and right eyes, each centered on its rest origin, prior to 1.35x scaling (docs/mascot.md §3)
     public var eyes: (left: EyeOutline, right: EyeOutline) {
         let (l, r) = design
         return (Eyes.ring(l), Eyes.ring(r))
     }
 
-    /// 眼形草图：拍平的折线，还没重采样
+    /// Eye shape sketch: flattened polylines before resampling
     private var design: (EyeOutline, EyeOutline) {
         func ellipse(_ rx: CGFloat, _ ry: CGFloat, dx: CGFloat = 0, dy: CGFloat = 0) -> EyeOutline {
             Eyes.points(CGPath(ellipseIn: CGRect(x: dx - rx, y: dy - ry, width: 2 * rx, height: 2 * ry), transform: nil))
@@ -124,7 +125,7 @@ extension Look {
         case .shielded: return pair(ellipse(1.15, 1.5).map { CGPoint(x: $0.x, y: max($0.y, -0.75)) })
         case .stale: return pair(ellipse(1.15, 1.6).map { CGPoint(x: $0.x, y: max($0.y, -0.25)) })
         case .danger:
-            // 左眼的 +x 是靠鼻梁的内侧：斜眉往内侧压下来
+            // +x for left eye is towards nose bridge: slanted brows press downwards inward
             return pair(ellipse(1.3, 1.6).map { CGPoint(x: $0.x, y: max($0.y, -0.55 + 0.6 * $0.x)) })
         case .sleeping:
             return pair(stroke(0.9) { $0.move(to: CGPoint(x: -1.7, y: -0.5)); $0.addQuadCurve(to: CGPoint(x: 1.7, y: -0.5), control: CGPoint(x: 0, y: 1.5)) })
@@ -135,7 +136,7 @@ extension Look {
         case .error:
             return pair(stroke(0.85) { $0.addLines(between: [CGPoint(x: -1.05, y: -1.45), CGPoint(x: 1.05, y: 0), CGPoint(x: -1.05, y: 1.45)]) })
         case .dizzy:
-            // 半圆接半圆的螺旋，半径 .35 → 1.4；clockwise: true 在 +y 向下的画布里是角度递减
+            // Spiral of tangent semicircles, radius .35 -> 1.4; clockwise: true is decreasing angle in +y-down canvas
             let s = stroke(0.55) { p in
                 p.move(to: CGPoint(x: 0.35, y: 0))
                 for (i, r) in [0.35, 0.7, 1.05, 1.4].enumerated() {
@@ -148,11 +149,11 @@ extension Look {
     }
 }
 
-/// 眼睛贴在球面上的位置。不知道球怎么转（App 用 Core Animation 的 3D 变换）
+/// Eye position on the sphere surface. Unaware of how the sphere rotates (App uses Core Animation 3D transforms)
 public enum Sphere {
-    /// 把正前方的点转到静止中心要的角度，弧度，约定同 `HeadPose`（pitch + = 往上）：
-    /// lat = asin((y − cy) / r)，lon = asin((x − cx) / (r cos lat))（docs/mascot.md §1）。
-    /// 眼睛在赤道下方（y 比圆心大），所以 pitch = −lat；先绕 x 轴转 pitch，再绕 y 轴转 yaw
+    /// Angles required to rotate front-facing point to rest center, radians, matching `HeadPose` conventions (pitch + = upwards):
+    /// lat = asin((y - cy) / r), lon = asin((x - cx) / (r cos lat)) (docs/mascot.md §1).
+    /// Eyes are below the equator (y greater than center), so pitch = -lat; rotates around x axis by pitch first, then around y axis by yaw
     public static func place(_ rest: CGPoint) -> (pitch: Double, yaw: Double) {
         let c = Anatomy.bodyCenter, r = Double(Anatomy.bodyRadius)
         let lat = asin(Double(rest.y - c.y) / r)

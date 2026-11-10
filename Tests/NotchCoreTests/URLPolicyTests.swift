@@ -2,8 +2,8 @@ import Foundation
 import Testing
 @testable import NotchCore
 
-/// 卡片上「打开 URL」默认只放行 https，用户在设置里加的 scheme 也放行。
-/// 自定义 scheme 能拉起别的 App 执行动作，所以不在白名单里的一律拦下
+/// "Open URL" on cards allows https by default; schemes added by user in settings are also allowed.
+/// Custom schemes can trigger actions in other apps, so any scheme not in allowlist is blocked
 @Suite struct URLPolicyRules {
     @Test(arguments: ["https://example.com/x", "HTTPS://example.com"])
     func httpsAlwaysAllowed(_ s: String) {
@@ -15,7 +15,7 @@ import Testing
         #expect(!URLPolicy(schemes: []).allows(URL(string: s)!))
     }
 
-    /// 白名单里写成「Raycast」「raycast://」都算同一个 scheme
+    /// Allowlist entries as "Raycast" or "raycast://" resolve to the same scheme
     @Test(arguments: ["raycast", "Raycast", "raycast://", " raycast "])
     func whitelistedSchemeAllowed(_ entry: String) {
         let policy = URLPolicy(schemes: [entry])
@@ -24,7 +24,7 @@ import Testing
     }
 }
 
-/// 白名单写错（空条目）不能变成放行；几种怪写法的结果钉住
+/// Erroneous entries (empty string) cannot become allowed; pinning edge cases
 @Suite struct URLPolicyEdges {
     @Test(arguments: ["", "://", " "])
     func emptyEntryAllowsNothing(_ entry: String) {
@@ -35,12 +35,12 @@ import Testing
         let p = URLPolicy(schemes: [])
         #expect(!p.allows(URL(string: "javascript:https://x")!))
         #expect(URL(string: "HTTPS ://x") == nil)
-        // 没有 host 的 https 放行：最多是浏览器打开一个坏链接
+        // https without host allowed: at worst browser opens invalid link
         #expect(p.allows(URL(string: "https:")!))
     }
 }
 
-/// 设置页新增白名单条目：统一成小写、去掉「://」；不合 RFC 3986 scheme 语法的不收
+/// Settings view new allowlist entry: normalized to lowercase, strips "://"; rejects non-RFC 3986 scheme syntax
 @Suite struct URLPolicySchemeEntry {
     @Test(arguments: [("Raycast", "raycast"), ("raycast://", "raycast"), (" x-callback+v1.2 ", "x-callback+v1.2")])
     func normalized(_ entry: String, _ scheme: String) {

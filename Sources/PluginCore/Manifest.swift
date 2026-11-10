@@ -1,17 +1,17 @@
 import Foundation
 import NotchCore
 
-/// 回答：一个外部插件登没登记、卡上标它什么名字和图标。来自 `plugins/<id>/manifest.json`，不读文件
+/// Answers: whether an external plugin is registered, what name and icon it shows on cards. Loaded from `plugins/<id>/manifest.json`, does not read files directly
 public struct Manifest: Equatable, Sendable {
     public var id: String
     public var name: String
-    /// SF Symbol 名
+    /// SF Symbol name
     public var symbol: String
 
-    /// 最长的系统图标名四十来个字符
+    /// Longest system icon name is around 40 characters
     public static let maxSymbol = 64
 
-    /// 目录名就是插件 id：对不上的不认，免得一个插件冒用另一个的名字。nil：要装的插件，还没装进 `plugins/<id>/`
+    /// Directory name is the plugin id: reject mismatches to prevent impersonation. nil: plugin to be installed, not yet in `plugins/<id>/`
     public static func parse(_ data: Data, directoryName: String?) throws(ManifestError) -> Manifest {
         struct Wire: Decodable { var id, name, symbol: String }
         let wire: Wire
@@ -23,20 +23,20 @@ public struct Manifest: Equatable, Sendable {
         guard wire.id == directoryName ?? wire.id, Message.isPluginID(wire.id) else { throw .badID }
         guard !PluginID.builtIn.contains(wire.id) else { throw .reservedID }
         guard !wire.name.allSatisfy(\.isWhitespace), !wire.symbol.isEmpty else { throw .missingField }
-        // 只在安装时拦：已经装着的照常收卡，名字由 `Card` 截短，图标名对不上 App 换成拼图块
+        // Only block on install: already-installed plugins still receive cards normally; name truncated by `Card`, mismatched icon replaced with puzzle piece by App
         guard directoryName != nil || (wire.name.count <= Card.maxValue && wire.symbol.count <= maxSymbol) else { throw .tooLong }
         return Manifest(id: wire.id, name: wire.name, symbol: wire.symbol)
     }
 }
 
-/// 登记文件解不开：这个插件算没登记
+/// Registration file cannot be decoded: plugin is considered unregistered
 public enum ManifestError: Error, Equatable, Sendable {
     case malformed
-    /// 不合规，或和目录名对不上
+    /// Invalid, or does not match directory name
     case badID
-    /// 是内置插件的 id（`PluginID.builtIn`）
+    /// Reserved built-in plugin id (`PluginID.builtIn`)
     case reservedID
     case missingField
-    /// 安装时：名字超过 `Card.maxValue` 个字，或图标名超过 `Manifest.maxSymbol`
+    /// On install: name exceeds `Card.maxValue` characters, or symbol exceeds `Manifest.maxSymbol`
     case tooLong
 }

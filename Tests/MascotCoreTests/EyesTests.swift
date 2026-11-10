@@ -19,25 +19,25 @@ private func bounds(_ p: EyeOutline) -> CGRect {
 }
 
 @Suite struct EyesTests {
-    /// docs/mascot.md §3：所有眼形都是 120 点闭合多边形、绕向一致，才能逐点补间
+    /// docs/mascot.md §3: All eye shapes are 120-point closed polygons with consistent winding for point-by-point tweening
     @Test func everyLookHasComparableRings() {
         for l in Look.allCases {
             let e = l.eyes
             for p in [e.left, e.right] {
                 #expect(p.count == Eyes.pointCount, "\(l)")
-                #expect(area(p) > 0, "\(l) 绕向")
+                #expect(area(p) > 0, "\(l) winding")
             }
         }
     }
 
-    /// 按弧长等距：相邻两点的距离差不多
+    /// Equidistant by arc length: adjacent points have nearly equal distance
     @Test func ringIsEvenlySpaced() {
         let p = Look.mismatch.eyes.left
         let d = p.indices.map { i in hypot(p[i].x - p[(i + 1) % p.count].x, p[i].y - p[(i + 1) % p.count].y) }
         #expect(d.max()! - d.min()! < 1e-3)
     }
 
-    /// 右眼是左眼的镜像；看云、看活、螺旋两只眼同向
+    /// Right eye mirrors left eye; thinking, working, dizzy have both eyes facing the same direction
     @Test func mirroring() {
         for l in Look.allCases {
             let e = l.eyes
@@ -48,7 +48,7 @@ private func bounds(_ p: EyeOutline) -> CGRect {
         }
     }
 
-    /// O 眼是正圆 r 1.45；竖长大眼 1.25 × 1.9；看云偏到 (0.35, −0.5)
+    /// O-eye is a true circle r 1.45; tall oval eye 1.25 x 1.9; thinking offset to (0.35, -0.5)
     @Test func sizes() {
         let o = bounds(Look.mismatch.eyes.left)
         #expect(abs(o.width - 2.9) < 0.01 && abs(o.height - 2.9) < 0.01)
@@ -58,19 +58,19 @@ private func bounds(_ p: EyeOutline) -> CGRect {
         #expect(abs(t.midX - 0.35) < 0.01 && abs(t.midY + 0.5) < 0.01)
     }
 
-    /// 切过的眼：耷拉眼上沿在 −0.25，镇定眼上沿在 −0.75
+    /// Clipped eyes: droopy eye top edge at -0.25, calm eye top edge at -0.75
     @Test func clipped() {
         #expect(abs(bounds(Look.stale.eyes.left).minY + 0.25) < 1e-6)
         #expect(abs(bounds(Look.shielded.eyes.left).minY + 0.75) < 1e-6)
     }
 
-    /// 描边眼形化成轮廓：笑眼的宽是中线宽 3.4 加线宽 0.9
+    /// Stroked eye shape converted to outline: smiling eye width is centerline width 3.4 plus line width 0.9
     @Test func strokeOutline() {
         let b = bounds(Look.finished.eyes.left)
         #expect(abs(b.width - 4.3) < 0.02)
     }
 
-    /// 放大 ×1.35 以后眼睛还在身体圆里（docs/mascot.md §1）
+    /// After scaling by 1.35x, eyes remain within body circle (docs/mascot.md §1)
     @Test func insideBody() {
         for l in Look.allCases {
             let e = l.eyes
@@ -83,7 +83,7 @@ private func bounds(_ p: EyeOutline) -> CGRect {
         }
     }
 
-    /// 对齐起点：上一个形状换个起点再对齐回来，得到它自己；结果的平方距离是所有起点里最小的
+    /// Align start point: shifting start point of previous shape and aligning back yields itself; resulting squared distance is minimum among all start points
     @Test func alignment() {
         let q = Look.idle.eyes.left
         #expect(Eyes.aligned(rotated(q, by: 37), to: q) == q)
@@ -92,7 +92,7 @@ private func bounds(_ p: EyeOutline) -> CGRect {
         for k in 0..<p.count { #expect(cost(a, q) <= cost(rotated(p, by: k), q) + 1e-9) }
     }
 
-    /// 眨眼：以竖直中心为轴压到 0.1 倍高，宽不变
+    /// Blink: compress along vertical center to 0.1x height, width unchanged
     @Test func shut() {
         let open = Look.idle.eyes.left
         let s = Eyes.shut(open)
@@ -101,12 +101,12 @@ private func bounds(_ p: EyeOutline) -> CGRect {
     }
 }
 
-/// 照 Core Animation 在翻转视图里的约定自己投影一遍（docs/mascot.md §1 实测：rotation.x 正 = 抬头，rotation.y 正 = 脸朝右）：
-/// 球心为原点，+z 朝观众，+y 向下。眼睛从正前方 (0, 0, r) 先绕 x 轴转 pitch、再绕 y 轴转 yaw，最后整颗头再转 headYaw
+/// Project following Core Animation conventions in flipped view (docs/mascot.md §1 measured: positive rotation.x = look up, positive rotation.y = face right):
+/// Sphere center as origin, +z towards viewer, +y downwards. Eye at front (0, 0, r) rotates pitch around x axis, yaw around y axis, and headYaw for whole head
 private func project(_ rest: CGPoint, headYaw: Double = 0) -> (x: Double, y: Double, facing: Bool) {
     let (pitch, yaw) = Sphere.place(rest)
     let r = Double(Anatomy.bodyRadius)
-    // 抬头：正前方的点往上（−y）走
+    // Looking up: front point moves upward (-y)
     let y = -r * sin(pitch), z1 = r * cos(pitch)
     let x = z1 * sin(yaw), z = z1 * cos(yaw)
     let x2 = x * cos(headYaw) + z * sin(headYaw), z2 = -x * sin(headYaw) + z * cos(headYaw)
@@ -114,14 +114,14 @@ private func project(_ rest: CGPoint, headYaw: Double = 0) -> (x: Double, y: Dou
 }
 
 @Suite struct SphereTests {
-    /// docs/mascot.md §1：左眼偏离正中约 20°；在赤道稍下，所以是低头的角度
+    /// docs/mascot.md §1: Left eye offset from center by ~20 deg; slightly below equator, so pitch looks downward
     @Test func placement() {
         let (pitch, yaw) = Sphere.place(Anatomy.leftEye)
         #expect(abs(pitch + asin(0.05)) < 1e-12)
         #expect(abs(yaw * 180 / .pi + 20.5) < 0.1)
     }
 
-    /// 放回去还是静止中心：x 和 y 都对得上，不偏到中心上方
+    /// Round-trip matches rest center: x and y match, no offset above center
     @Test func roundTrip() {
         for rest in [Anatomy.leftEye, Anatomy.rightEye] {
             let p = project(rest)
@@ -130,7 +130,7 @@ private func project(_ rest: CGPoint, headYaw: Double = 0) -> (x: Double, y: Dou
         }
     }
 
-    /// 脸朝右转 90°：左眼转到右侧边缘附近（还看得见），右眼转到背面；转 180° 两只都看不见
+    /// Turn face 90 deg right: left eye moves near right edge (still visible), right eye turns to back; at 180 deg neither is visible
     @Test func turning() {
         let side = project(Anatomy.leftEye, headYaw: 90 * .pi / 180)
         #expect(side.facing && side.x > 9)

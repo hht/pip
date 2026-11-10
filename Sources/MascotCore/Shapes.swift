@@ -1,23 +1,23 @@
 import CoreGraphics
 
-// Pip 的身体和装饰：画布坐标里的 CGPath 和画法。不知道这些形状怎么动。
-// 坐标、路径全部照 docs/mascot.md §1、§4，单位是画布单位，原点左上、+y 向下。
+// Pip's body and decorations: CGPath and painting methods in canvas coordinates. Unaware of how these shapes animate.
+// Coordinates and paths follow docs/mascot.md §1, §4. Units are canvas units, origin top-left, +y downwards.
 
-/// 身体各部位在画布上的位置
+/// Positions of anatomical parts on the canvas
 public enum Anatomy {
     public static let bodyCenter = CGPoint(x: 14, y: 16.5)
     public static let bodyRadius: CGFloat = 10
     public static let leftEye = CGPoint(x: 10.5, y: 17)
     public static let rightEye = CGPoint(x: 17.5, y: 17)
-    /// 右上装饰区的中心，整组装饰弹出时以它为锚点
+    /// Center of top-right decoration area; serves as anchor when the decoration group pops out
     public static let decoCenter = CGPoint(x: 23.25, y: 4.5)
-    /// 画布范围 viewBox -4 -6 40 34：比身体大一圈，装饰在右上方出框。左耳那只是同一张画布缩小（docs/mascot.md §1）
+    /// Canvas frame viewBox -4 -6 40 34: slightly larger than body, decorations overflow top-right. Left ear pip scales down this exact canvas (docs/mascot.md §1)
     public static let canvas = CGRect(x: -4, y: -6, width: 40, height: 34)
 }
 
 public enum Paint: Equatable, Sendable {
     case fill
-    /// 描边都是圆头圆角
+    /// Strokes always have round caps and joins
     case stroke(CGFloat)
     case fillAndStroke(CGFloat)
 }
@@ -26,7 +26,7 @@ public struct ShapeSpec: Equatable, @unchecked Sendable {
     public let path: CGPath
     public let paint: Paint
     public let color: RGB
-    /// 静止时的不透明度；循环的不透明度动画叠加在它上面
+    /// Rest opacity; looped opacity animations are superimposed onto it
     public let opacity: Double
 
     public init(_ path: CGPath, _ paint: Paint = .fill, _ color: RGB = .ink, opacity: Double = 1) {
@@ -37,7 +37,7 @@ public struct ShapeSpec: Equatable, @unchecked Sendable {
     }
 }
 
-/// 装饰里能单独动的一块，带自己的锚点（缩放、旋转的中心）
+/// An independently animatable decoration piece with its own anchor (scale/rotation center)
 public struct DecoPart: Equatable, Sendable {
     public let spec: ShapeSpec
     public let anchor: CGPoint
@@ -49,7 +49,7 @@ public struct DecoPart: Equatable, Sendable {
 }
 
 extension Look {
-    /// 右上装饰，按画的先后排。下标是固定的：`Choreography` 按下标点名会动的部件
+    /// Top-right decorations, ordered by drawing sequence. Indices are fixed: `Choreography` targets animated pieces by index
     public var decoration: [DecoPart] {
         func at(_ anchor: CGPoint, _ specs: [ShapeSpec]) -> [DecoPart] { specs.map { DecoPart(spec: $0, anchor: anchor) } }
         switch self {
@@ -66,7 +66,7 @@ extension Look {
                          CGRect(x: 25, y: 3, width: 3, height: 3), CGRect(x: 18.5, y: 5.5, width: 2, height: 2)]
                 .map { CGPath(ellipseIn: $0, transform: nil) } + [CGPath(rect: CGRect(x: 22, y: 4, width: 4.5, height: 2), transform: nil)]
             let dot = { (x: CGFloat) in CGPath(ellipseIn: CGRect(x: x - 0.55, y: 4.05, width: 1.1, height: 1.1), transform: nil) }
-            // 暗点常亮，亮点叠在上面，静止时不透明度 0，由循环依次点亮
+            // Dim dots always visible, bright dots overlay on top; rest opacity 0, lit in turn by loop
             return at(Anatomy.decoCenter, [ShapeSpec(union(cloud), .fill, RGB(0xE9E2FB), opacity: 0.95),
                                            ShapeSpec(union([22.5, 24.5, 26.5].map(dot)), .fill, RGB(0xBFB2EE))]
                 + [22.5, 24.5, 26.5].map { ShapeSpec(dot($0), .fill, RGB(0x7C5CE0), opacity: 0) })
@@ -91,7 +91,7 @@ extension Look {
                     DecoPart(spec: ShapeSpec(star(center: CGPoint(x: 21, y: 6.5), outer: 1.25, inner: 0.375), .fill, RGB(0xFFD66B), opacity: 0.6),
                              anchor: CGPoint(x: 21, y: 6.5))]
         case .longTurn:
-            // 汗珠
+            // Sweat drop
             let p = CGMutablePath()
             p.move(to: CGPoint(x: 23.2, y: 2.8))
             p.addQuadCurve(to: CGPoint(x: 24.3, y: 5.4), control: CGPoint(x: 24.2, y: 4.2))
@@ -99,7 +99,7 @@ extension Look {
             p.addQuadCurve(to: CGPoint(x: 23.2, y: 2.8), control: CGPoint(x: 22.2, y: 4.2))
             return at(Anatomy.decoCenter, [ShapeSpec(p, .fill, RGB(0x7CC4F5))])
         case .approval:
-            // 举起的手：手掌 + 四指 + 拇指
+            // Raised hand: palm + 4 fingers + thumb
             var parts = [CGPath(roundedRect: CGRect(x: 21.8, y: 4.2, width: 4.6, height: 3.8), cornerWidth: 1.3, cornerHeight: 1.3, transform: nil)]
             for (x, top) in [(21.9, 1.9), (23.05, 1.1), (24.2, 1.3), (25.35, 2.1)] {
                 parts.append(CGPath(roundedRect: CGRect(x: x, y: top, width: 0.95, height: 5 - top), cornerWidth: 0.47, cornerHeight: 0.47, transform: nil))
@@ -113,7 +113,7 @@ extension Look {
             p.addLines(between: [CGPoint(x: 26.5, y: 2), CGPoint(x: 22.5, y: 6)])
             return at(CGPoint(x: 24.5, y: 4), [ShapeSpec(p, .stroke(1.1), RGB(0xFF8A3D))])
         case .offline:
-            // Wi-Fi 扇形 + 斜杠
+            // Wi-Fi sector + slash
             let c = CGPoint(x: 24.5, y: 7.6)
             func arc(_ r: CGFloat) -> CGPath {
                 let p = CGMutablePath()
@@ -141,14 +141,14 @@ extension Look {
             p.closeSubpath()
             return at(CGPoint(x: 24.5, y: 4.5), [ShapeSpec(p, .fill, RGB(0xB7A27A))])
         case .danger:
-            // 两个 ! 是两个部件，轮流跳
+            // Two ! marks are two distinct pieces that bounce alternately
             return [21.5, 25].map { x in
                 let p = CGMutablePath()
                 p.addRects([CGRect(x: x, y: 1.5, width: 1.5, height: 3.5), CGRect(x: x, y: 6, width: 1.5, height: 1.5)])
                 return DecoPart(spec: ShapeSpec(p, .fill, .red), anchor: CGPoint(x: x + 0.75, y: 4.5))
             }
         case .shielded:
-            // 锁：锁梁、锁身、锁孔
+            // Lock: shackle, body, keyhole
             let shackle = CGMutablePath()
             shackle.move(to: CGPoint(x: 22.8, y: 4.4))
             shackle.addLine(to: CGPoint(x: 22.8, y: 3.0))
@@ -166,13 +166,13 @@ extension Look {
     }
 }
 
-/// 几块同色的形状合成一块：重叠处不会因为半透明叠深，也不会因为绕向相反抠出洞
+/// Merges shapes of the same color into a single union: overlapping areas won't darken through alpha stacking, nor cut holes from opposing winding directions
 /// @see https://developer.apple.com/documentation/coregraphics/cgpath/union(_:using:)
 private func union(_ paths: [CGPath]) -> CGPath {
     paths.dropFirst().reduce(paths[0]) { $0.union($1) }
 }
 
-/// 四角星：外顶点上下左右，内顶点在 45° 方向、两轴各偏 inner（docs/mascot.md §4 的两颗星都是这个形状）
+/// Four-pointed star: outer vertices up/down/left/right, inner vertices at 45° with inner offset (both stars in docs/mascot.md §4 use this shape)
 private func star(center c: CGPoint, outer: CGFloat, inner: CGFloat) -> CGPath {
     let p = CGMutablePath()
     p.addLines(between: (0..<8).map { i in

@@ -1,13 +1,13 @@
-/// 空闲时 Pip 什么时候眨眼、什么时候做哪个小动作。全 App 只有一个，左耳和面板里的 Pip 同步。
-/// 不知道现在是不是空闲、看不看得见、鼠标在哪（App 决定要不要问它、问到的提示播不播），也不知道动作长什么样（`Choreography`）。
-/// 时间和随机数都从参数进来：同一个种子、同一串调用，结果完全一样。
+/// Directs when Pip blinks and performs idle motions. Shared application-wide, synchronizing left ear and panel Pips.
+/// Unaware of whether currently idle, visible, or mouse position (App decides whether to query it and whether to play returned cues), and motion aesthetics (`Choreography`).
+/// Time and RNG state are passed as arguments: identical seeds and call sequences produce identical outputs.
 public struct IdleDirector: Sendable {
     private var nextBlink: Double
     private var nextMotion: Double
     private var rng: SplitMix64
     private var last: Motion?
 
-    /// 眨眼间隔 2.5–6s，15% 连眨两次；小动作每 8–20s 一个
+    /// Blink interval 2.5-6s, 15% double blink; idle motion every 8-20s
     static let blinkGap = 2.5...6.0
     static let doubleBlink = 0.15
     static let motionGap = 8.0...20.0
@@ -21,7 +21,7 @@ public struct IdleDirector: Sendable {
 
     public var nextWake: Double { min(nextBlink, nextMotion) }
 
-    /// 到 now 为止该发的提示；发过的按 now 重新排下一次
+    /// Cues due up to now; emitted cues rescheduled starting from now
     public mutating func cues(at now: Double) -> [Cue] {
         var out: [Cue] = []
         if now >= nextBlink {
@@ -37,18 +37,18 @@ public struct IdleDirector: Sendable {
         return out
     }
 
-    /// 鼠标在动、Pip 在看鼠标时不做小动作：停下以后至少再等最短间隔
+    /// When mouse is moving and Pip is tracking it, idle motions are suppressed: waits at least minimum interval after stopping
     public mutating func postponeMotions(until t: Double) {
         nextMotion = max(nextMotion, t + Self.motionGap.lowerBound)
     }
 
-    /// 看不见一段时间后回来：不补发攒下的提示，从现在重新排
+    /// Returning after being invisible: skips accumulated cues, rescheduling from now
     public mutating func resume(at now: Double) {
         nextBlink = now + Double.random(in: Self.blinkGap, using: &rng)
         nextMotion = now + Double.random(in: Self.motionGap, using: &rng)
     }
 
-    /// 按权重抽，不和上一个重复
+    /// Weighted selection without repeating the immediate predecessor
     private mutating func pick() -> Motion {
         let pool = Motion.allCases.filter { $0 != last && $0.idleWeight > 0 }
         var r = Double.random(in: 0..<pool.reduce(0) { $0 + $1.idleWeight }, using: &rng)
@@ -66,7 +66,7 @@ public enum Cue: Equatable, Sendable {
 }
 
 extension Motion {
-    /// 空闲小动作的权重（docs/mascot.md §5）：左右转圈、上下翻圈各 5%，其余 8 个等分剩下的 90%；完成跳转不在里面
+    /// Idle motion weights (docs/mascot.md §5): spinAround and flip 5% each, remaining 8 divide 90% equally; finishJump excluded
     var idleWeight: Double {
         switch self {
         case .spinAround, .flip: return 5
@@ -76,7 +76,7 @@ extension Motion {
     }
 }
 
-/// 可复现的随机数（SplitMix64）
+/// Reproducible RNG (SplitMix64)
 /// @see https://prng.di.unimi.it/splitmix64.c
 struct SplitMix64: RandomNumberGenerator, Sendable {
     private var state: UInt64

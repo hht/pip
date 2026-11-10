@@ -3,13 +3,13 @@ import SwiftUI
 import QuartzCore
 import MascotCore
 
-/// 右耳指示（docs/mascot.md §2「右耳指示」）：收起态的右耳，面板里每个会话行的状态也用它画（docs/ui.md「面板布局」）。
-/// `center` 是指示的中心：三蓝点的圆心在它左边 8、3 和右边 2；7pt 的点、装饰的外框都以它为中心
+/// Right ear indicator (docs/mascot.md §2 "Right Ear Indicator"): Retracted right ear; session row status in panel also rendered with this (docs/ui.md "Panel Layout").
+/// `center` is indicator center: three blue dot centers offset -8, -3, +2 from it; 7pt dot and decoration frames center on it.
 struct EarIndicatorView: NSViewRepresentable {
     let indicator: EarIndicator
     let size: CGSize
     let center: CGPoint
-    /// false：此刻透明、看不见，停掉动画
+    /// false: transparent / invisible, stop animations.
     var playing = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -25,8 +25,8 @@ struct EarIndicatorView: NSViewRepresentable {
     }
 }
 
-/// 右耳图层：点、三蓝点、灰环，或者某个造型的装饰（和 40pt Pip 右上角的一样大、一样动）。
-/// 换指示时和 Pip 换装饰一样：旧的缩小淡出，新的弹出
+/// Right ear layer: single dot, three dots, grey ring, or look decoration (same scale and animation as 40pt Pip top-right).
+/// Indicator transition mirrors Pip decoration: old shrinks and fades out, new pops in.
 @MainActor
 final class EarLayerView: MascotLayerView {
     private let center: CGPoint
@@ -72,7 +72,7 @@ final class EarLayerView: MascotLayerView {
         if on { startLoops(loops) }
     }
 
-    /// 装饰只要装饰的节奏（这里没有身体和头）
+    /// Decorations only use decoration rhythm (no body or head here).
     private var loops: [Track] {
         switch indicator {
         case .dots: return Choreography.earDots(reduceMotion: reduceMotion)
@@ -85,7 +85,7 @@ final class EarLayerView: MascotLayerView {
     }
 
     private func make() -> DecoLayer? {
-        guard let root = layer else { preconditionFailure("wantsLayer 之后一定有 layer") }
+        guard let root = layer else { preconditionFailure("layer is guaranteed after wantsLayer = true") }
         let scale = window?.backingScaleFactor ?? 2
         func circle(_ c: CGPoint, diameter d: CGFloat, _ paint: Paint, _ color: RGB, opacity: Double = 1) -> DecoPart {
             let r = paint == .fill ? d / 2 : d / 2 - 0.5
@@ -98,16 +98,16 @@ final class EarLayerView: MascotLayerView {
         case .none:
             return nil
         case .dots:
-            // 直径 3，圆心在中心 x − 8、− 3、+ 2
+            // Diameter 3, centers at x - 8, - 3, + 2 relative to center
             parts = [-8.0, -3, 2].map { circle(CGPoint(x: center.x + $0, y: center.y), diameter: 3, .fill, RGB.working,
                                                opacity: Choreography.earDotRest) }
         case .dot(let color):
             parts = [circle(center, diameter: 7, .fill, color)]
         case .ring:
-            // 7pt 外径、1pt 描边
+            // 7pt outer diameter, 1pt stroke
             parts = [circle(center, diameter: 7, .stroke(1), .grey)]
         case .decoration(let look):
-            // 装饰外框的中心对准右耳中心，1 画布单位 = 2pt
+            // Center of decoration bounding box aligns with right ear center, 1 canvas unit = 2pt
             parts = look.decoration
             let box = parts.map { $0.spec.path.boundingBoxOfPath }.reduce(CGRect.null) { $0.union($1) }
             map = CGAffineTransform(translationX: center.x, y: center.y).scaledBy(x: 2, y: 2).translatedBy(x: -box.midX, y: -box.midY)

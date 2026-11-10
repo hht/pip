@@ -4,7 +4,7 @@ import MascotCore
 import NotchCore
 @testable import Notchkeeper
 
-/// 状态点在亮暗两种底上都至少 3:1（WCAG 1.4.11，docs/ui.md「亮色与暗色」）。底色取设置窗口里常见的几种，偏保守
+/// Status dots have at least 3:1 contrast against both light and dark backgrounds (WCAG 1.4.11, docs/ui.md "Light and Dark"). Background colors sample common values in settings window.
 @Suite struct GuardColorContrast {
     private static let lightBackgrounds = [RGB(0xFFFFFF), RGB(0xF2F2F7), RGB(0xECECEC), RGB(0xE5E5E5)]
     private static let darkBackgrounds = [RGB(0x000000), RGB(0x1E1E1E), RGB(0x2C2C2E), RGB(0x3A3A3C)]
@@ -12,11 +12,11 @@ import NotchCore
     @Test(arguments: [GuardPresentation.Tone.healthy, .mismatch, .unknown, .violated])
     func dotsReadOnBothAppearances(_ tone: GuardPresentation.Tone) {
         let p = GuardPresentation.palette(tone)
-        for bg in Self.lightBackgrounds { #expect(contrast(p.light, bg) >= 3, "\(tone) 亮色 \(bg)") }
-        for bg in Self.darkBackgrounds { #expect(contrast(p.dark, bg) >= 3, "\(tone) 暗色 \(bg)") }
+        for bg in Self.lightBackgrounds { #expect(contrast(p.light, bg) >= 3, "\(tone) light \(bg)") }
+        for bg in Self.darkBackgrounds { #expect(contrast(p.dark, bg) >= 3, "\(tone) dark \(bg)") }
     }
 
-    /// 刘海窗口固定暗色外观：取到的是暗色那套，和 Pip、右耳的配色一致
+    /// Notch window uses fixed dark appearance: resolves dark palette, matching Pip and right ear colors.
     @Test @MainActor func notchUsesDarkPalette() {
         let dark = NSAppearance(named: .darkAqua)!
         var resolved: NSColor?

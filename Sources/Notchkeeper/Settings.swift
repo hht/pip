@@ -4,27 +4,27 @@ import MascotCore
 import NotchCore
 import PluginCore
 
-// 设置窗口：按 macOS 系统设置的布局，只用原生控件。
-// 每个开关直接绑定 ConfigStore，改了立刻写盘，不在视图里缓存配置值。
+// Settings window: Follows macOS System Settings layout, using native controls only.
+// Every toggle binds directly to ConfigStore, writing to disk immediately without view-side caching.
 
 enum SettingsPane: String, CaseIterable, Identifiable {
     case general, plugins, exitGuard, claudeCode, terminal, firewall, mascot, stateTest, about
     var id: Self { self }
 
-    /// 侧边栏分组，组与组之间空一行。内置插件和自带的终端插件各有一页，别的外部插件只在「插件」页里开关
+    /// Sidebar grouping, separated by blank lines. Built-in plugins and bundled terminal plugin have dedicated pages; other external plugins are toggled in "Plugins" page.
     static let groups: [[SettingsPane]] = [[.general], [.plugins, .exitGuard, .claudeCode, .terminal], [.firewall], [.mascot], [.stateTest], [.about]]
 
     var title: String {
         switch self {
-        case .general: return String(localized: "通用")
-        case .plugins: return String(localized: "插件")
-        case .exitGuard: return String(localized: "出口守卫")
+        case .general: return String(localized: "General")
+        case .plugins: return String(localized: "Plugins")
+        case .exitGuard: return String(localized: "Egress Guard")
         case .claudeCode: return "Claude Code"
-        case .terminal: return String(localized: "终端")
-        case .firewall: return String(localized: "防火墙")
-        case .mascot: return "Pip" // 和 App 同名
-        case .stateTest: return String(localized: "状态测试")
-        case .about: return String(localized: "关于")
+        case .terminal: return String(localized: "Terminal")
+        case .firewall: return String(localized: "Firewall")
+        case .mascot: return "Pip" // Matches App name
+        case .stateTest: return String(localized: "State Test")
+        case .about: return String(localized: "About")
         }
     }
 
@@ -57,7 +57,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     }
 }
 
-/// 关掉窗口后 SwiftUI 视图会卸载，选中的页和白名单输入框里的半截地址放这里
+/// Holds selected pane and draft inputs across window close/reopen.
 @MainActor
 final class SettingsModel: ObservableObject {
     @Published var pane: SettingsPane = .general
@@ -85,7 +85,7 @@ struct SettingsView: View {
                     }
                 }
             }
-            // 留着侧栏开关：工具栏一个按钮都没有时，系统按普通标题栏画，滚动时是一条硬边线；有按钮才是系统设置那种柔和渐隐（实测）
+            // Retains sidebar toggle: toolbar needs a button to get System Settings-style smooth gradient blur.
             .navigationSplitViewColumnWidth(215)
         } detail: {
             detail
@@ -113,17 +113,17 @@ struct SettingsView: View {
     }
 }
 
-/// config.json 解不开时，改了也存不进去（ConfigStore 不覆盖原文件），所以先说清楚，并把改配置的控件禁掉
+/// When config.json cannot be parsed, edits cannot be saved (ConfigStore preserves original file); locks controls with banner.
 private struct ConfigUnreadableBanner: View {
     let store: ConfigStore
 
     var body: some View {
         HStack(spacing: 8) {
-            // 多色：黄三角里是黑色的 !，亮色的浅底上也看得清
+            // Multicolor exclamation mark in yellow triangle
             Image(systemName: "exclamationmark.triangle.fill").symbolRenderingMode(.multicolor)
-            Text("配置文件读不了，暂时不能改设置。修好文件后自动恢复。")
+            Text("The config file can't be read, so settings can't be changed for now. They come back once the file is fixed.")
             Spacer()
-            Button("打开配置文件") { store.openFile() }.controlSize(.small)
+            Button("Open Config File") { store.openFile() }.controlSize(.small)
         }
         .font(.callout)
         .padding(10)
@@ -133,7 +133,7 @@ private struct ConfigUnreadableBanner: View {
     }
 }
 
-/// 系统设置式图标：20×20 圆角 5 的色块，白色符号
+/// System settings-style icon: 20x20 corner radius 5 color block with white symbol.
 struct SettingsIcon: View {
     let symbol: String
     let color: Color
@@ -146,7 +146,7 @@ struct SettingsIcon: View {
     }
 }
 
-/// 侧边栏顶部的状态卡，点它跳到「出口守卫」
+/// Status card at top of sidebar; clicking jumps to Egress Guard.
 private struct StatusCard: View {
     let presentation: GuardPresentation
 
@@ -166,77 +166,77 @@ private struct StatusCard: View {
     }
 }
 
-// MARK: - 通用
+// MARK: - General
 
 private struct GeneralPane: View {
     @ObservedObject var store: ConfigStore
-    /// SMAppService 的状态不会通知 SwiftUI：存一份，改完开关和每次出现时重读
+    /// SMAppService status does not notify SwiftUI: store local copy, reload after toggle or appear.
     @State private var loginStatus = LoginItem.status
     @State private var loginError: String?
     @State private var confirmQuit = false
 
     var body: some View {
         Form {
-            Section("启动") {
+            Section("Startup") {
                 Toggle(isOn: Binding(get: { loginStatus == .enabled || loginStatus == .requiresApproval },
                                      set: setLogin)) {
-                    Text("登录时打开")
+                    Text("Open at Login")
                     Text(loginError ?? LoginItem.text(loginStatus))
                 }
                 if loginStatus == .requiresApproval {
-                    LabeledContent("在系统设置中批准") {
-                        Button("打开…") { LoginItem.openSettings() }.controlSize(.small)
+                    LabeledContent("Approve in System Settings") {
+                        Button("Open…") { LoginItem.openSettings() }.controlSize(.small)
                     }
                 }
             }
             Section {
                 Toggle(isOn: $store.config.hoverExpand) {
-                    Text("鼠标悬停时展开")
-                    Text("展开面板，查看出口状态和各插件")
+                    Text("Expand on Hover")
+                    Text("Expands the panel to view egress status and plugins")
                 }
-                LabeledContent("卡片停留") {
+                LabeledContent("Card Duration") {
                     HStack {
                         Slider(value: $store.config.cardAutoDismissSeconds, in: 2...10, step: 1)
                             .labelsHidden()
-                        Text("\(Int(store.config.cardAutoDismissSeconds)) 秒").monospacedDigit()
+                        Text("\(Int(store.config.cardAutoDismissSeconds)) s").monospacedDigit()
                     }
                 }
                 Toggle(isOn: $store.config.soundEnabled) {
-                    Text("提示音")
-                    Text("完成 Glass · 出错 Funk · 等你 Ping · 有流量没走代理 Basso")
+                    Text("Sound Effects")
+                    Text("Done: Glass - Error: Funk - Waiting: Ping - Bypassing proxy: Basso")
                 }
             } header: {
-                Text("刘海")
+                Text("Notch")
             }
             .disabled(store.fileUnreadable)
-            // App 不自己切语言，交给系统按 App 设（docs/ui.md「多语言」）
+            // App does not switch language itself, delegating to system per-app setting (docs/ui.md "Localization").
             Section {
                 LabeledContent {
-                    Button("在系统设置中更改语言…") { NSWorkspace.shared.open(Self.languageSettings) }
+                    Button("Change Language in System Settings…") { NSWorkspace.shared.open(Self.languageSettings) }
                         .controlSize(.small)
                 } label: {
-                    Text("语言")
-                    Text("默认跟随系统；也可以在「语言与地区」里单独给 Pip 选")
+                    Text("Language")
+                    Text("Follows the system language by default; you can also choose a language for Pip under Language & Region")
                 }
             }
             Section {
                 HStack {
                     Spacer()
-                    Button("退出 Pip…") { confirmQuit = true }
+                    Button("Quit Pip…") { confirmQuit = true }
                 }
             } footer: {
-                Text("退出后刘海和卡片都会停止，后台的出口守卫照常运行；要停止守卫，请运行卸载脚本。")
+                Text("Quitting stops the notch and pop-up cards; the background Egress Guard continues running. To stop the guard, run the uninstall script.")
             }
         }
-        .onAppear { loginStatus = LoginItem.status } // 可能刚在系统设置里批准过
-        .confirmationDialog("退出 Pip？", isPresented: $confirmQuit) {
-            Button("退出", role: .destructive) { AppDelegate.quit(reason: "设置里点了退出") }
+        .onAppear { loginStatus = LoginItem.status } // May have just been approved in System Settings
+        .confirmationDialog("Quit Pip?", isPresented: $confirmQuit) {
+            Button("Quit", role: .destructive) { AppDelegate.quit(reason: "quit clicked in settings") }
         } message: {
-            Text("退出后刘海和卡片都会停止，后台的出口守卫照常运行；要停止守卫，请运行卸载脚本。")
+            Text("Quitting stops the notch and pop-up cards; the background Egress Guard continues running. To stop the guard, run the uninstall script.")
         }
     }
 
-    /// 系统设置 › 通用 › 语言与地区。id 取自 /System/Library/ExtensionKit/Extensions/Localization.appex 的 CFBundleIdentifier（macOS 26 实查）
+    /// System Settings > General > Language & Region. ID sourced from Localization.appex CFBundleIdentifier.
     private static let languageSettings = URL(string: "x-apple.systempreferences:com.apple.Localization-Settings.extension")!
 
     private func setLogin(_ on: Bool) {
@@ -245,7 +245,7 @@ private struct GeneralPane: View {
     }
 }
 
-// MARK: - 出口守卫
+// MARK: - Egress Guard
 
 private struct ExitGuardPane: View {
     @ObservedObject var model: SettingsModel
@@ -257,22 +257,21 @@ private struct ExitGuardPane: View {
         let p = state.presentation
         Form {
             PluginOffNote(store: store, plugin: PluginID.exitGuard)
-            Section("当前状态") {
-                LabeledContent("状态") {
+            Section("Current Status") {
+                LabeledContent("Status") {
                     HStack(spacing: 6) {
                         GuardDot(presentation: p, size: 6)
                         Text(p.title)
                     }
                 }
-                // 和刘海展开后的出口是同一个值（GuardStateReader 的 egressIP），完整显示，可选中拷贝
-                LabeledContent("当前出口") {
+                // Same value as egress in expanded notch (GuardDisplay egressIP), selectable and copyable.
+                LabeledContent("Current Egress") {
                     Text(state.display.egressIP ?? "—")
                         .monospacedDigit()
                         .foregroundStyle(p.tone == .mismatch ? AnyShapeStyle(p.color) : AnyShapeStyle(.secondary))
                         .textSelection(.enabled)
                 }
-                // guardd 最后一次写文件的时间；守卫不响应时它会停在过去，正好说明问题
-                LabeledContent("上次检查") {
+                LabeledContent("Last Checked") {
                     if let d = state.display.checkedAt {
                         TimelineView(.periodic(from: .now, by: 1)) { _ in Text(AgoText.string(d)) }
                     } else {
@@ -285,34 +284,33 @@ private struct ExitGuardPane: View {
                     LabeledContent {
                         Button { state.removeAllowed(ip) } label: { Image(systemName: "minus.circle") }
                             .buttonStyle(.borderless)
-                            .help("移除 \(ip)")
+                            .help("Remove \(ip)")
                     } label: {
                         Text(ip).monospacedDigit()
-                        if ip == state.display.egressIP { Text("当前出口") }
+                        if ip == state.display.egressIP { Text("Current Egress") }
                     }
                 }
                 HStack {
-                    TextField("新增", text: $model.allowDraft, prompt: Text("例如 198.51.100.10"))
+                    TextField("Add", text: $model.allowDraft, prompt: Text("e.g. 198.51.100.10"))
                         .onSubmit(add)
                         .onChange(of: model.allowDraft) { invalid = false }
-                    Button("添加", action: add).disabled(model.allowDraft.isEmpty)
+                    Button("Add", action: add).disabled(model.allowDraft.isEmpty)
                 }
             } header: {
-                Text("允许的出口 IP（IPv4）")
+                Text("Allowed Egress IPs (IPv4)")
             } footer: {
                 if invalid {
-                    Text("不是有效的 IPv4 地址，或已在列表里。").foregroundStyle(.red)
+                    Text("Not a valid IPv4 address, or already in the list.").foregroundStyle(.red)
                 } else if store.fileUnreadable {
-                    // guardd 只解 allowlist，别的键坏了它照样读到真实列表，这里却是默认值
-                    Text("配置文件读不了，这里显示的是默认值，不是文件里的列表。")
+                    Text("The configuration file can’t be read; default values are shown instead of the file’s list.")
                 } else if store.config.allowlist.isEmpty {
-                    Text("列表为空时，守卫判断不了出口 IP 对不对，只能显示「暂时判断不了出口」；有流量没走代理仍然会报。")
+                    Text("When the list is empty, the guard cannot verify whether the egress IP is correct, showing “Can’t verify the egress”; traffic bypassing the proxy will still be alerted.")
                 }
             }
             .disabled(store.fileUnreadable)
-            Section("提示") {
-                Toggle("有流量没走代理时弹红卡", isOn: $store.config.autoAlert)
-                Toggle("红卡一直保留，直到恢复", isOn: $store.config.alertPersistent)
+            Section("Alerts") {
+                Toggle("Pop up an alert card when traffic bypasses the proxy", isOn: $store.config.autoAlert)
+                Toggle("Keep the alert card up until recovered", isOn: $store.config.alertPersistent)
             }
             .disabled(store.fileUnreadable)
         }
@@ -323,9 +321,9 @@ private struct ExitGuardPane: View {
     }
 }
 
-// MARK: - 插件
+// MARK: - Plugins
 
-/// 内置插件的页上：插件关着时说清楚关掉的是什么
+/// Banner on built-in plugin pane explaining effects when disabled.
 private struct PluginOffNote: View {
     @ObservedObject var store: ConfigStore
     let plugin: String
@@ -334,19 +332,19 @@ private struct PluginOffNote: View {
         if !store.config.isEnabled(plugin) {
             Section {
                 LabeledContent {
-                    Button("打开插件") { store.config.setEnabled(true, for: plugin) }
+                    Button("Enable Plugin") { store.config.setEnabled(true, for: plugin) }
                         .controlSize(.small)
                         .disabled(store.fileUnreadable)
                 } label: {
-                    Text("插件已关闭")
-                    Text(plugin == PluginID.exitGuard ? "不弹红卡，Pip 和面板也不显示出口；后台照常检查" : "不弹卡，面板里也不显示会话")
+                    Text("Plugin Disabled")
+                    Text(plugin == PluginID.exitGuard ? String(localized: "Alert cards are suppressed, and Pip and the panel will not show egress; background checks continue") : String(localized: "Cards are suppressed, and the panel will not show sessions"))
                 }
             }
         }
     }
 }
 
-/// 插件的开关、面板里各段的顺序和行数、收起时常驻谁、链接白名单（docs/ui.md「面板布局」「卡片」）
+/// Plugin toggles, panel section order/row counts, resident plugin, and URL scheme allowlist (docs/ui.md "Panel Layout", "Card").
 private struct PluginsPane: View {
     @ObservedObject var model: SettingsModel
     let state: AppState
@@ -362,16 +360,16 @@ private struct PluginsPane: View {
         Form {
             Section {
                 Toggle(isOn: Binding(get: { c.isEnabled(PluginID.exitGuard) }, set: setGuard)) {
-                    PluginLabel(plugin: PluginID.exitGuard, state: state, detail: String(localized: "有流量没走代理时弹红卡，面板顶上显示出口"))
+                    PluginLabel(plugin: PluginID.exitGuard, state: state, detail: String(localized: "Alert card when traffic bypasses the proxy; egress shown at top of panel"))
                 }
                 ForEach(ids, id: \.self) { id in
                     Toggle(isOn: Binding(get: { c.isEnabled(id) }, set: { store.config.setEnabled($0, for: id) })) {
                         PluginLabel(plugin: id, state: state,
-                                    detail: id == PluginID.claudeCode ? String(localized: "列出会话；做完、出错、等你时弹卡") : String(localized: "外部插件 · \(id)"))
+                                    detail: id == PluginID.claudeCode ? String(localized: "Lists sessions; alerts when finished, errored, or waiting for you") : String(localized: "External plugin - \(id)"))
                     }
                 }
             } footer: {
-                Text("关掉插件只关提醒，出口守卫照常在后台检查。外部插件关掉后，它发来的卡片和活动都会丢掉。")
+                Text("Disabling a plugin only turns off its alerts; Egress Guard continues checking in the background. When an external plugin is disabled, cards and activities it sends are dropped.")
             }
             .disabled(store.fileUnreadable)
 
@@ -383,15 +381,15 @@ private struct PluginsPane: View {
                     ForEach(enabled, id: \.self) { id in
                         LabeledContent {
                             HStack(spacing: 8) {
-                                Stepper("最多 \(c.maxRows(id)) 行", value: Binding(get: { c.maxRows(id) }, set: { store.config.setMaxRows($0, for: id) }),
+                                Stepper("Up to \(c.maxRows(id)) rows", value: Binding(get: { c.maxRows(id) }, set: { store.config.setMaxRows($0, for: id) }),
                                         in: PluginSettings.rowRange)
                                 ControlGroup {
                                     Button { store.config.move(id, by: -1, in: enabled) } label: { Image(systemName: "chevron.up") }
                                         .disabled(enabled.first == id)
-                                        .help("上移")
+                                        .help("Move Up")
                                     Button { store.config.move(id, by: 1, in: enabled) } label: { Image(systemName: "chevron.down") }
                                         .disabled(enabled.last == id)
-                                        .help("下移")
+                                        .help("Move Down")
                                 }
                                 .fixedSize()
                             }
@@ -400,25 +398,25 @@ private struct PluginsPane: View {
                         }
                     }
                 } header: {
-                    Text("面板")
+                    Text("Panel")
                 } footer: {
-                    Text("出口守卫固定在最上面。各段合起来最多显示 \(PanelShape.maxRows) 行，排在前面的先占；多出来的在段里滚动。")
+                    Text("Egress Guard is pinned to the top. All sections combined show up to \(PanelShape.maxRows) rows, allocated to earlier sections first; excess rows scroll within their section.")
                 }
                 .disabled(store.fileUnreadable)
             }
 
             Section {
-                Picker("常驻插件", selection: $store.config.residentPlugin) {
-                    Text("不常驻").tag("")
+                Picker("Resident Plugin", selection: $store.config.residentPlugin) {
+                    Text("None").tag("")
                     Divider()
                     ForEach([PluginID.exitGuard] + ids, id: \.self) { id in
                         Text(state.pluginName(id)).tag(id)
                     }
                 }
             } header: {
-                Text("收起时")
+                Text("When Retracted")
             } footer: {
-                Text("有插件在忙或要你看时，收起的刘海显示最急的那个；都平静时显示常驻插件。")
+                Text("When plugins are active or require attention, the retracted notch displays the most urgent one; when all are quiet, it displays the resident plugin.")
             }
             .disabled(store.fileUnreadable)
 
@@ -427,32 +425,32 @@ private struct PluginsPane: View {
                     LabeledContent {
                         Button { store.config.urlSchemes.removeAll { $0 == scheme } } label: { Image(systemName: "minus.circle") }
                             .buttonStyle(.borderless)
-                            .help("移除 \(scheme)")
+                            .help("Remove \(scheme)")
                     } label: {
                         Text("\(scheme)://").monospaced()
                     }
                 }
                 HStack {
-                    TextField("新增", text: $model.schemeDraft, prompt: Text("例如 raycast"))
+                    TextField("Add", text: $model.schemeDraft, prompt: Text("e.g. raycast"))
                         .onSubmit(addScheme)
                         .onChange(of: model.schemeDraft) { badScheme = false }
-                    Button("添加", action: addScheme).disabled(model.schemeDraft.isEmpty)
+                    Button("Add", action: addScheme).disabled(model.schemeDraft.isEmpty)
                 }
             } header: {
-                Text("链接白名单")
+                Text("URL Scheme Allowlist")
             } footer: {
                 if badScheme {
-                    Text("不是有效的 scheme，或已在列表里。").foregroundStyle(.red)
+                    Text("Not a valid scheme, or already in the list.").foregroundStyle(.red)
                 } else {
-                    Text("卡片和面板里的链接默认只打开 https。这里加的 scheme 也放行：它们能让别的 App 执行动作，只加你信得过的。")
+                    Text("Links in cards and the panel open https by default. Schemes added here are also allowed: they can trigger actions in other apps, so add only ones you trust.")
                 }
             }
             .disabled(store.fileUnreadable)
 
             CommandLineSection()
         }
-        .onAppear { state.reloadManifests() } // 可能刚装了插件
-        // 拖进来的交给「已安装」那一段校验（不是文件夹的报「没有 manifest.json」）；只认第一个
+        .onAppear { state.reloadManifests() } // May have just installed a plugin
+        // Dropped folder inspected by InstalledPluginsSection (non-folders report missing manifest.json); recognizes first item only.
         .dropDestination(for: URL.self) { urls, _ in
             guard let url = urls.first, url.isFileURL else { return false }
             dropped = url
@@ -464,16 +462,16 @@ private struct PluginsPane: View {
                     .allowsHitTesting(false)
             }
         }
-        .confirmationDialog("还有流量没走代理，确定关掉提醒？", isPresented: $confirmGuardOff) {
-            Button("关掉提醒", role: .destructive) { store.config.setEnabled(false, for: PluginID.exitGuard) }
+        .confirmationDialog("Traffic is still bypassing the proxy. Turn off alerts anyway?", isPresented: $confirmGuardOff) {
+            Button("Turn Off Alerts", role: .destructive) { store.config.setEnabled(false, for: PluginID.exitGuard) }
         } message: {
-            Text("红卡会撤下，Pip 和面板不再显示出口；后台照常检查，重新打开立即恢复。")
+            Text("The alert card will dismiss, and Pip and the panel will no longer show the egress. Background checks continue, and turning it back on restores everything immediately.")
         }
     }
 
-    /// 违规中关守卫要确认
+    /// Confirm before disabling guard during active violation.
     private func setGuard(_ on: Bool) {
-        if !on, state.presentation.holdsViolation {
+        if !on, state.presentation.status == .violated {
             confirmGuardOff = true
         } else {
             store.config.setEnabled(on, for: PluginID.exitGuard)
@@ -490,7 +488,7 @@ private struct PluginsPane: View {
     }
 }
 
-/// 插件的图标和名字：内置的用设置页侧栏的图标，外部的用它登记的 SF Symbol
+/// Plugin icon and name: built-in plugins use sidebar icon, external plugins use manifest SF Symbol.
 struct PluginLabel: View {
     let plugin: String
     let state: AppState
@@ -511,7 +509,7 @@ struct PluginLabel: View {
     }
 }
 
-/// 命令行工具 pipctl 在哪，点了才链进 ~/.local/bin（`CommandLineTool`）。不靠 config.json，配置文件解不开也能用
+/// CLI tool pipctl location, symlinked to ~/.local/bin upon user request (`CommandLineTool`). Works even if config file is unparseable.
 private struct CommandLineSection: View {
     @State private var link = CommandLineTool.linkState()
     @State private var error: String?
@@ -520,8 +518,8 @@ private struct CommandLineSection: View {
         Section {
             LabeledContent {
                 switch link {
-                case .linked: Button("移除链接") { run { try CommandLineTool.removeLink() } }
-                case .absent: Button("链接到 ~/.local/bin") { run { try CommandLineTool.createLink() } }
+                case .linked: Button("Remove Symlink") { run { try CommandLineTool.removeLink() } }
+                case .absent: Button("Link to ~/.local/bin") { run { try CommandLineTool.createLink() } }
                 case .occupied: EmptyView()
                 }
             } label: {
@@ -529,7 +527,7 @@ private struct CommandLineSection: View {
                 Text(error ?? caption)
             }
             LabeledContent {
-                Button("拷贝") {
+                Button("Copy") {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(CommandLineTool.installed.path, forType: .string)
                 }
@@ -539,17 +537,17 @@ private struct CommandLineSection: View {
                     .textSelection(.enabled)
             }
         } header: {
-            Text("命令行")
+            Text("Command Line")
         } footer: {
-            Text("脚本用 pipctl 发卡片、报活动，pipctl 不带参数看用法。~/.local/bin 要在 PATH 里才能直接敲 pipctl（终端里 echo $PATH 看）。")
+            Text("Scripts use pipctl to post cards and update activities; run pipctl without arguments for usage. ~/.local/bin must be in your PATH to run pipctl directly (check with echo $PATH in Terminal).")
         }
     }
 
     private var caption: String {
         switch link {
-        case .linked: return String(localized: "已链接：终端里可以直接用 pipctl")
-        case .absent: return String(localized: "未链接：用下面的完整路径，或链接到 ~/.local/bin")
-        case .occupied: return String(localized: "~/.local/bin/pipctl 已经是别的文件，不覆盖；用下面的完整路径")
+        case .linked: return String(localized: "Linked: you can run pipctl directly in Terminal")
+        case .absent: return String(localized: "Not linked: use the full path below, or link to ~/.local/bin")
+        case .occupied: return String(localized: "~/.local/bin/pipctl is already another file; not overwriting it. Use the full path below")
         }
     }
 
@@ -558,13 +556,13 @@ private struct CommandLineSection: View {
         do {
             try action()
         } catch {
-            self.error = String(localized: "操作失败：\(error.localizedDescription)")
+            self.error = String(localized: "Failed: \(error.localizedDescription)")
         }
         link = CommandLineTool.linkState()
     }
 }
 
-/// 装、卸终端插件，给出要加进 ~/.zshrc 的一行。Notchkeeper 不改 ~/.zshrc（CLAUDE.md 硬规则）。开关在「插件」页（它是外部插件）
+/// Install/uninstall terminal plugin, providing line to add to ~/.zshrc. Notchkeeper never edits ~/.zshrc (CLAUDE.md hard rule). Toggled in "Plugins" pane.
 private struct TerminalPluginSection: View {
     let state: AppState
     @State private var installed = TerminalPlugin.isInstalled
@@ -573,24 +571,24 @@ private struct TerminalPluginSection: View {
     var body: some View {
         Section {
             LabeledContent {
-                Button(installed ? "卸载" : "安装") {
+                Button(installed ? "Uninstall" : "Install") {
                     error = nil
                     do {
                         try installed ? TerminalPlugin.uninstall() : TerminalPlugin.install()
                     } catch {
-                        self.error = String(localized: "操作失败：\(error.localizedDescription)")
-                        Log.write("终端插件：操作失败：\(error.localizedDescription)")
+                        self.error = String(localized: "Failed: \(error.localizedDescription)")
+                        Log.write("Terminal plugin: operation failed: \(error.localizedDescription)")
                     }
                     installed = TerminalPlugin.isInstalled
                     state.reloadManifests()
                 }
             } label: {
-                Text("命令跑完时弹卡")
-                Text(error ?? (installed ? String(localized: "已安装：把下面这行加进 ~/.zshrc，新开的终端生效") : String(localized: "未安装")))
+                Text("Alert when a command finishes")
+                Text(error ?? (installed ? String(localized: "Installed: add the line below to ~/.zshrc; takes effect in new terminals") : String(localized: "Not installed")))
             }
             if installed {
                 LabeledContent {
-                    Button("拷贝") {
+                    Button("Copy") {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(TerminalPlugin.sourceLine, forType: .string)
                     }
@@ -601,16 +599,16 @@ private struct TerminalPluginSection: View {
                 }
             }
         } header: {
-            Text("终端")
+            Text("Terminal")
         } footer: {
-            Text("zsh 里跑了 10 秒以上的命令结束时弹卡，点卡片跳回那个终端。你正看着那个终端时不弹（同一窗口的其他标签、分屏不算）。命令行只交出命令名，不带参数；vim、ssh、top 这类全屏或交互的命令不弹。")
+            Text("Alerts when a command that ran in zsh for over 10 seconds finishes; clicking the card switches back to that terminal. Suppressed when you are already looking at that terminal (other tabs or splits in the same window do not count). The command line reveals only the command name, without arguments; full-screen or interactive commands like vim, ssh, and top do not alert.")
         }
     }
 }
 
-/// 装、卸 Notchkeeper 的 Claude Code mod（docs/agent-integration.md「安装和卸载」）。不靠 config.json，配置文件解不开也能用
+/// Install/uninstall Notchkeeper's Claude Code mod (docs/agent-integration.md "Installation & Uninstallation"). Works even if config file is unparseable.
 private struct ClaudeModSection: View {
-    /// nil：还在查
+    /// nil: query in progress
     @State private var status: ClaudeMod.Status?
     @State private var working = false
     @State private var error: String?
@@ -622,32 +620,32 @@ private struct ClaudeModSection: View {
                 case nil:
                     ProgressView().controlSize(.small)
                 case .installed?, .disabled?:
-                    Button("卸载") { run(ClaudeMod.uninstall) }.disabled(working)
+                    Button("Uninstall") { run(ClaudeMod.uninstall) }.disabled(working)
                 case .notInstalled?, .unknown?:
-                    Button("安装") { run(ClaudeMod.install) }.disabled(working)
+                    Button("Install") { run(ClaudeMod.install) }.disabled(working)
                 case .noClaude?:
                     EmptyView()
                 }
             } label: {
-                Text("完成卡和出错卡")
+                Text("Completed and Error Cards")
                 Text(error ?? caption)
             }
         } header: {
             Text("Claude Code")
         } footer: {
-            Text("给 Claude Code 装上 Pip 自带的 mod：只记录每个回合怎么结束，不记录对话内容。安装会在 ~/.claude/settings.json 里加一项插件，卸载时去掉。已经开着的会话要重开或运行 /reload-plugins 才生效。")
+            Text("Installs Pip’s bundled mod into Claude Code: records only how each turn finishes, never conversation contents. Installation adds a plugin entry to ~/.claude/settings.json, removed upon uninstallation. Open sessions must be restarted or run /reload-plugins to take effect.")
         }
         .task { status = await ClaudeMod.status() }
     }
 
     private var caption: String {
         switch status {
-        case nil: return String(localized: "正在检查…")
-        case .installed?: return String(localized: "已安装：回合做完或出错时弹卡")
-        case .disabled?: return String(localized: "已安装，但在 Claude Code 里关掉了（/plugin 里打开）")
-        case .notInstalled?: return String(localized: "未安装：面板照常显示会话状态，但不弹完成卡和出错卡")
-        case .noClaude?: return String(localized: "找不到 claude（找过 ~/.local/bin、/opt/homebrew/bin、/usr/local/bin）")
-        case .unknown(let reason)?: return String(localized: "无法确认是否已安装：\(reason)")
+        case nil: return String(localized: "Checking…")
+        case .installed?: return String(localized: "Installed: alerts when a turn finishes or errors")
+        case .disabled?: return String(localized: "Installed, but disabled in Claude Code (enable with /plugin)")
+        case .notInstalled?: return String(localized: "Not installed: panel displays session state as usual, but completed and error cards will not alert")
+        case .noClaude?: return String(localized: "Can’t find claude (checked ~/.local/bin, /opt/homebrew/bin, /usr/local/bin)")
+        case .unknown(let reason)?: return String(localized: "Cannot verify installation: \(reason)")
         }
     }
 
@@ -658,8 +656,8 @@ private struct ClaudeModSection: View {
             do {
                 try await action()
             } catch {
-                self.error = String(localized: "操作失败：\(error.localizedDescription)")
-                Log.write("Claude Code mod：操作失败：\(error.localizedDescription)")
+                self.error = String(localized: "Failed: \(error.localizedDescription)")
+                Log.write("Claude Code mod: operation failed: \(error.localizedDescription)")
             }
             status = await ClaudeMod.status()
             working = false
@@ -683,12 +681,12 @@ private struct MascotPane: View {
             }
             Section {
                 Toggle(isOn: $store.config.mascotFollowsMouse) {
-                    Text("跟随鼠标")
-                    Text("眼睛跟着鼠标，身体也往那边转；鼠标移到刘海上时探头。关掉后一直看正前方")
+                    Text("Follow Mouse")
+                    Text("Eyes track the mouse and the body turns toward it; peeks when the mouse moves onto the notch. When off, Pip always looks forward.")
                 }
                 Toggle(isOn: $store.config.showsEarMascot) {
-                    Text("收起时显示 Pip")
-                    Text("关掉后左耳不显示 Pip；右耳也没有内容时，刘海就是一块纯黑。展开和弹卡时照常显示")
+                    Text("Show Pip When Retracted")
+                    Text("When off, Pip is hidden from the left ear; if the right ear is also empty, the retracted notch is solid black. Shows normally when expanded or popping up cards.")
                 }
             }
             .disabled(store.fileUnreadable)
@@ -696,7 +694,7 @@ private struct MascotPane: View {
     }
 }
 
-// MARK: - 状态测试（只在内存里，见 StateTest.swift）
+// MARK: - State Test (in-memory only, see StateTest.swift)
 
 private struct StateTestPane: View {
     @ObservedObject var overrides: NotchOverrides
@@ -710,34 +708,34 @@ private struct StateTestPane: View {
                 VStack(spacing: 6) {
                     MascotStage(look: overrides.mascot(real: state.look), size: 40)
                         .environment(\.mascotLiteral, overrides.look != nil)
-                    // 说的是上面这只 Pip 此刻画的造型（上位插件的，叠上晕和睡着），不是出口状态
-                    Text(overrides.look.map { "强制：\($0.title)" } ?? "真实状态：\(director.shown(state.look).title)")
+                    // Displays look rendered above by Pip (active plugin with dizziness/sleepiness), not egress status.
+                    Text(overrides.look.map { String(localized: "Forced: \($0.title)") } ?? String(localized: "Real state: \(director.shown(state.look).title)"))
                         .font(.system(size: 13, weight: .semibold))
                 }
                 .frame(maxWidth: .infinity)
             }
             Section {
                 Picker("Pip", selection: Binding(get: { overrides.look }, set: { notch.force($0) })) {
-                    Text("真实状态").tag(Look?.none)
+                    Text("Real State").tag(Look?.none)
                     Divider()
                     ForEach(Look.allCases, id: \.self) { l in
                         Text(l.title).tag(Look?.some(l))
                     }
                 }
-                Picker("刘海", selection: Binding(get: { overrides.pin }, set: { notch.setPin($0) })) {
+                Picker("Notch", selection: Binding(get: { overrides.pin }, set: { notch.setPin($0) })) {
                     ForEach(NotchPin.allCases) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.segmented)
             } header: {
-                Text("强制显示")
+                Text("Force Display")
             } footer: {
-                Text("只改 Pip 和刘海的样子，不影响出口判定，也不弹红卡、不响；真的红卡照常弹出。不写入任何文件，重开 App 即恢复。")
+                Text("Only changes how Pip and the notch look; doesn’t affect egress decisions, doesn’t pop up alert cards or play sounds. Real alert cards still appear as usual. Nothing is written to disk; restarting the app restores the real state.")
             }
             MotionSection()
             Section {
                 HStack {
                     Spacer()
-                    Button("恢复真实状态") { notch.restoreRealState() }
+                    Button("Restore Real State") { notch.restoreRealState() }
                         .disabled(overrides.isReal)
                 }
             }
@@ -745,7 +743,7 @@ private struct StateTestPane: View {
     }
 }
 
-/// 「播放动作」：看得见的 Pip（左耳、上面的预览）各播一次，不管当前造型。只在内存里
+/// "Play Motion": visible Pips play action once regardless of current look. In-memory only.
 private struct MotionSection: View {
     var body: some View {
         Section {
@@ -753,12 +751,12 @@ private struct MotionSection: View {
                 ForEach(Motion.allCases, id: \.self) { m in
                     Button(m.title) { MascotDirector.shared.play(.idle(m)) }
                 }
-                Button("眨眼") { MascotDirector.shared.play(.blink(double: false)) }
+                Button("Blink") { MascotDirector.shared.play(.blink(double: false)) }
             }
         } header: {
-            Text("播放动作")
+            Text("Play Motion")
         } footer: {
-            Text("看得见的 Pip 各播放一次；开启「减弱动态效果」时只有眨眼。不写入任何文件。")
+            Text("Every visible Pip plays it once; with Reduce Motion on, only blinking. Nothing is written to disk.")
         }
     }
 }
@@ -766,22 +764,22 @@ private struct MotionSection: View {
 private extension Motion {
     var title: String {
         switch self {
-        case .spinAround: return String(localized: "左右转圈")
-        case .flip: return String(localized: "上下翻圈")
-        case .lookAround: return String(localized: "东张西望")
-        case .nod: return String(localized: "点头")
-        case .tilt: return String(localized: "歪头")
-        case .shake: return String(localized: "摇头")
-        case .lookUp: return String(localized: "抬头看天")
-        case .lookDown: return String(localized: "低头看脚")
-        case .sideways: return String(localized: "侧身 90°")
-        case .curious: return String(localized: "好奇歪看")
-        case .finishJump: return String(localized: "完成跳转")
+        case .spinAround: return String(localized: "Spin")
+        case .flip: return String(localized: "Flip")
+        case .lookAround: return String(localized: "Look Around")
+        case .nod: return String(localized: "Nod")
+        case .tilt: return String(localized: "Tilt Head")
+        case .shake: return String(localized: "Shake Head")
+        case .lookUp: return String(localized: "Look Up")
+        case .lookDown: return String(localized: "Look Down")
+        case .sideways: return String(localized: "Turn 90°")
+        case .curious: return String(localized: "Curious Tilt")
+        case .finishJump: return String(localized: "Victory Hop")
         }
     }
 }
 
-// MARK: - 关于
+// MARK: - About
 
 private struct AboutPane: View {
     @ObservedObject var store: ConfigStore
@@ -792,26 +790,26 @@ private struct AboutPane: View {
                 VStack(spacing: 6) {
                     MascotStage(look: .finished, size: 64)
                     Text("Pip").font(.title3.weight(.semibold))
-                    Text("版本 \(version)（本机签名）").foregroundStyle(.secondary)
+                    Text("Version \(version) (signed locally)").foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity)
             }
-            Section("文件") {
+            Section("Files") {
                 LabeledContent {
                     HStack {
-                        Button("打开") { store.openFile() }
-                        Button("在访达中显示") { store.revealInFinder() }
+                        Button("Open") { store.openFile() }
+                        Button("Show in Finder") { store.revealInFinder() }
                     }
                     .controlSize(.small)
                 } label: {
-                    Text("配置文件")
+                    Text("Config File")
                     Text(tilde(store.url.path))
                 }
                 LabeledContent {
-                    Button("在访达中显示") { NSWorkspace.shared.activateFileViewerSelecting([Log.url]) }
+                    Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([Log.url]) }
                         .controlSize(.small)
                 } label: {
-                    Text("日志")
+                    Text("Log")
                     Text(tilde(Log.url.path))
                 }
             }

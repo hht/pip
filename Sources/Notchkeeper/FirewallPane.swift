@@ -2,12 +2,12 @@ import AppKit
 import FirewallCore
 import SwiftUI
 
-/// 设置 › 防火墙：开关、状态、试运行倒计时和「保留」，以及装、卸（`FirewallInstaller`）。状态只看状态摘要（`FirewallReading`），
-/// 页面看得见时每 2 秒重读一次（被遮挡、最小化、锁屏时停）；开启、保留、关闭、装、卸每次都先用一句话说清会发生什么，再弹管理员密码框，之后等守护进程跑完那一轮再放开开关。
-/// 不靠 config.json，配置文件解不开也能用
+/// Settings > Firewall: Toggles, status, trial countdown, "Keep", installation, and uninstallation (`FirewallInstaller`). Status sourced from summary (`FirewallReading`),
+/// polling every 2s while visible (halts when occluded, minimized, or screen locked); install, enable, keep, disable, and uninstall explain effects before prompting for administrator credentials, holding toggle disabled until daemon round settles.
+/// Does not rely on config.json, remaining usable even if config file is unparseable.
 struct FirewallPane: View {
     @State private var reading = FirewallInstaller.reading(now: Date()).reading
-    /// 开启、保留、关闭开始的时刻（命令成功才记）：`FirewallReading.settled` 之前开关还不能信，守护进程那一轮可能还没写完
+    /// Timestamp when enable, keep, or disable began (recorded only on command success): toggle remains pending until `FirewallReading.settled`.
     @State private var waitingSince: Date?
     @State private var visible = false
     @State private var tunnel = "utun1024"
@@ -16,7 +16,7 @@ struct FirewallPane: View {
     @State private var confirmUninstall = false
     @State private var working = false
     @State private var error: String?
-    /// 装完、卸完的一句话：脚本的输出普通用户看不懂，结果用一句话说
+    /// Post-action notification: script output is simplified into a single user-facing sentence.
     @State private var notice: String?
 
     private var installed: Bool { reading != .notInstalled }
@@ -26,9 +26,9 @@ struct FirewallPane: View {
             if installed {
                 Section {
                     Toggle(isOn: Binding(get: { reading.switchedOn }, set: { $0 ? (confirmEnable = true) : disable() })) {
-                        Text("防火墙")
+                        Text("Firewall")
                         if waitingSince != nil {
-                            Text("等守护进程确认…").foregroundStyle(.secondary)
+                            Text("Waiting for the daemon to confirm…").foregroundStyle(.secondary)
                         } else {
                             FirewallStatusLine(reading: reading, live: visible)
                         }
@@ -36,10 +36,10 @@ struct FirewallPane: View {
                     .disabled(working || waitingSince != nil)
                     if case .trial = reading {
                         LabeledContent {
-                            Button("保留", action: keep).disabled(!reading.canKeep || working || waitingSince != nil)
+                            Button("Keep", action: keep).disabled(!reading.canKeep || working || waitingSince != nil)
                         } label: {
-                            Text(reading.canKeep ? String(localized: "网络正常就点「保留」，之后一直开着，重启也开着")
-                                                 : String(localized: "出了问题不能保留：什么都不用做，到时自动关掉"))
+                            Text(reading.canKeep ? String(localized: "If your connection works, click Keep: it stays on, even after a restart")
+                                                 : String(localized: "Can’t keep while there’s a problem: do nothing and it turns off when time’s up"))
                         }
                     }
                     if let error {
@@ -48,7 +48,7 @@ struct FirewallPane: View {
                         Text(notice).foregroundStyle(.secondary)
                     }
                 } footer: {
-                    Text("开着时，没走 Clash 隧道的流量除局域网、Clash 直连的地址和国内 IP 外一律拦下。每次开启先试运行 2 分钟，不点「保留」自动关掉。开启、保留、关闭都要管理员密码。")
+                    Text("While on, traffic that bypasses the Clash tunnel is blocked, except for the local network, addresses Clash connects to directly, and mainland China IPs. Each time you turn it on, it runs a 2-minute trial and turns itself off unless you click Keep. Turning on, keeping, and turning off all need an administrator password.")
                 }
             }
             Section {
@@ -56,49 +56,49 @@ struct FirewallPane: View {
                     HStack {
                         if working { ProgressView().controlSize(.small) }
                         if installed {
-                            Button("卸载…") { confirmUninstall = true }
+                            Button("Uninstall…") { confirmUninstall = true }
                         } else {
-                            Button("安装…") { confirmInstall = true }
+                            Button("Install…") { confirmInstall = true }
                         }
                     }
                     .disabled(working)
                 } label: {
-                    Text(installed ? "卸载" : "安装")
+                    Text(installed ? "Uninstall" : "Install")
                     if !installed, let error {
                         Text(error).foregroundStyle(.red)
                     } else if !installed, let notice {
                         Text(notice)
                     } else {
-                        Text(installed ? String(localized: "清掉守护进程、规则和文件，开着的话立即放开，断网时也用它") : String(localized: "未安装"))
+                        Text(installed ? String(localized: "Removes the daemon, rules, and files and lifts any blocking immediately; use it if you lose your connection") : String(localized: "Not installed"))
                     }
                 }
                 if !installed {
-                    TextField("隧道网卡", text: $tunnel, prompt: Text("utun1024"))
+                    TextField("Tunnel Interface", text: $tunnel, prompt: Text("utun1024"))
                         .disabled(working)
                 }
             } footer: {
                 if !installed {
-                    Text("安装要管理员密码，装完是关着的，什么都不拦。隧道网卡填 Clash 的 TUN 网卡名，只收 utun 加数字（Clash Verge 默认 utun1024）：填错了开启后会把外网全拦掉。")
+                    Text("Installing needs an administrator password; the firewall starts off and blocks nothing. Enter Clash’s TUN interface name — utun followed by digits (Clash Verge defaults to utun1024): a wrong name blocks all internet traffic once the firewall is on.")
                 }
             }
         }
-        .confirmationDialog("安装防火墙？", isPresented: $confirmInstall) {
-            Button("安装", action: install)
+        .confirmationDialog("Install the firewall?", isPresented: $confirmInstall) {
+            Button("Install", action: install)
         } message: {
-            Text("装完是关着的，什么都不拦，要用时再打开。要管理员密码。")
+            Text("It’s off after installing and blocks nothing; turn it on when you need it. Requires an administrator password.")
         }
-        .confirmationDialog("开启防火墙？", isPresented: $confirmEnable) {
-            Button("开启试运行", action: enable)
+        .confirmationDialog("Turn on the firewall?", isPresented: $confirmEnable) {
+            Button("Start Trial", action: enable)
         } message: {
-            Text("没走 Clash 隧道的流量除局域网、Clash 直连的地址和国内 IP 外都会被拦下。先试运行 2 分钟：网断了什么都不用做，到时自动关掉；没问题就点「保留」。开启时从 Clash Verge 读一次节点和国内 IP 段，之后换了订阅要关掉再开。")
+            Text("Traffic that bypasses the Clash tunnel will be blocked, except for the local network, addresses Clash connects to directly, and mainland China IPs. It starts with a 2-minute trial: if you lose your connection, do nothing and it turns itself off; if all is well, click Keep. It reads the proxy nodes and China IP ranges from Clash Verge once when turned on; after changing subscriptions, turn it off and on again.")
         }
-        .confirmationDialog("卸载防火墙？", isPresented: $confirmUninstall) {
-            Button("卸载", role: .destructive, action: uninstall)
+        .confirmationDialog("Uninstall the firewall?", isPresented: $confirmUninstall) {
+            Button("Uninstall", role: .destructive, action: uninstall)
         } message: {
-            Text("清掉守护进程、规则和文件，开着的话立即放开。要管理员密码。")
+            Text("Removes the daemon, rules, and files, and lifts any blocking immediately. Needs an administrator password.")
         }
         .background(WindowVisibility(visible: $visible))
-        // 看得见才读（看不见就不调度）：守护进程 10 秒一轮，2 秒一读够及时
+        // Read only when visible (no scheduling when invisible): daemon updates every 10s, 2s polling is responsive enough.
         .task(id: visible) {
             while visible, !Task.isCancelled {
                 refresh()
@@ -108,24 +108,24 @@ struct FirewallPane: View {
     }
 
     private func enable() {
-        command("已开启试运行") { try await FirewallInstaller.enable() }
+        command("trial started") { try await FirewallInstaller.enable() }
     }
 
     private func keep() {
-        command("已保留") { try await FirewallInstaller.keep() }
+        command("kept") { try await FirewallInstaller.keep() }
     }
 
     private func disable() {
-        command("已关闭") { try await FirewallInstaller.disable() }
+        command("turned off") { try await FirewallInstaller.disable() }
     }
 
-    /// 开启、保留、关闭：结果看开关那一行，不另说
+    /// Enable, Keep, Disable: outcome reflected in toggle row.
     private func command(_ log: String, _ run: @escaping @MainActor () async throws -> FirewallInstaller.Outcome) {
         let started = Date()
         perform {
             guard try await run() == .done else { return }
             waitingSince = started
-            Log.write("防火墙：\(log)")
+            Log.write("Firewall: \(log)")
         }
     }
 
@@ -144,8 +144,8 @@ struct FirewallPane: View {
             let staged = try FirewallInstaller.stage()
             defer { FirewallInstaller.discard(staged) }
             guard try await FirewallInstaller.install(staged, tunnel: tunnel) == .done else { return }
-            Log.write("防火墙：已安装")
-            notice = String(localized: "已安装，现在是关着的，什么都不拦")
+            Log.write("Firewall: installed")
+            notice = String(localized: "Installed. It’s off and blocks nothing")
         }
     }
 
@@ -154,8 +154,8 @@ struct FirewallPane: View {
             let staged = try FirewallInstaller.stage()
             defer { FirewallInstaller.discard(staged) }
             guard try await FirewallInstaller.uninstall(staged) == .done else { return }
-            Log.write("防火墙：已卸载")
-            notice = String(localized: "已卸载，规则和文件都清掉了")
+            Log.write("Firewall: uninstalled")
+            notice = String(localized: "Uninstalled. Rules and files are removed")
         }
     }
 
@@ -167,8 +167,8 @@ struct FirewallPane: View {
             do {
                 try await work()
             } catch {
-                self.error = String(localized: "操作失败：\(error.localizedDescription)")
-                Log.write("防火墙：操作失败")
+                self.error = String(localized: "Failed: \(error.localizedDescription)")
+                Log.write("Firewall: operation failed")
             }
             refresh()
             working = false
@@ -176,16 +176,16 @@ struct FirewallPane: View {
     }
 }
 
-/// 开关下面那一行：试运行时倒计时（只在这一行上每秒刷新）
+/// Row beneath toggle: trial countdown (updates every second in this row only).
 private struct FirewallStatusLine: View {
     let reading: FirewallReading
-    /// 看不见时不走秒
+    /// Stops countdown when invisible.
     let live: Bool
 
     var body: some View {
         switch reading {
         case .trial(let endsAt?, let problem):
-            // 出了问题也留着倒计时：最需要「什么都不做，到点自动关掉」这句的时候
+            // Retain countdown even when problem occurs: crucial context for "do nothing, will turn off automatically".
             if live {
                 TimelineView(.periodic(from: .now, by: 1)) { context in Self.countdown(endsAt, at: context.date) }
             } else {
@@ -199,16 +199,16 @@ private struct FirewallStatusLine: View {
 
     private static func countdown(_ endsAt: Date, at now: Date) -> Text {
         let left = max(0, Int(endsAt.timeIntervalSince(now).rounded(.up)))
-        return Text(left > 0 ? String(localized: "试运行中，还剩 \(left / 60):\(String(format: "%02d", left % 60))，到时自动关掉")
-                             : String(localized: "试运行到期，正在关掉"))
+        return Text(left > 0 ? String(localized: "In trial, \(left / 60):\(String(format: "%02d", left % 60)) left; turns off automatically")
+                             : String(localized: "Trial ended, turning off"))
     }
 
     private static func caption(_ r: FirewallReading) -> String {
         switch r {
-        case .notInstalled: return String(localized: "未安装")
-        case .off(nil): return String(localized: "关着，什么都不拦")
-        case .trial(_, nil): return String(localized: "试运行中，到时自动关掉")
-        case .on(nil): return String(localized: "已保护")
+        case .notInstalled: return String(localized: "Not installed")
+        case .off(nil): return String(localized: "Off, blocking nothing")
+        case .trial(_, nil): return String(localized: "In trial; turns off automatically when it ends")
+        case .on(nil): return String(localized: "Protected")
         case .off(let p?), .trial(_, let p?), .on(let p?), .unknown(let p): return text(p)
         }
     }
@@ -222,20 +222,20 @@ private struct FirewallStatusLine: View {
 
     private static func text(_ p: FirewallReading.Problem) -> String {
         switch p {
-        case .noSummary: return String(localized: "还没有状态：刚装上或刚卸到一半，稍等几秒；一直这样就卸载重装")
-        case .unreadable: return String(localized: "状态摘要读不出来")
-        case .stale: return String(localized: "异常：守护进程 30 秒没有更新状态，说不清在不在拦；关掉或卸载")
-        case .stateUnreadable: return String(localized: "防火墙状态文件读不出来，现在按关着办；要再开，先卸载再装")
-        case .testRules: return String(localized: "装的是测试规则，只拦去测试地址的流量，不算保护")
-        case .rulesNotLoaded: return String(localized: "规则这一轮没装上，下一轮重做；现在可能没在拦")
-        case .tunnelMissing: return String(localized: "隧道网卡不在（Clash 没开 TUN，或网卡名填错）：现在外网全被拦下")
-        case .checkFailed: return String(localized: "异常：核对没通过（pf 被停、规则被换掉或隧道网卡不在），可能没在拦")
-        case .failedSteps: return String(localized: "有 pf 动作没做成，下一轮重做；关着时规则也可能还在")
+        case .noSummary: return String(localized: "No status yet: just installed or halfway through uninstalling; wait a few seconds. If it stays like this, uninstall and reinstall")
+        case .unreadable: return String(localized: "The status summary can’t be read")
+        case .stale: return String(localized: "Problem: the daemon hasn’t updated its status for 30 seconds, so it’s unclear whether anything is blocked; turn it off or uninstall")
+        case .stateUnreadable: return String(localized: "The firewall state file can’t be read, so it’s treated as off; to turn it on again, uninstall and reinstall")
+        case .testRules: return String(localized: "Test rules are installed: only traffic to the test address is blocked, which isn’t protection")
+        case .rulesNotLoaded: return String(localized: "The rules failed to load this round and will be retried; it may not be blocking right now")
+        case .tunnelMissing: return String(localized: "Tunnel interface missing (Clash TUN is off, or the name is wrong): all internet traffic is blocked right now")
+        case .checkFailed: return String(localized: "Problem: the check failed (pf stopped, rules replaced, or the tunnel interface is missing); it may not be blocking")
+        case .failedSteps: return String(localized: "A pf step failed and will be retried next round; rules may still be loaded even while off")
         }
     }
 }
 
-/// 所在窗口看不看得见（被遮挡、最小化、锁屏都算看不见）
+/// Window visibility probe (occluded, minimized, or screen locked all count as invisible).
 /// @see https://developer.apple.com/documentation/appkit/nswindow/didchangeocclusionstatenotification
 private struct WindowVisibility: NSViewRepresentable {
     @Binding var visible: Bool
@@ -251,7 +251,7 @@ private struct WindowVisibility: NSViewRepresentable {
             super.init(frame: .zero)
         }
 
-        required init?(coder: NSCoder) { preconditionFailure("只从代码创建") }
+        required init?(coder: NSCoder) { preconditionFailure("code initialization only") }
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
@@ -264,7 +264,7 @@ private struct WindowVisibility: NSViewRepresentable {
 
         @objc private func report() {
             let v = window?.occlusionState.contains(.visible) == true
-            // 在视图更新当中改 SwiftUI 状态会报警告：放到下一轮
+            // Mutating SwiftUI state during view update throws warning: dispatch to next run loop.
             DispatchQueue.main.async { [onChange] in onChange(v) }
         }
     }

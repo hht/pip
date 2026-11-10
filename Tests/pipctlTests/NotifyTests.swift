@@ -13,21 +13,21 @@ private func notify(_ args: [String]) throws -> Message {
 
 @Suite struct NotifyArguments {
     @Test func minimal() throws {
-        let m = try notify(["--plugin", "terminal", "--title", "sleep 跑完了"])
-        #expect(m.plugin == "terminal" && m.title == "sleep 跑完了" && m.id == id && m.at == t0)
+        let m = try notify(["--plugin", "terminal", "--title", "sleep finished"])
+        #expect(m.plugin == "terminal" && m.title == "sleep finished" && m.id == id && m.at == t0)
         #expect(m.outcome == .info)
         #expect(m.subtitle == nil && m.value == nil && m.group == nil && m.block == nil && m.action == nil)
     }
 
     @Test func allOptions() throws {
-        let m = try notify(["--plugin", "terminal", "--title", "sleep 失败了", "--subtitle", "~/x", "--value", "12 秒", "--outcome", "failed",
-                            "--group", "tty:/dev/ttys003", "--fact", "退出码=1", "--fact", "目录=~/a=b", "--open", "https://example.com/x"])
-        #expect(m.subtitle == "~/x" && m.value == "12 秒" && m.outcome == .failed && m.group == "tty:/dev/ttys003")
-        #expect(m.block == .facts([.init(title: "退出码", value: "1"), .init(title: "目录", value: "~/a=b")]))
+        let m = try notify(["--plugin", "terminal", "--title", "sleep failed", "--subtitle", "~/x", "--value", "12s", "--outcome", "failed",
+                            "--group", "tty:/dev/ttys003", "--fact", "exit_code=1", "--fact", "dir=~/a=b", "--open", "https://example.com/x"])
+        #expect(m.subtitle == "~/x" && m.value == "12s" && m.outcome == .failed && m.group == "tty:/dev/ttys003")
+        #expect(m.block == .facts([.init(title: "exit_code", value: "1"), .init(title: "dir", value: "~/a=b")]))
         #expect(m.action == .open(URL(string: "https://example.com/x")!))
     }
 
-    /// zsh 插件传 `--tty $TTY --pid $$ --cwd $PWD`：点卡片跳回这个终端
+    /// zsh plugin passes `--tty $TTY --pid $$ --cwd $PWD`: clicking card returns focus to this terminal
     @Test func focusTerminal() throws {
         let m = try notify(["--plugin", "terminal", "--title", "x", "--tty", "/dev/ttys003", "--pid", "4242", "--cwd", "/Users/x"])
         #expect(m.action == .focusTerminal(tty: "/dev/ttys003", pid: 4242, cwd: "/Users/x"))
@@ -40,12 +40,12 @@ private func notify(_ args: [String]) throws -> Message {
     }
 
     @Test(arguments: [[], ["--plugin", "terminal"], ["--title", "x"], ["--plugin", "terminal", "--title"],
-                      ["--plugin", "terminal", "--title", "x", "--fact", "没有等号"], ["--plugin", "terminal", "--title", "x", "--color", "red"]])
+                       ["--plugin", "terminal", "--title", "x", "--fact", "no_equal_sign"], ["--plugin", "terminal", "--title", "x", "--color", "red"]])
     func usageErrors(_ args: [String]) {
         #expect(throws: NotifyError.self) { try Notify.message(args, id: id, now: t0) }
     }
 
-    /// 消息本身不合规（插件 id、outcome、URL）在写盘之前就报错，和 App 读的是同一套规则
+    /// Non-compliant message (plugin id, outcome, URL) errors out before writing to disk, following same rules as App readers
     @Test(arguments: [["--plugin", "Terminal", "--title", "x"], ["--plugin", "terminal", "--title", "x", "--outcome", "violation"],
                       ["--plugin", "terminal", "--title", "x", "--open", "no scheme"]])
     func invalidMessages(_ args: [String]) {
@@ -53,23 +53,23 @@ private func notify(_ args: [String]) throws -> Message {
     }
 }
 
-/// `pipctl activity start|update|end --id <活动> …`：其余参数和 notify 一样，多一个 `--progress`、`--alert`
+/// `pipctl activity start|update|end --id <activity> …`: options same as notify, plus `--progress`, `--alert`
 @Suite struct ActivityArguments {
     private func activity(_ event: String, _ extra: [String]) throws -> Message {
-        try Message.parse(Notify.message(extra + ["--plugin", "dl", "--title", "下载中"], id: id, now: t0, activity: event))
+        try Message.parse(Notify.message(extra + ["--plugin", "dl", "--title", "Downloading"], id: id, now: t0, activity: event))
     }
 
     @Test func update() throws {
-        let m = try activity("update", ["--id", "xcode", "--progress", "0.62", "--label", "7.4 / 12 GB", "--value", "剩 1 分"])
+        let m = try activity("update", ["--id", "xcode", "--progress", "0.62", "--label", "7.4 / 12 GB", "--value", "1m left"])
         #expect(m.activity == .init(id: "xcode", event: .update, alert: false))
-        #expect(m.block == .progress(0.62, label: "7.4 / 12 GB") && m.value == "剩 1 分")
+        #expect(m.block == .progress(0.62, label: "7.4 / 12 GB") && m.value == "1m left")
     }
 
     @Test func alertFlag() throws {
         #expect(try activity("start", ["--id", "x", "--alert"]).activity == .init(id: "x", event: .start, alert: true))
     }
 
-    /// nan、inf 能被 Double 解析，但 JSON 写不出来（JSONSerialization 抛 NSException，接不住）
+    /// nan and inf parse as Double but cannot serialize to JSON (JSONSerialization raises uncaught NSException)
     @Test(arguments: [["--progress", "0.5"], ["--id", "x", "--progress", "abc"], ["--id", "x", "--progress", "nan"], ["--id", "x", "--progress", "inf"],
                       ["--id", "x", "--progress", "0.5", "--fact", "a=b"], ["--id", "x", "--group", "g"]])
     func usageErrors(_ extra: [String]) {
@@ -80,14 +80,14 @@ private func notify(_ args: [String]) throws -> Message {
         #expect(throws: NotifyError.self) { try activity("stop", ["--id", "x"]) }
     }
 
-    /// 普通卡不收活动的参数
+    /// Regular cards do not accept activity options
     @Test(arguments: [["--id", "x"], ["--alert"]])
     func notifyRejectsActivityOptions(_ extra: [String]) {
         #expect(throws: NotifyError.self) { try Notify.message(["--plugin", "dl", "--title", "x"] + extra, id: id, now: t0) }
     }
 }
 
-/// 发出时刻带毫秒：脚本一秒里连发 start、end，App 才分得清先后
+/// Timestamp includes fractional seconds: enables App to order start and end fired within same second
 @Suite struct NotifyTimestamp {
     @Test func fractionalSeconds() throws {
         let now = Date(timeIntervalSince1970: 1_800_000_000.25)
@@ -96,22 +96,22 @@ private func notify(_ args: [String]) throws -> Message {
     }
 }
 
-/// 手写 JSON 才拼得出的那些：按钮、文本块、日志块、勾叉列表、切换 App、过期
+/// Rich options requiring handcrafted JSON: buttons, text blocks, log blocks, checklist, switch app, stale
 @Suite struct NotifyRichOptions {
     @Test func buttons() throws {
-        let m = try notify(["--plugin", "ci", "--title", "x", "--button", "看日志=https://example.com/log?id=1", "--button", "重跑=raycast://x"])
-        #expect(m.buttons == [.init(title: "看日志", action: .open(URL(string: "https://example.com/log?id=1")!)),
-                              .init(title: "重跑", action: .open(URL(string: "raycast://x")!))])
+        let m = try notify(["--plugin", "ci", "--title", "x", "--button", "View log=https://example.com/log?id=1", "--button", "Rerun=raycast://x"])
+        #expect(m.buttons == [.init(title: "View log", action: .open(URL(string: "https://example.com/log?id=1")!)),
+                              .init(title: "Rerun", action: .open(URL(string: "raycast://x")!))])
     }
 
     @Test func textAndLog() throws {
-        #expect(try notify(["--plugin", "ci", "--title", "x", "--text", "第一行\n第二行"]).block == .text(["第一行", "第二行"]))
+        #expect(try notify(["--plugin", "ci", "--title", "x", "--text", "Line 1\nLine 2"]).block == .text(["Line 1", "Line 2"]))
         #expect(try notify(["--plugin", "ci", "--title", "x", "--log", "error: a\nerror: b"]).block == .log(["error: a", "error: b"]))
     }
 
     @Test func checklist() throws {
-        let m = try notify(["--plugin", "ci", "--title", "x", "--check", "ok=编译", "--check", "failed=测试 a=b", "--check", "pending=部署"])
-        #expect(m.block == .checklist([.init(text: "编译", state: .ok), .init(text: "测试 a=b", state: .failed), .init(text: "部署", state: .pending)]))
+        let m = try notify(["--plugin", "ci", "--title", "x", "--check", "ok=Build", "--check", "failed=Test a=b", "--check", "pending=Deploy"])
+        #expect(m.block == .checklist([.init(text: "Build", state: .ok), .init(text: "Test a=b", state: .failed), .init(text: "Deploy", state: .pending)]))
     }
 
     @Test func activate() throws {
@@ -122,9 +122,9 @@ private func notify(_ args: [String]) throws -> Message {
         #expect(try notify(["--plugin", "ci", "--title", "x", "--stale", "90"]).staleAt == t0.addingTimeInterval(90))
     }
 
-    @Test(arguments: [["--button", "没有等号"], ["--button", "=https://example.com"], ["--button", "a=no scheme"],
+    @Test(arguments: [["--button", "no_equal_sign"], ["--button", "=https://example.com"], ["--button", "a=no scheme"],
                       ["--button", "a=https://a.com", "--button", "b=https://b.com", "--button", "c=https://c.com"],
-                      ["--check", "done=x"], ["--check", "没有等号"], ["--text", "a", "--log", "b"], ["--text", "a", "--fact", "a=b"],
+                      ["--check", "done=x"], ["--check", "no_equal_sign"], ["--text", "a", "--log", "b"], ["--text", "a", "--fact", "a=b"],
                       ["--check", "ok=a", "--progress", "0.5"], ["--activate", "com.apple.Safari", "--open", "https://example.com"],
                       ["--activate", "com.apple.Safari", "--tty", "/dev/ttys003", "--pid", "4242", "--cwd", "/"],
                       ["--stale", "abc"], ["--stale", "0"], ["--stale", "-5"]])
@@ -133,10 +133,10 @@ private func notify(_ args: [String]) throws -> Message {
     }
 }
 
-/// `pipctl send`：标准输入里一整份消息。缺 `v`、`id`、`at` 就补上，其余原样交给 `Message.parse`
+/// `pipctl send`: full message on stdin. Fills in `v`, `id`, `at` if omitted; passes remainder to `Message.parse`
 @Suite struct SendJSON {
     @Test func fillsEnvelope() throws {
-        let data = try Notify.send(Data(#"{"plugin":"ci","title":"x","buttons":[{"type":"Action.OpenUrl","title":"看","url":"https://example.com"}]}"#.utf8),
+        let data = try Notify.send(Data(#"{"plugin":"ci","title":"x","buttons":[{"type":"Action.OpenUrl","title":"View","url":"https://example.com"}]}"#.utf8),
                                    id: id, now: t0)
         let m = try Message.parse(data)
         #expect(m.plugin == "ci" && m.id == id && m.at == t0 && m.buttons.count == 1)
@@ -149,7 +149,7 @@ private func notify(_ args: [String]) throws -> Message {
         #expect(m.id == other && m.at == Date(timeIntervalSince1970: 1_798_761_600))
     }
 
-    @Test(arguments: [#"不是 JSON"#, #"[1]"#, #"{"plugin":"ci"}"#, #"{"plugin":"ci","title":"x","outcome":"violation"}"#])
+    @Test(arguments: [#"not JSON"#, #"[1]"#, #"{"plugin":"ci"}"#, #"{"plugin":"ci","title":"x","outcome":"violation"}"#])
     func rejected(_ json: String) {
         #expect(throws: NotifyError.self) { try Notify.send(Data(json.utf8), id: id, now: t0) }
     }

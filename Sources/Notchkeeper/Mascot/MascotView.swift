@@ -2,15 +2,15 @@ import AppKit
 import SwiftUI
 import MascotCore
 
-/// Pip 嵌进 SwiftUI 的地方。
-/// 布局占 size × size，正好是身体圆的外框；画布按 docs/mascot.md §1 的比例画在 overlay 里，装饰在右上方出框。
-/// 这里只决定画哪个造型（晕、睡着盖不盖过调用方给的造型）；怎么画、怎么动见 `MascotFigureView`。
+/// Pip embedding point in SwiftUI.
+/// Layout occupies size x size, exactly fitting body circular bounding box; canvas rendered in overlay per docs/mascot.md §1 ratio, decorations overflowing top-right.
+/// Selects active look (dizziness, sleepiness overriding passed look); rendering and animations implemented in `MascotFigureView`.
 struct MascotView: View {
     let look: Look
     let size: CGFloat
-    /// 收起态的左耳、面板：sign 装饰挪到右边，这里不画
+    /// Retracted left ear and panel: sign decorations moved to right, omitted here.
     var hidesSigns = false
-    /// false：此刻透明、看不见（关掉了收起时的 Pip），停掉动画，导演的时钟也跟着停
+    /// false: transparent / invisible (retracted Pip disabled), animations halted, director clock paused.
     var playing = true
 
     @ObservedObject private var director = MascotDirector.shared
@@ -20,7 +20,7 @@ struct MascotView: View {
 
     private var shown: Look { literal ? look : director.shown(look) }
 
-    /// 画布相对身体外框（原点 = 身体左上）的位置，单位 pt。身体外框在画布里是 (4, 6.5) 起的 20 × 20 单位
+    /// Canvas position relative to body bounding box (origin = body top-left), in points. Body box spans 20 x 20 units starting at (4, 6.5) in canvas coordinates.
     private var canvas: (unit: CGFloat, frame: CGRect) {
         let k = size / (2 * Anatomy.bodyRadius)
         let c = Anatomy.canvas
@@ -40,13 +40,13 @@ struct MascotView: View {
             }
             .accessibilityElement()
             .accessibilityLabel("Pip")
-            // Pip 用表情表达状态，旁白要能念出来（HIG Accessibility）
+            // Pip uses expressions to convey state, announced by VoiceOver (HIG Accessibility).
             .accessibilityValue(shown.title)
     }
 }
 
-/// 设置页里的 Pip 站在黑底「舞台」上：Pip 的配色按黑底设计，白底上几乎看不见；这样造型数据不用分亮暗（docs/ui.md「亮色与暗色」）。
-/// 四周留的边装得下右上角的装饰
+/// Pip in settings pane displayed on a dark "stage": Pip color palette designed for dark background, nearly invisible on white; avoids splitting look data across light/dark (docs/ui.md "Light and Dark").
+/// Padding accommodates top-right decorations.
 struct MascotStage: View {
     let look: Look
     let size: CGFloat
@@ -78,7 +78,7 @@ private struct MascotLayer: NSViewRepresentable {
     }
 }
 
-/// 「状态测试」强制显示、卡片上时为 true：照给的造型画，不让晕和犯困盖掉（强制空闲不会自己睡着）
+/// Set to true during State Testing or on cards: renders exact passed look without dizziness or sleepiness overrides (forced idle does not fall asleep).
 /// @see https://developer.apple.com/documentation/swiftui/environmentkey
 private struct MascotLiteralKey: EnvironmentKey {
     static let defaultValue = false

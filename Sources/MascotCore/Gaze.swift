@@ -1,8 +1,8 @@
 import CoreGraphics
 
-/// 鼠标在哪，Pip 就往哪看：输入鼠标相对身体圆心的位移，输出头的 yaw / pitch（弧度）。
-/// 不知道鼠标从哪来、什么时候回正（App），也不知道怎么转过去（`Choreography.followSpring`）。
-/// 数字出自 docs/mascot.md §5「跟随鼠标」：两轴各自线性，400pt 处到最大角度，再远停在最大角度。
+/// Pip tracks mouse position: takes mouse displacement relative to body center, outputs head yaw / pitch (radians).
+/// Unaware of mouse event sources, re-centering timing (managed by App), or transition animation (`Choreography.followSpring`).
+/// Values follow docs/mascot.md §5 "Follow mouse": linear per axis, reaching maximum angle at 400pt and clamping beyond.
 public struct Gaze: Equatable, Sendable {
     public var yaw: Double
     public var pitch: Double
@@ -12,17 +12,17 @@ public struct Gaze: Equatable, Sendable {
     static let reach: CGFloat = 400
     static let maxYaw = 25 * Double.pi / 180
     static let maxPitch = 20 * Double.pi / 180
-    /// 结果取整的格：鼠标挪一两个点结果不变，App 就不用重新提交动画（每换一次目标都是一次 Core Animation 事务提交）
+    /// Quantization step: small mouse movements within 1-2pt yield identical result, sparing App from committing new Core Animation transactions
     static let step = 0.5 * Double.pi / 180
 
-    /// offset：鼠标相对身体圆心，单位 pt，+y 向下
+    /// offset: mouse relative to body center in pt, +y downwards
     public init(toward offset: CGVector) {
         func axis(_ v: CGFloat, _ max: Double) -> Double {
             let a = max * Double(Swift.max(-1, Swift.min(1, v / Self.reach)))
             return (a / Self.step).rounded() * Self.step
         }
         yaw = axis(offset.dx, Self.maxYaw)
-        // 鼠标在上方（dy < 0）时抬头
+        // Pitches up when mouse is above (dy < 0)
         pitch = axis(-offset.dy, Self.maxPitch)
     }
 

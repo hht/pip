@@ -11,23 +11,23 @@ private func tempConfig(_ json: String?) throws -> URL {
     return url
 }
 
-/// 外部改了文件：换内容并把修改时间往后拨，热加载靠修改时间发现变化
+/// External edit: write content and push modification date forward; hot reload discovers changes via modification date.
 private func edit(_ url: URL, _ json: String, minutesLater: Double = 1) throws {
     try Data(json.utf8).write(to: url)
     try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(minutesLater * 60)], ofItemAtPath: url.path)
 }
 
-/// 测试不写真实日志
+/// Tests do not write real logs.
 private final class Lines { var all: [String] = [] }
 @MainActor private func store(_ url: URL, _ lines: Lines = Lines()) -> ConfigStore {
     ConfigStore(url: url, log: { lines.all.append($0) })
 }
 
-/// CLAUDE.md 准则 5：解析不了的外部数据降级，不覆盖原文件
+/// CLAUDE.md Principle 5: Degrade gracefully on unparseable external data; never overwrite original file.
 @MainActor @Suite struct ConfigStoreKeepsUnreadableFile {
     @Test(arguments: [
-        #"{"allowlist":["198.51.100.8"],"#,                      // 语法错误
-        #"{"allowlist":"198.51.100.8","soundEnabled":false}"#,   // 字段类型不对
+        #"{"allowlist":["198.51.100.8"],"#,                      // Syntax error
+        #"{"allowlist":"198.51.100.8","soundEnabled":false}"#,   // Wrong field type
     ])
     func startupDoesNotOverwrite(_ json: String) throws {
         let url = try tempConfig(json)
@@ -70,7 +70,7 @@ private final class Lines { var all: [String] = [] }
         #expect(try JSONDecoder().decode(Config.self, from: Data(contentsOf: url)) == Config())
     }
 
-    /// 缺失字段用默认值、未知字段忽略（CLAUDE.md「配置与状态文件」）
+    /// Missing fields fallback to defaults, unknown fields ignored (CLAUDE.md "Configuration & State Files").
     @Test func missingAndUnknownKeysStillLoad() throws {
         let url = try tempConfig(#"{"allowlist":["198.51.100.8"],"future":1}"#)
         var expected = Config()
@@ -78,14 +78,14 @@ private final class Lines { var all: [String] = [] }
         #expect(store(url).config == expected)
     }
 
-    /// URL 白名单默认是空的：只放行 https
+    /// URL schemes allowlist defaults empty: only https allowed.
     @Test func urlSchemesDefaultEmptyAndLoad() throws {
         #expect(Config().urlSchemes.isEmpty)
         let url = try tempConfig(#"{"urlSchemes":["raycast"]}"#)
         #expect(store(url).config.urlSchemes == ["raycast"])
     }
 
-    /// 改坏后又原样改回：坏着时在内存里的改动要被文件内容取代，界面和 guardd 读的是同一份
+    /// Restoring file after corruption: in-memory edits during corruption replaced by file contents; UI and guard read same source.
     @Test func restoringOriginalBytesReloadsThem() throws {
         let original = #"{"allowlist":["198.51.100.8"]}"#
         let url = try tempConfig(original)
@@ -98,7 +98,7 @@ private final class Lines { var all: [String] = [] }
         #expect(store.config.allowlist == ["198.51.100.8"])
     }
 
-    /// 外部刚改坏、监听的事件还没送到时存盘：也不能覆盖
+    /// External edit corrupted just before save and event not yet received: do not overwrite.
     @Test func saveChecksForExternalEditFirst() throws {
         let url = try tempConfig(#"{"allowlist":["198.51.100.8"]}"#)
         let store = store(url)
@@ -109,7 +109,7 @@ private final class Lines { var all: [String] = [] }
         #expect(try Data(contentsOf: url) == Data(broken.utf8))
     }
 
-    /// 存盘前读到了外部的合法改动：外部的赢，也不把手写的文件重排格式、去掉未知键
+    /// Valid external edit read prior to save: external wins, does not reformat or strip unknown keys from manually edited file.
     @Test func saveYieldsToExternalEdit() throws {
         let url = try tempConfig(#"{"allowlist":["198.51.100.8"]}"#)
         let store = store(url)
@@ -121,7 +121,7 @@ private final class Lines { var all: [String] = [] }
         #expect(try Data(contentsOf: url) == Data(external.utf8))
     }
 
-    /// 日志指出是哪个键坏了，但不带值，也就不会带出 IP（CLAUDE.md「日志不记 IP」）
+    /// Log identifies bad key without exposing values, avoiding IP exposure (CLAUDE.md "Never log IPs").
     @Test func logNamesTheBadKeyWithoutValues() throws {
         let lines = Lines()
         _ = store(try tempConfig(#"{"allowlist":"198.51.100.8"}"#), lines)
@@ -130,9 +130,9 @@ private final class Lines { var all: [String] = [] }
     }
 }
 
-/// 外部改了文件马上载入：靠监听目录和文件，不轮询（CLAUDE.md「看不见就不调度」）
+/// External file edit loaded immediately: monitored via directory and file events without polling (CLAUDE.md "Never schedule when invisible").
 @MainActor @Suite struct ConfigStoreHotReload {
-    /// 原子替换（大多数编辑器）和原地改写（`>`、部分编辑器）都要收得到
+    /// Catches atomic replacement (most editors) and in-place rewriting (`>`, some editors).
     @Test(arguments: [true, false])
     func externalEditIsLoaded(atomically: Bool) async throws {
         let url = try tempConfig(#"{"soundEnabled":true}"#)

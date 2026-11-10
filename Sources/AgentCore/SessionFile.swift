@@ -1,44 +1,44 @@
 import Foundation
 
-/// 一个 Claude Code 会话此刻的状态，从它的 sessions 文件解析而来。
+/// State of a Claude Code session at this moment, parsed from its session file.
 public struct Session: Equatable, Sendable {
     public var pid: Int32
-    /// 进程启动时刻（UTC，精确到秒）：和 `pid` 一起认进程，防 pid 复用
+    /// Process start time (UTC, second precision): used with pid to identify process and prevent pid reuse
     public var processStart: Date
-    /// 和 mod 写的回合文件对上；`/clear` 之后会换。已校验是 UUID：会拼进文件路径
+    /// Matches turn file written by mod; changes after /clear. Validated as UUID: will be interpolated into file paths
     public var sessionId: String
-    /// 工作目录的完整路径
+    /// Absolute path to working directory
     public var cwd: String
     public var state: AgentState
-    /// 进入这个状态的时刻
+    /// Timestamp when this state was entered
     public var stateSince: Date
 }
 
-/// agent 状态（docs/agent-integration.md「状态」）
+/// Agent state (docs/agent-integration.md "States")
 public enum AgentState: Equatable, Sendable {
     case working
     case stopped
     case needsYou(Need)
 
-    /// 需要你介入的是哪一类：决定 Pip 是 question 还是 approval（docs/mascot.md §2）
+    /// Category of required intervention: determines whether Pip shows question or approval (docs/mascot.md §2)
     public enum Need: Sendable {
         case question
         case approval
     }
 }
 
-/// sessions 文件解不开的原因：App 计数、跳过，不覆盖原文件（CLAUDE.md 准则 5）
+/// Reasons parsing session file failed: App counts and skips without overwriting file (CLAUDE.md Principle 5)
 public enum SessionFileError: Error, Equatable {
     case unknownStatus(String)
     case badSessionId(String)
 }
 
-/// 回答：一份 `~/.claude/sessions/<pid>.json` 是不是要看的会话、此刻什么状态。
-/// 只取判定和显示要的字段；不读文件、不查进程。
-/// @see docs/agent-integration.md「实测」（Claude Code 2.1.296）
+/// Answers: whether a ~/.claude/sessions/<pid>.json is a target session, and its current state.
+/// Extracts only fields required for judgment and display; does not read files or query processes directly.
+/// @see docs/agent-integration.md "Observations" (Claude Code 2.1.296)
 public enum SessionFile {
-    /// 不是终端里开的交互式 `claude`（`claude -p`、SDK、VS Code、后台会话等），
-    /// 或者会话刚起来还没写状态，返回 `nil`，其余字段不再检查。
+    /// If not an interactive claude run in terminal (claude -p, SDK, VS Code, background sessions, etc.),
+    /// or session has just started and not written status yet, returns nil without further checks.
     public static func parse(_ data: Data) throws -> Session? {
         let gate = try JSONDecoder().decode(Gate.self, from: data)
         guard gate.kind == "interactive", gate.entrypoint == "cli", gate.status != nil else { return nil }
@@ -49,8 +49,8 @@ public enum SessionFile {
                        state: try state(raw.status, waitingFor: raw.waitingFor), stateSince: Date(timeIntervalSince1970: raw.statusUpdatedAt / 1000))
     }
 
-    /// `claude -p` 的 `kind` 也是 `interactive`，只有 `entrypoint` 是 `sdk-cli`（「实测」1）；
-    /// 会话第一次写的文件没有 `status`、`statusUpdatedAt`，过一会儿原地补上（「实测」5）
+    /// claude -p has kind == "interactive" as well, with entrypoint == "sdk-cli" ("Observations" 1);
+    /// First file written by session lacks status and statusUpdatedAt, filled in shortly after ("Observations" 5)
     private struct Gate: Decodable {
         var kind: String?
         var entrypoint: String?
@@ -70,17 +70,17 @@ public enum SessionFile {
     private static func state(_ status: String, waitingFor: String?) throws -> AgentState {
         switch status {
         case "busy": return .working
-        // `shell`：空闲，但后台挂着 shell 命令（docs/agent-integration.md「实测」6）
+        // "shell": idle, but background shell command is running (docs/agent-integration.md "Observations" 6)
         case "idle", "shell": return .stopped
         case "waiting": return .needsYou(approvalKinds.contains(waitingFor ?? "") ? .approval : .question)
         default: throw SessionFileError.unknownStatus(status)
         }
     }
 
-    /// Claude Code 自己把这几种 `waitingFor` 归为 permission；`input needed`、`dialog open` 和没见过的都归等你回答
+    /// Claude Code classifies these waitingFor values as permission; "input needed", "dialog open", and unseen values default to question
     private static let approvalKinds: Set = ["permission prompt", "sandbox request", "worker request", "goal proposal"]
 
-    /// `procStart` 是 `LC_ALL=C TZ=UTC ps -o lstart=` 的输出，例如 `Thu Oct 29 17:54:51 2026`
+    /// procStart is output of LC_ALL=C TZ=UTC ps -o lstart=, e.g. "Thu Oct 29 17:54:51 2026"
     private static let lstart = Date.ParseStrategy(
         format: "\(weekday: .abbreviated) \(month: .abbreviated) \(day: .defaultDigits) \(hour: .twoDigits(clock: .twentyFourHour, hourCycle: .zeroBased)):\(minute: .twoDigits):\(second: .twoDigits) \(year: .defaultDigits)",
         locale: Locale(identifier: "en_US_POSIX"), timeZone: .gmt)

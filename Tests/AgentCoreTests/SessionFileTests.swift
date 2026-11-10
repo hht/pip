@@ -2,12 +2,12 @@ import Foundation
 import Testing
 @testable import AgentCore
 
-/// 照实测的真实文件拼（docs/agent-integration.md「实测」），只改要测的字段
+/// Constructed modeled after real session files observed (docs/agent-integration.md "Observations"), only mutating tested fields
 private func file(_ overrides: [String: Any?] = [:]) -> Data {
     var json: [String: Any] = [
-        "pid": 31301, "sessionId": "5d0c7c2e-0000-4000-8000-000000000000", "cwd": "/Users/u/Documents/Projects/notchkeeper",
+        "pid": 31301, "sessionId": "5d0c7c2e-0000-4000-8000-000000000000", "cwd": "/Users/u/Documents/Projects/pip",
         "startedAt": 1793296492153, "procStart": "Thu Oct 29 17:54:51 2026", "version": "2.1.296", "peerProtocol": 1,
-        "kind": "interactive", "entrypoint": "cli", "pidDomain": "darwin", "name": "会话名", "nameSource": "user",
+        "kind": "interactive", "entrypoint": "cli", "pidDomain": "darwin", "name": "session name", "nameSource": "user",
         "status": "busy", "statusUpdatedAt": 1793304005799, "updatedAt": 1793304005799,
     ]
     for (k, v) in overrides { json[k] = v }
@@ -21,7 +21,7 @@ private let procStart = Date(timeIntervalSince1970: 1_793_296_491)
     @Test func busyCLISession() throws {
         #expect(try SessionFile.parse(file()) == Session(
             pid: 31301, processStart: procStart, sessionId: "5d0c7c2e-0000-4000-8000-000000000000",
-            cwd: "/Users/u/Documents/Projects/notchkeeper",
+            cwd: "/Users/u/Documents/Projects/pip",
             state: .working, stateSince: Date(timeIntervalSince1970: 1_793_304_005.799)))
     }
 }
@@ -35,26 +35,26 @@ private let procStart = Date(timeIntervalSince1970: 1_793_296_491)
         #expect(try state("busy") == .working)
     }
 
-    /// `shell` 是空闲、但后台挂着 shell 命令（docs/agent-integration.md「实测」6）
+    /// shell is idle, but background shell command is running (docs/agent-integration.md "Observations" 6)
     @Test func idleAndShellAreStopped() throws {
         #expect(try state("idle") == .stopped)
         #expect(try state("shell") == .stopped)
     }
 
-    /// 照 Claude Code 自己的归类表：前四个是权限类（docs/agent-integration.md「实测」3）
+    /// Per Claude Code's own taxonomy: first 4 are permissions (docs/agent-integration.md "Observations" 3)
     @Test(arguments: ["permission prompt", "sandbox request", "worker request", "goal proposal"])
     func permissionKindsNeedApproval(_ waitingFor: String) throws {
         #expect(try state("waiting", waitingFor: waitingFor) == .needsYou(.approval))
     }
 
-    /// `dialog open`、没见过的取值、缺了 waitingFor：都还是需要你介入，归等你回答
+    /// dialog open, unseen values, missing waitingFor: all still require intervention, categorized as question
     @Test(arguments: ["input needed", "dialog open", "something new", nil] as [String?])
     func otherWaitsAreQuestions(_ waitingFor: String?) throws {
         #expect(try state("waiting", waitingFor: waitingFor) == .needsYou(.question))
     }
 }
 
-/// 只看终端里开的交互式 claude：`claude -p` 的 kind 也是 interactive，要靠 entrypoint 排除
+/// Only targets interactive claude in terminal: claude -p has kind == "interactive" as well, distinguished by entrypoint
 @Suite struct SessionFiltering {
     @Test(arguments: ["sdk-cli", "sdk-ts", "sdk-py", "claude-vscode", "claude-desktop", "remote"])
     func otherEntrypointsAreIgnored(_ entrypoint: String) throws {
@@ -66,19 +66,19 @@ private let procStart = Date(timeIntervalSince1970: 1_793_296_491)
         #expect(try SessionFile.parse(file(["kind": kind])) == nil)
     }
 
-    /// 会话刚起来时第一次写的文件没有 status、statusUpdatedAt，过一会儿原地补上（实测）：还没有状态，先不看，也不算解不开
+    /// Initial file written upon startup lacks status and statusUpdatedAt, filled in shortly after (observed): lacks status, skipped temporarily without error
     @Test func sessionWithoutStatusYetIsIgnored() throws {
         #expect(try SessionFile.parse(file(["status": nil, "statusUpdatedAt": nil, "updatedAt": nil])) == nil)
     }
 
-    /// 不看的会话，别的字段缺了、状态不认识也不算解不开
+    /// Ignored sessions are not validated: missing fields or unknown status do not fail parsing
     @Test func ignoredSessionIsNotValidated() throws {
         #expect(try SessionFile.parse(file(["entrypoint": "sdk-cli", "status": "bogus", "procStart": nil])) == nil)
     }
 }
 
 @Suite struct SessionFileBoundary {
-    /// ps 的 lstart 日期个位数时前面补空格（%e）
+    /// ps lstart pads single-digit day with space (%e)
     @Test func singleDigitDayIsSpacePadded() throws {
         let s = try SessionFile.parse(file(["procStart": "Mon Nov  2 03:04:05 2026"]))
         #expect(s?.processStart == Date(timeIntervalSince1970: 1_793_588_645)) // 2026-11-02T03:04:05Z
@@ -89,7 +89,7 @@ private let procStart = Date(timeIntervalSince1970: 1_793_296_491)
         #expect(throws: (any Error).self) { try SessionFile.parse(file(["procStart": text])) }
     }
 
-    /// sessionId 会拼进要删的回合文件路径：不是 UUID 一律不认（CLAUDE.md 准则 5）
+    /// sessionId is interpolated into turn file path: non-UUID is strictly rejected (CLAUDE.md Principle 5)
     @Test func sessionIdMustBeUUID() {
         #expect(throws: SessionFileError.badSessionId("../../config")) { try SessionFile.parse(file(["sessionId": "../../config"])) }
     }
@@ -103,7 +103,7 @@ private let procStart = Date(timeIntervalSince1970: 1_793_296_491)
         #expect(throws: (any Error).self) { try SessionFile.parse(file([key: nil])) }
     }
 
-    /// 写到一半的文件
+    /// Partially written file
     @Test func truncatedJSONThrows() {
         #expect(throws: (any Error).self) { try SessionFile.parse(Data(#"{"pid":1,"kind":"interactive""#.utf8)) }
     }

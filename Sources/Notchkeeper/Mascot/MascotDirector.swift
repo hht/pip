@@ -2,22 +2,22 @@ import AppKit
 import QuartzCore
 import MascotCore
 
-/// 所有 Pip 共用的一份：登记看得见的 Pip、按 `MascotClock` 给的时刻醒来把提示发给它们、转发鼠标、熄屏锁屏时停下。
-/// 什么时候眨眼、做小动作、回正、犯困、晕完都由 `MascotClock` 定；不知道 Pip 怎么画、动作长什么样。
-/// 一只都看不见、或者熄屏锁屏时，时钟停掉（docs/mascot.md §5「渲染」）。
+/// Shared across all Pips: registers visible Pips, wakes at moments determined by `MascotClock` to dispatch cues, forwards mouse events, halts on display sleep / screen lock.
+/// Timing for blinks, idle micro-movements, gaze reset, drowsiness, and dizziness recovery is governed by `MascotClock`; agnostic to Pip rendering and kinematics.
+/// Clock stops when no Pips are visible, or when display sleeps / screen locks (docs/mascot.md §5 "Rendering").
 @MainActor
 final class MascotDirector: ObservableObject {
     static let shared = MascotDirector()
 
-    /// `MascotClock` 的镜像，变了才发布：视图按它们叠晕和睡着（`shown`）
+    /// Mirror of `MascotClock`, published on change: views overlay dizziness and sleepiness (`shown`).
     @Published private(set) var drowsy = false
     @Published private(set) var dizzy = false
-    /// 熄屏或锁屏。没有视图读它，所以不发布：每只 Pip 由 `refreshActive` 逐个看
+    /// Display asleep or screen locked. Not published as views don't read directly; evaluated individually per Pip via `refreshActive`.
     var paused: Bool { !away.isEmpty }
-    /// 熄屏或锁屏变了：卡片队列跟着停、跟着放（docs/ui.md「卡片」8）
+    /// Changes in paused state: card queue pauses/resumes accordingly (docs/ui.md "Card" 8).
     var onPausedChange: ((Bool) -> Void)?
 
-    /// 鼠标离刘海这么近算靠近（不犯困）
+    /// Mouse within this distance of notch is considered near (prevents drowsiness).
     static let nearDistance: CGFloat = 150
 
     private enum Away { case screensAsleep, locked }
@@ -27,9 +27,9 @@ final class MascotDirector: ObservableObject {
     private var views: [Weak] = []
     private var clock = MascotClock(seed: UInt64.random(in: 1...UInt64.max), now: CACurrentMediaTime())
     private var timer: Timer?
-    /// 定时器定在哪一刻醒；nil = 停着
+    /// Wake time scheduled for timer; nil = stopped.
     private var timerAt: CFTimeInterval?
-    /// 设置里的「跟随鼠标」
+    /// "Follow mouse" setting in preferences.
     private var followsMouse = true
 
     private struct Weak {
@@ -39,13 +39,13 @@ final class MascotDirector: ObservableObject {
     private var all: [MascotFigureView] { views.compactMap { $0.view as? MascotFigureView } }
     private var live: [MascotFigureView] { all.filter(\.active) }
 
-    /// App 启动时调用一次，传入刘海在屏幕上的位置
+    /// Called once at App startup with notch screen rectangle.
     func start(notchRect: @escaping () -> NSRect) {
         self.notchRect = notchRect
         let ws = NSWorkspace.shared.notificationCenter
         let dn = DistributedNotificationCenter.default()
-        // 锁屏没有公开的通知；com.apple.screenIsLocked / Unlocked 是系统发的分布式通知，Apple 文档没列出。
-        // 哪个系统版本不再发，也只是少了锁屏这一路：熄屏和窗口遮挡照样让 Pip 停下
+        // Lock screen has no public API notification; com.apple.screenIsLocked / Unlocked are system distributed notifications.
+        // If a macOS version discontinues them, only lock screen detection is affected; display sleep and window occlusion still halt Pip.
         // @see https://developer.apple.com/documentation/appkit/nsworkspace/screensdidsleepnotification
         // @see https://developer.apple.com/documentation/appkit/nsworkspace/screensdidwakenotification
         // @see https://developer.apple.com/documentation/foundation/distributednotificationcenter
@@ -70,17 +70,17 @@ final class MascotDirector: ObservableObject {
         onPausedChange?(paused)
     }
 
-    /// 实际画哪个造型：晕、睡着叠在给的造型上
+    /// Actual look to render: overlays dizziness/sleepiness onto base look.
     func shown(_ look: Look) -> Look { look.shown(drowsy: drowsy, dizzy: dizzy) }
 
-    /// 点到矩形的距离，点在矩形里为 0
+    /// Distance from point to rectangle; 0 if inside.
     nonisolated static func distance(from p: NSPoint, to r: NSRect) -> CGFloat {
         hypot(max(r.minX - p.x, 0, p.x - r.maxX), max(r.minY - p.y, 0, p.y - r.maxY))
     }
 
     private func mouseNear(_ p: NSPoint) -> Bool { Self.distance(from: p, to: notchRect()) <= Self.nearDistance }
 
-    // MARK: Pip 登记
+    // MARK: Pip Registration
 
     func attach(_ v: MascotLayerView) {
         views.removeAll { $0.view == nil || $0.view === v }
@@ -92,7 +92,7 @@ final class MascotDirector: ObservableObject {
         activityChanged()
     }
 
-    /// 有 Pip 变得看得见或看不见、熄屏锁屏：时钟跟着开停
+    /// When Pip visibility changes or screen locks/sleeps: clock pauses/resumes.
     func activityChanged() {
         let on = !live.isEmpty
         guard on != (timerAt != nil) else { return }
@@ -100,14 +100,14 @@ final class MascotDirector: ObservableObject {
             clock.resume(at: CACurrentMediaTime())
             schedule()
         } else if !clock.dizzy {
-            // 晕着先不停（最多再跑 1.6 秒）：这里常在 SwiftUI 更新视图时被调（`playing` 变了），
-            // 晕留给到点的 tick 收，镜像的发布就只在定时器回调里
+            // Keep running if dizzy (at most 1.6s remaining): often triggered when SwiftUI updates views (`playing` changes);
+            // dizziness cleanup deferred to scheduled tick, keeping published mirror updates inside timer callback.
             timer?.invalidate()
             stopClock()
         }
     }
 
-    /// 停时钟。到点的 tick 发现 Pip 都看不见了时晕可能还在：一起收掉（`MascotClock.suspend`），镜像跟着变
+    /// Stop clock. If Pips became invisible while dizzy, clear dizziness (`MascotClock.suspend`) and update mirror.
     private func stopClock() {
         timer = nil
         timerAt = nil
@@ -115,7 +115,7 @@ final class MascotDirector: ObservableObject {
         clockChanged()
     }
 
-    // MARK: 时钟
+    // MARK: Clock
 
     private func schedule() {
         timer?.invalidate()
@@ -123,7 +123,7 @@ final class MascotDirector: ObservableObject {
         let t = Timer(fire: Date(timeIntervalSinceNow: max(0, at - CACurrentMediaTime())), interval: 0, repeats: false) { _ in
             MainActor.assumeIsolated { MascotDirector.shared.tick() }
         }
-        // 眨眼、小动作差几十毫秒看不出来，让系统合并唤醒
+        // Blinks and micro-movements tolerate minor jitter; allow system timer coalescing.
         // @see https://developer.apple.com/documentation/foundation/timer/tolerance
         t.tolerance = 0.05
         RunLoop.main.add(t, forMode: .common)
@@ -131,7 +131,7 @@ final class MascotDirector: ObservableObject {
         timerAt = at
     }
 
-    /// 时钟改完：镜像跟上；在跑并且要早于定好的时刻醒就改定时器（推迟的不用改：到点 tick 会按新的时刻再定）
+    /// Clock updated: sync mirrors; reschedule timer if wake time moved earlier (postponed wakes adjust on next tick).
     private func clockChanged() {
         if drowsy != clock.drowsy { drowsy = clock.drowsy }
         if dizzy != clock.dizzy { dizzy = clock.dizzy }
@@ -140,7 +140,7 @@ final class MascotDirector: ObservableObject {
 
     private func tick() {
         let views = live
-        // 看得见的 Pip 没走 refreshActive 就没了：时钟停掉
+        // Visible Pips vanished without refreshActive: stop clock.
         guard !views.isEmpty else { return stopClock() }
         let t = clock.tick(now: CACurrentMediaTime(), mouseNear: mouseNear(NSEvent.mouseLocation))
         if t.gazeRested { all.forEach { $0.follow(mouse: nil) } }
@@ -149,20 +149,20 @@ final class MascotDirector: ObservableObject {
         schedule()
     }
 
-    /// 「播放动作」：看得见的 Pip 各播一次，不管当前造型
+    /// "Play action": visible Pips perform action once regardless of current look.
     func play(_ cue: Cue) {
         live.forEach { $0.perform(cue, force: true) }
     }
 
-    /// 点了面板里的 Pip：晕一会儿
+    /// Poke Pip in panel: triggers dizziness briefly.
     func poke() {
         clock.poke(now: CACurrentMediaTime())
         clockChanged()
     }
 
-    // MARK: 鼠标
+    // MARK: Mouse
 
-    /// 关掉时眼睛回正、不再探头，之后只看鼠标近不近刘海（犯困）
+    /// When disabled, eyes reset forward without peeking, observing only mouse proximity to notch (drowsiness).
     func setFollowsMouse(_ on: Bool) {
         guard on != followsMouse else { return }
         followsMouse = on
@@ -174,7 +174,7 @@ final class MascotDirector: ObservableObject {
         }
     }
 
-    /// NotchController 的全局鼠标监听转过来（屏幕坐标）。Pip 看鼠标、鼠标在刘海上时探头（docs/mascot.md §5「跟随鼠标」）
+    /// Global mouse moved event from NotchController (screen coordinates). Pip tracks mouse and peeks when cursor is on notch (docs/mascot.md §5 "Follow Mouse").
     func mouseMoved(to p: NSPoint) {
         var looking = false
         if followsMouse {

@@ -1,23 +1,23 @@
 import Foundation
 
-/// 回答：一张卡上写什么——谁发的、标题、右侧短值、结果、底部内容块、点了去哪。
-/// 纯值：不知道颜色、声音、Pip 造型和版式（App 按 `outcome` 去取），也不知道它什么时候放（`CardQueue`）。
-/// 一眼能看完：构造时按条数和长度截断（docs/ui.md「卡片」）。内容块照 Adaptive Cards 起名（TextBlock、FactSet），进度和勾叉列表是扩展。
+/// Answers: What appears on a card — sender, title, right short value, outcome, bottom block, click action.
+/// Pure value: agnostic of colors, sounds, Pip look, and layout (App fetches them via `outcome`), and display timing (`CardQueue`).
+/// Glanceable: truncated by item count and length at initialization (docs/ui.md "Cards"). Content blocks follow Adaptive Cards naming (TextBlock, FactSet), progress and checklist are extensions.
 /// @see https://github.com/microsoft/AdaptiveCards/tree/main/schemas/src/elements
 public struct Card: Identifiable, Equatable, Sendable {
     public enum Source: Equatable, Sendable {
         case exitGuard
         case claudeCode
-        /// 外部插件：卡上标明是谁发的（CLAUDE.md 硬规则「外部插件可信但受限」）
+        /// External plugin: card indicates sender (CLAUDE.md hard rule "External plugins are trusted but restricted")
         case plugin(id: String, name: String, symbol: String)
     }
 
-    /// 发生了什么：App 据此定流星颜色、Pip 造型、提示音
+    /// What happened: App determines streak color, Pip look, cue sound accordingly
     public enum Outcome: Equatable, Sendable {
         case done, failed, question, approval, info, recovered
-        /// 要你看，但不是等你回答或批准
+        /// Needs attention, but not waiting for user response or approval
         case attention
-        /// 出口违规：只有出口守卫能用
+        /// Egress violation: only egress guard may use this
         case violation
     }
 
@@ -34,28 +34,28 @@ public struct Card: Identifiable, Equatable, Sendable {
         public init(text: String, state: State) { self.text = text; self.state = state }
     }
 
-    /// 底部内容块，一张卡至多一个
+    /// Bottom content block, at most one per card
     public enum Block: Equatable, Sendable {
-        /// TextBlock：正文，Markdown 子集，一行一项，留前 3 行（外部文字在边界按换行切好）
+        /// TextBlock: body text, Markdown subset, one item per line, keeps first 3 lines (external text split on newlines)
         case text([String])
-        /// TextBlock + monospace：日志尾巴，留后 3 行
+        /// TextBlock + monospace: log tail, keeps last 3 lines
         case log([String])
-        /// FactSet：键值，至多 4 对
+        /// FactSet: key-value pairs, at most 4 pairs
         case facts([Fact])
-        /// 勾叉列表，至多 3 项
+        /// Checklist, at most 3 items
         case checklist([Check])
-        /// 进度 0…1
+        /// Progress 0…1
         case progress(Double, label: String?)
     }
 
-    /// 点卡片或按钮去哪：只有这三种（CLAUDE.md 硬规则「插件」）。打开 URL 放不放行看 `URLPolicy`
+    /// Where clicking card or button navigates: only these three (CLAUDE.md hard rule "Plugins"). URL opening checked by `URLPolicy`
     public enum Action: Equatable, Sendable {
         case open(URL)
         case activate(bundleID: String)
         case terminal(TerminalRef)
     }
 
-    /// 卡片右下的按钮，至多两个；点了也算关掉这张卡
+    /// Buttons at bottom-right of card, at most two; clicking also dismisses card
     public struct Button: Equatable, Sendable {
         public var title: String
         public var action: Action
@@ -63,13 +63,13 @@ public struct Card: Identifiable, Equatable, Sendable {
     }
 
     public static let maxText = 200
-    /// 右侧短值和插件名：长了会把标题挤没
+    /// Short value and plugin name on right: prevents crowding out title
     public static let maxValue = 24
     public static let maxLines = 3
     public static let maxFacts = 4
     public static let maxButtons = 2
 
-    /// 活动的卡每次更新都新造，id 沿用第一张：App 认出是同一张，原地换内容（`CardQueue.update`）
+    /// Activity card recreated on each update, reusing id from first card: App updates in-place (`CardQueue.update`)
     public let id: UUID
     public let source: Source
     public let title: String
@@ -91,7 +91,7 @@ public struct Card: Identifiable, Equatable, Sendable {
         self.title = Self.capped(title)
         self.subtitle = subtitle.map { Self.capped($0) }
         self.value = value.map { Self.capped($0, to: Self.maxValue) }
-        // 红色和绿色只属于出口守卫（CLAUDE.md 硬规则「插件」）
+        // Red and green only belong to egress guard (CLAUDE.md hard rule "Plugins")
         switch outcome {
         case .violation where source != .exitGuard: self.outcome = .attention
         case .recovered where source != .exitGuard: self.outcome = .done
@@ -102,14 +102,7 @@ public struct Card: Identifiable, Equatable, Sendable {
         self.buttons = buttons.prefix(Self.maxButtons).map { Button(title: Self.capped($0.title, to: Self.maxValue), action: $0.action) }
     }
 
-    /// 守卫的红卡挂着时换副标题：同一张卡（id 不变），不重弹
-    public func replacingSubtitle(_ subtitle: String) -> Card {
-        var c = self
-        c.subtitle = Self.capped(subtitle)
-        return c
-    }
-
-    /// 外部插件的 id，内置插件的卡是 nil：外部的卡红卡挂着时排着，不盖它
+    /// External plugin ID, nil for built-in plugin cards: external cards queue while red card is active
     public var externalPluginID: String? {
         if case .plugin(let id, _, _) = source { return id }
         return nil
@@ -135,13 +128,13 @@ public struct Card: Identifiable, Equatable, Sendable {
     }
 }
 
-/// 终端里的哪个会话：点卡片跳回它的 Ghostty 窗口
+/// Session in terminal: clicking card jumps to its Ghostty window
 public struct TerminalRef: Equatable, Sendable {
-    /// 防 pid 复用：往 pid 的 tty 写标记之前，先确认它还是那个进程
+    /// Prevent PID reuse: verify process before writing marker to tty
     public enum Identity: Equatable, Sendable {
-        /// Claude Code 会话：进程启动时刻对得上
+        /// Claude Code session: matched by process start time
         case started(Date)
-        /// 外部插件说的 shell（没有启动时刻）：pid 的控制终端还是这个 tty
+        /// Shell from external plugin (no start time): matched by controlling terminal tty
         case tty(String)
     }
 

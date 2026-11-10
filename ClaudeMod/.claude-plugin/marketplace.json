@@ -1,7 +1,7 @@
 {
-  "name": "notchkeeper",
+  "name": "notifier",
   "owner": { "name": "Pip" },
   "plugins": [
-    { "name": "notchkeeper", "source": "./plugins/notchkeeper", "description": "把 Claude Code 主回合怎么结束的写给刘海 App Pip（只写元数据）" }
+    { "name": "pip", "source": "./plugins/pip", "description": "Writes how Claude Code primary turns end to notch app Pip (metadata only)" }
   ]
 }

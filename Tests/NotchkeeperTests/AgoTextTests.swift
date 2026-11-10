@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import Notchkeeper
 
-/// 「多久以前」只说过去：刚写完的守卫状态、和现在一样或稍晚的时间，不说成「0 秒后」（英文界面是「in 0 sec.」）
+/// "Ago text" only describes the past: freshly written guard status and timestamps equal to or slightly ahead of now should never say "in 0 sec."
 @Suite struct AgoTextTense {
     private let now = Date(timeIntervalSinceReferenceDate: 800_000_000)
     private let en = Locale(identifier: "en_US")
@@ -12,7 +12,7 @@ import Testing
     func nowOrLaterIsPast(_ ahead: TimeInterval) {
         let s = AgoText.string(now.addingTimeInterval(ahead), now: now, locale: en)
         #expect(s.hasSuffix("ago") && !s.hasPrefix("in "), "\(s)")
-        #expect(AgoText.string(now.addingTimeInterval(ahead), now: now, locale: zh).hasSuffix("前"))
+        #expect(AgoText.string(now.addingTimeInterval(ahead), now: now, locale: zh).hasSuffix("\u{524D}"))
     }
 
     @Test func pastStaysAsIs() {

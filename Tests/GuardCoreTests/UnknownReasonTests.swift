@@ -21,10 +21,10 @@ private let unknownRound = Observation(clashRunning: true, routeInterface: nil, 
         #expect(UnknownReason.decide(verdict: .unknown, path: up) == .probeFailed)
     }
 
-    /// 没拿到网络快照（监视器还没回话或超时）不能断言「断网」，只能说探针没结果
+    /// Missing snapshot cannot assert offline; treated as probeFailed
     @Test func noSnapshotIsProbeFailed() { #expect(UnknownReason.decide(verdict: .unknown, path: nil) == .probeFailed) }
 
-    /// 优先级：断网时探针必然也失败，原因报 offline
+    /// Priority: offline takes precedence as probes necessarily fail during disconnect
     @Test func offlineBeatsProbeFailed() {
         var g = EgressGuard()
         #expect(g.observe(Observation(clashRunning: nil, routeInterface: nil, egressIPs: []), allowlist: []) == .unknown)
@@ -39,65 +39,18 @@ private let unknownRound = Observation(clashRunning: true, routeInterface: nil, 
     }
 }
 
-@Suite struct UnknownReasonInStateFile {
-    private func state(_ v: Verdict, path: NetworkPath?) -> GuardState {
-        GuardState(verdict: v, observation: unknownRound, allowlist: [], egressFailures: [:], networkPath: path, checkedAt: now)
+@Suite struct UnknownReasonInDisplay {
+    private func display(_ v: Verdict, path: NetworkPath?) -> GuardDisplay {
+        GuardDisplay(verdict: v, observation: unknownRound, allowlist: [], networkPath: path, violatedSince: nil, checkedAt: now)
     }
 
-    @Test func unknownWritesTheReason() throws {
-        let json = String(decoding: try state(.unknown, path: nothing).encoded(), as: UTF8.self)
-        #expect(json.contains(#""unknownReason":"offline""#))
-        #expect(try GuardState.decode(state(.unknown, path: up).encoded()).unknownReason == .probeFailed)
+    @Test func unknownCarriesTheReason() {
+        #expect(display(.unknown, path: nothing).unknownReason == .offline)
+        #expect(display(.unknown, path: up).unknownReason == .probeFailed)
     }
 
     @Test(arguments: [Verdict.healthy, .egressMismatch, .violated])
-    func otherVerdictsWriteNoReason(_ v: Verdict) throws {
-        let s = state(v, path: nothing)
-        #expect(s.unknownReason == nil)
-        #expect(!String(decoding: try s.encoded(), as: UTF8.self).contains("unknownReason"))
-    }
-
-    @Test func roundTrips() throws {
-        for s in [state(.unknown, path: nothing), state(.unknown, path: up), state(.healthy, path: up)] {
-            #expect(try GuardState.decode(s.encoded()) == s)
-        }
-    }
-}
-
-@Suite struct UnknownReasonDisplay {
-    private func file(_ v: Verdict, path: NetworkPath?, age: TimeInterval = 0) throws -> Data {
-        try GuardState(verdict: v, observation: unknownRound, allowlist: [], egressFailures: [:], networkPath: path,
-                       checkedAt: now.addingTimeInterval(-age)).encoded()
-    }
-    private func read(_ d: Data?) -> GuardDisplay { GuardStateReader.display(data: d, now: now) }
-
-    @Test func freshUnknownExposesTheReason() throws {
-        #expect(read(try file(.unknown, path: nothing)).unknownReason == .offline)
-        #expect(read(try file(.unknown, path: up)).unknownReason == .probeFailed)
-        #expect(read(try file(.unknown, path: up)).reason == .fresh)
-    }
-
-    /// 文件是外部数据：新鲜的 unknown 缺 unknownReason 时按 probeFailed 显示
-    @Test func freshUnknownWithoutReasonIsProbeFailed() {
-        let old = #"{"schemaVersion":1,"verdict":"unknown","checkedAt":"2027-01-15T08:00:00Z","egressFailures":{}}"#
-        let d = GuardStateReader.display(data: Data(old.utf8), now: ISO8601DateFormatter().date(from: "2027-01-15T08:00:03Z")!)
-        #expect(d == GuardDisplay(verdict: .unknown, checkedAt: ISO8601DateFormatter().date(from: "2027-01-15T08:00:00Z"),
-                                  reason: .fresh, unknownReason: .probeFailed, lastVerdict: .unknown))
-    }
-
-    /// 文件里 healthy 却带了 unknownReason（手改或格式错误）：不显示原因
-    @Test func reasonIsDroppedForOtherVerdicts() {
-        let odd = #"{"schemaVersion":1,"verdict":"healthy","unknownReason":"offline","checkedAt":"2027-01-15T08:00:00Z","egressFailures":{}}"#
-        let d = GuardStateReader.display(data: Data(odd.utf8), now: ISO8601DateFormatter().date(from: "2027-01-15T08:00:03Z")!)
-        #expect(d.verdict == .healthy && d.unknownReason == nil)
-    }
-
-    /// App 侧原因（过期、缺失、时钟跳变、解不开、新格式）不带 guardd 的原因，文字走「出口守卫没响应」
-    @Test func appSideReasonsCarryNoGuarddReason() throws {
-        #expect(read(try file(.unknown, path: nothing, age: 16)).unknownReason == nil)
-        #expect(read(try file(.unknown, path: nothing, age: 16)).reason == .stale)
-        #expect(read(try file(.unknown, path: nothing, age: -6)).unknownReason == nil)
-        #expect(read(nil).unknownReason == nil)
-        #expect(read(Data("{".utf8)).unknownReason == nil)
+    func otherVerdictsCarryNoReason(_ v: Verdict) {
+        #expect(display(v, path: nothing).unknownReason == nil)
     }
 }

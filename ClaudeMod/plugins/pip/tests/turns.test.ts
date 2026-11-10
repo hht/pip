@@ -2,7 +2,7 @@ import { expect, mock, test } from 'claude-code/testing'
 
 const FILE = '/Users/u/Library/Application Support/Notchkeeper/turns/s1.json'
 
-/** 给 mod 用到的调用打桩，返回它写过的每一份回合文件（解析成对象） */
+/** Stub calls used by mod, returning all turn files it wrote (parsed into objects) */
 function stubs(on) {
   const writes = []
   const clock = mock.clock(on, { now: 1000 })
@@ -24,7 +24,7 @@ function stubs(on) {
   return { writes, clock }
 }
 
-/** 走一步请求；测试借 model 字段指定这一步停在哪 */
+/** Execute one step; tests borrow model field to specify where step stops */
 async function step($, turnId, stopReason, agentId) {
   const stream = $.turn.step({ turnId, index: 0, model: stopReason, messageCount: 1, ...(agentId ? { agentId } : {}) })
   let s = await stream.next()
@@ -43,7 +43,7 @@ function spawn($, id, background) {
   return $.agent.spawn({ tool_use_id: id, prompt: '', description: '', subagentType: 'general-purpose', background })
 }
 
-test('主回合正常答完：写 reason、最后一步的 stopReason、结束时刻', async ($, on) => {
+test('primary turn normal completion: writes reason, final step stopReason, completion time', async ($, on) => {
   const { writes, clock } = stubs(on)
   await start($)
   await $.turn.start({ text: '', turnId: 't1' })
@@ -54,7 +54,7 @@ test('主回合正常答完：写 reason、最后一步的 stopReason、结束�
   expect(writes).toEqual([{ sessionId: 's1', ended: { turnId: 't1', reason: 'answer', lastStop: 'end_turn', backgroundAgents: 0, at: 1500 } }])
 })
 
-test('批准框里被拒：最后一步停在 tool_use', async ($, on) => {
+test('rejected at approval prompt: final step stops at tool_use', async ($, on) => {
   const { writes } = stubs(on)
   await start($)
   await $.turn.start({ text: '', turnId: 't1' })
@@ -63,7 +63,7 @@ test('批准框里被拒：最后一步停在 tool_use', async ($, on) => {
   expect(writes.at(-1).ended.lastStop).toBe('tool_use')
 })
 
-test('出错：照写 reason，一步都没走完时 lastStop 是 null', async ($, on) => {
+test('error: writes reason as usual; lastStop is null when no step ran', async ($, on) => {
   const { writes } = stubs(on)
   await start($)
   await $.turn.start({ text: '', turnId: 't1' })
@@ -71,7 +71,7 @@ test('出错：照写 reason，一步都没走完时 lastStop 是 null', async (
   expect(writes.at(-1).ended).toMatchObject({ reason: 'error', lastStop: null })
 })
 
-test('子 agent 的步骤不算主 agent 的最后一步', async ($, on) => {
+test('subagent steps do not count as primary agent final step', async ($, on) => {
   const { writes } = stubs(on)
   await start($)
   await $.turn.start({ text: '', turnId: 't1' })
@@ -81,7 +81,7 @@ test('子 agent 的步骤不算主 agent 的最后一步', async ($, on) => {
   expect(writes.at(-1).ended.lastStop).toBe('end_turn')
 })
 
-test('结束时还在跑的后台 agent 照记；前台子 agent 不算；子 agent 的回合不写', async ($, on) => {
+test('active background agents recorded; foreground subagents excluded; subagent turns not written', async ($, on) => {
   const { writes } = stubs(on)
   await start($)
   await $.turn.start({ text: '', turnId: 't1' })
@@ -91,13 +91,13 @@ test('结束时还在跑的后台 agent 照记；前台子 agent 不算；子 ag
   expect(writes.at(-1).ended.backgroundAgents).toBe(1)
   await complete($, 'x', 'answer', { agentId: 'bg' })
   expect(writes.length).toBe(1)
-  // 后台 agent 完成后送进来的通知回合
+  // Notification turn arriving after background agent completion
   await $.turn.start({ text: '', turnId: 't2' })
   await complete($, 't2', 'answer')
   expect(writes.at(-1).ended).toMatchObject({ turnId: 't2', backgroundAgents: 0 })
 })
 
-test('下一回合开始不清掉上一回合的记录（排队的消息）', async ($, on) => {
+test('next turn starting does not clear previous turn record (queued messages)', async ($, on) => {
   const { writes } = stubs(on)
   await start($)
   await $.turn.start({ text: '', turnId: 't1' })
@@ -107,7 +107,7 @@ test('下一回合开始不清掉上一回合的记录（排队的消息）', as
   expect(writes[0].ended.turnId).toBe('t1')
 })
 
-test('/clear 之后：后台 agent 和正在跑的回合都清掉', async ($, on) => {
+test('after /clear: background agents and running turns cleared', async ($, on) => {
   const { writes } = stubs(on)
   await start($)
   await $.turn.start({ text: '', turnId: 't1' })
@@ -120,7 +120,7 @@ test('/clear 之后：后台 agent 和正在跑的回合都清掉', async ($, on
   expect(writes.at(-1).ended.backgroundAgents).toBe(0)
 })
 
-test('非交互式会话（claude -p、SDK）不写', async ($, on) => {
+test('non-interactive sessions (claude -p, SDK) not written', async ($, on) => {
   const { writes } = stubs(on)
   await start($, false)
   await $.turn.start({ text: '', turnId: 't1' })
@@ -128,10 +128,22 @@ test('非交互式会话（claude -p、SDK）不写', async ($, on) => {
   expect(writes).toEqual([])
 })
 
-test('不写提示词和回答', async ($, on) => {
+test('never writes prompts or answers', async ($, on) => {
   const { writes } = stubs(on)
   await start($)
-  await $.turn.start({ text: '秘密提示词', turnId: 't1' })
-  await $.turn.complete({ turnId: 't1', answer: '秘密回答', durationMs: 1, isAborted: false, reason: 'answer', usage: null })
-  expect(JSON.stringify(writes)).not.toContain('秘密')
+  await $.turn.start({ text: 'secret prompt', turnId: 't1' })
+  await $.turn.complete({ turnId: 't1', answer: 'secret answer', durationMs: 1, isAborted: false, reason: 'answer', usage: null })
+  expect(JSON.stringify(writes)).not.toContain('secret')
+})
+
+test('subagent turn.start does not replace the running primary turn', async ($, on) => {
+  const { writes } = stubs(on)
+  await start($)
+  await $.turn.start({ text: '', turnId: 't1' })
+  await $.turn.start({ text: '', turnId: 'sub', agentId: 'a1' })
+  await spawn($, 'a1', true)
+  await step($, 'sub', 'tool_use', 'a1')
+  await step($, 't1', 'end_turn')
+  await complete($, 't1', 'answer')
+  expect(writes).toEqual([{ sessionId: 's1', ended: { turnId: 't1', reason: 'answer', lastStop: 'end_turn', backgroundAgents: 1, at: 1000 } }])
 })

@@ -12,18 +12,18 @@ private func read(_ mode: FirewallStatus.Mode, scope: FirewallRules.Scope? = .ev
                                                                    failedSteps: failed, checkedAt: now.addingTimeInterval(-ago))), now: now)
 }
 
-/// App 只信新鲜的状态摘要；只有正式规则、核对全过的 on 才算「已保护」（docs/firewall.md §2、§4）
+/// App only trusts fresh status summary; only official rules and fully-passed on count as "Protected" (docs/firewall.md §2, §4)
 @Suite struct FirewallReadingRules {
     @Test func protectedOnlyWhenOnFreshOfficialAndChecked() {
         #expect(read(.on) == .on(problem: nil))
         #expect(read(.on, scope: .testTable) == .on(problem: .testRules))
-        // scope 是 nil：换规则那一轮装失败，anchor 里不是这一份，不是测试规则
+        // scope is nil: rule reload failed in that round, anchor does not have this version, not test rules
         #expect(read(.on, scope: nil) == .on(problem: .rulesNotLoaded))
-        // 隧道网卡不在：Clash 没开 TUN 或网卡名填错，这时是全拦，单独说
+        // Tunnel interface missing: Clash TUN not enabled or interface name wrong; in this case everything is blocked, reported separately
         #expect(read(.on, check: noTunnel) == .on(problem: .tunnelMissing))
         let pfStopped = FirewallCheck(pfEnabled: false, anchorPointPresent: true, rulesLoaded: true, evaluations: 10, evaluationsGrowing: true, tunnelPresent: true)
         #expect(read(.on, check: pfStopped) == .on(problem: .checkFailed))
-        // 网卡不在、pf 也停了：什么都没在拦，不能说「全被拦下」
+        // Interface missing and pf stopped: nothing is blocked, cannot say "everything blocked"
         let pfStoppedNoTunnel = FirewallCheck(pfEnabled: false, anchorPointPresent: true, rulesLoaded: true, evaluations: 10, evaluationsGrowing: true, tunnelPresent: false)
         #expect(read(.on, check: pfStoppedNoTunnel) == .on(problem: .checkFailed))
         let emptyAnchorNoTunnel = FirewallCheck(pfEnabled: true, anchorPointPresent: true, rulesLoaded: false, evaluations: nil, evaluationsGrowing: nil, tunnelPresent: false)
@@ -38,30 +38,30 @@ private func read(_ mode: FirewallStatus.Mode, scope: FirewallRules.Scope? = .ev
         #expect(read(.trial) == .trial(endsAt: nil, problem: nil))
     }
 
-    /// 说开着的摘要 30 秒（3 轮）没更新：守护进程被卸、崩了，或恢复脚本刚跑过，说不清是开是关
+    /// Summary claiming open not updated for 30 seconds (3 rounds): daemon uninstalled, crashed, or rescue script just ran; status uncertain
     @Test(arguments: [FirewallStatus.Mode.trial, .on])
     func staleOpenSummaryIsUnknown(_ mode: FirewallStatus.Mode) {
         #expect(read(mode, ago: 31) == .unknown(.stale))
-        // 钟被往回调过：摘要的时刻在未来太远也不信
+        // Clock dialed backward: summary timestamp too far in future is not trusted either
         #expect(read(mode, ago: -31) == .unknown(.stale))
         #expect(read(mode, ago: 29) != .unknown(.stale))
         #expect(read(mode, ago: 30) != .unknown(.stale))
     }
 
-    /// off 时守护进程本来就不跑：不看新不新鲜
+    /// Daemon does not run when off: freshness ignored
     @Test func offIgnoresFreshness() {
         #expect(read(.off, check: nil, ago: 3600) == .off(problem: nil))
     }
 
-    /// 清规则、释放引用失败了：关着也可能还在拦，要让人看见
+    /// Flushing rules or releasing references failed: may still block while off, must be visible
     @Test func failedStepsAreShown() {
         #expect(read(.off, check: nil, failed: [.flush]) == .off(problem: .failedSteps))
-        // 关着时只是释放引用没做成：规则已经清了，多留一个引用不影响上网，守护进程也不再跑
+        // When off, failing only to release reference: rules already flushed, leftover reference does not affect connectivity, daemon no longer runs
         #expect(read(.off, check: nil, failed: [.release]) == .off(problem: nil))
         #expect(read(.on, failed: [.load]) == .on(problem: .failedSteps))
     }
 
-    /// 「保留」只在试运行一切正常时给：网卡不在时外网全被拦，这时保留就是把断网锁成重启也在。测试规则不算保护，但照样能保留
+    /// "Keep" offered only when trial is completely healthy: missing interface blocks external network, keeping it would persist blackout across reboots. Test rules do not count as protected, but can still be kept
     @Test func keepOnlyWhenTrialIsHealthy() {
         #expect(read(.trial).canKeep)
         #expect(read(.trial, scope: .testTable).canKeep)
@@ -73,7 +73,7 @@ private func read(_ mode: FirewallStatus.Mode, scope: FirewallRules.Scope? = .ev
         #expect(!read(.trial, ago: 31).canKeep)
     }
 
-    /// 开关打开：试运行、开着，和说不清的时候，让人能点「关」。还没有摘要也算说不清：守护进程可能在拦、只是摘要写不进去
+    /// Switch toggled on: in trial, on, and uncertain states, allowing user to click "Off". Missing summary is also uncertain: daemon may be blocking while failing to write summary
     @Test func switchedOn() {
         #expect(read(.trial).switchedOn && read(.on, check: noTunnel).switchedOn)
         #expect(FirewallReading(installed: true, summary: .missing, now: now).switchedOn)
@@ -85,18 +85,18 @@ private func read(_ mode: FirewallStatus.Mode, scope: FirewallRules.Scope? = .ev
 
     @Test func boundaryCases() {
         #expect(FirewallReading(installed: false, summary: .missing, now: now) == .notInstalled)
-        // 刚装上、第一轮还没写；或者恢复脚本删到一半
+        // Freshly installed, first round not written yet; or rescue script partially cleaned up
         #expect(FirewallReading(installed: true, summary: .missing, now: now) == .unknown(.noSummary))
         #expect(FirewallReading(installed: true, summary: .unreadable, now: now) == .unknown(.unreadable))
-        // 读不出状态文件时守护进程按 off 办、清了规则：开关该是关的，不然点「关」没反应
+        // When state file unreadable, daemon treated as off and flushed rules: switch should be off, otherwise clicking "Off" has no effect
         #expect(read(.stateUnreadable) == .off(problem: .stateUnreadable))
-        // 没装但还剩一份摘要（卸到一半）：按装着办，让人能看见、能再卸一次
+        // Not installed but leftover summary exists (partially uninstalled): treat as installed so user can see it and retry uninstall
         #expect(FirewallReading(installed: false, summary: .read(FirewallStatus(mode: .on, scope: .everyone, check: passed, checkedAt: now)), now: now)
                 == .on(problem: nil))
     }
 }
 
-/// 实机（测试规则、保留之后）守护进程写下的一份摘要原文：格式和判读都对得上
+/// Actual verbatim summary written by daemon on real machine (test rules, after keep): format and interpretation match
 @Suite struct FirewallReadingRealSummary {
     @Test func testRulesOnIsNotProtected() throws {
         let json = #"{"check":{"anchorPointPresent":true,"evaluations":40851,"evaluationsGrowing":true,"pfEnabled":true,"rulesLoaded":true,"tunnelPresent":true},"checkedAt":"2026-11-01T00:46:05Z","failedSteps":[],"mode":"on","scope":"testTable"}"#
@@ -109,17 +109,17 @@ private func read(_ mode: FirewallStatus.Mode, scope: FirewallRules.Scope? = .ev
     }
 }
 
-/// 开启、保留、关闭之后，什么时候开关能照摘要显示：摘要只精确到秒，关闭后守护进程跑完那一轮就退出
+/// When switch reflects summary after enable, keep, disable: summary precision is seconds, daemon exits after finishing round on disable
 @Suite struct FirewallCommandSettling {
-    /// 从点下开始算（密码框要好几秒），摘要是之后那一轮写的就信
+    /// Counted from click time (password prompt takes seconds), summary written in subsequent round is trusted
     @Test func summaryAfterCommandStartSettles() {
         let started = Date(timeIntervalSince1970: 1_800_000_000.6)
-        let round = Date(timeIntervalSince1970: 1_800_000_004) // 只精确到秒
+        let round = Date(timeIntervalSince1970: 1_800_000_004) // Second precision only
         #expect(FirewallReading.settled(checkedAt: round, commandStarted: started, now: round.addingTimeInterval(0.5)))
         #expect(!FirewallReading.settled(checkedAt: Date(timeIntervalSince1970: 1_800_000_000), commandStarted: started, now: round))
     }
 
-    /// 守护进程没起来：等满 3 轮就照摘要显示，开关不会一直锁着
+    /// Daemon failed to start: settles after 3 rounds, switch will not stay locked indefinitely
     @Test func givesUpAfterFreshness() {
         let started = Date(timeIntervalSince1970: 1_800_000_000)
         #expect(!FirewallReading.settled(checkedAt: nil, commandStarted: started, now: started.addingTimeInterval(29)))

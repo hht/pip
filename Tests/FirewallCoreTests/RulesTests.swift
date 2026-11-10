@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import FirewallCore
 
-/// docs/firewall.md §4 的规则草稿，逐字抄来，是正式规则的标准答案；改规则先改文档
+/// Draft rules in docs/firewall.md §4, transcribed verbatim as the canonical standard for production rules; edit doc before changing rules
 private let documentedRules = """
 tun  = "utun1024"
 lan4 = "{ 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16 }"
@@ -37,8 +37,8 @@ private let directory = "/Library/Application Support/Notchkeeper"
         #expect(FirewallRules(tunnel: "utun1024", directory: directory)?.text == documentedRules)
     }
 
-    /// 网卡名原样拼进 root 加载的规则，只收 `utun` 加数字。物理网卡（en0）、网桥（bridge0）也是真网卡：
-    /// 填了它，第一条 `pass quick on $tun` 就把物理网卡上的流量全放行，核对「TUN 网卡在」照样过
+    /// Interface name is interpolated directly into rules loaded as root, only accepts utun followed by digits. Physical interfaces (en0) or bridges (bridge0) are also real interfaces:
+    /// If allowed, the first pass quick on $tun would allow all traffic on the physical interface while check for "TUN interface present" still passes
     @Test(arguments: ["", "utun", "1024", "utun 1024", "utun1024\"", "utun1024\nblock all", "UTUN1024", "utun1024}", "u\u{301}tun0",
                       "en0", "en1", "bridge0", "lo0", "awdl0", "xutun0", "utun1\u{301}"])
     func rejectsNonTunnelNames(_ name: String) {
@@ -50,7 +50,7 @@ private let directory = "/Library/Application Support/Notchkeeper"
         #expect(FirewallRules(tunnel: name, directory: directory) != nil)
     }
 
-    /// 测试规则（docs/firewall.md §7「测试时不能真的断网」）：多一张测试表，三条 block 改成只拦去（来自）测试表的流量，其余逐字和正式规则一样
+    /// Test rules (docs/firewall.md §7 "Tests must not disrupt network"): includes additional test table, 3 block rules modified to only block traffic to/from test table, rest verbatim matches production rules
     @Test func testRulesBlockOnlyTheTestTable() {
         let expected = documentedRules
             .replacingOccurrences(of: "tun  = \"utun1024\"", with: "tun  = \"utun9999\"")
@@ -64,7 +64,7 @@ private let directory = "/Library/Application Support/Notchkeeper"
         #expect(FirewallRules(tunnel: "utun9999", scope: .testTable, directory: directory)?.text == expected)
     }
 
-    /// `user` / `group` 让 pf 在内核里死锁、只能重启（docs/firewall.md §5）：哪种规则里都不能出现
+    /// user / group cause kernel deadlock in pf requiring reboot (docs/firewall.md §5): must never appear in any rules
     @Test(arguments: [FirewallRules.Scope.everyone, .testTable])
     func rulesNeverMatchOnUserOrGroup(_ scope: FirewallRules.Scope) throws {
         let words = try #require(FirewallRules(tunnel: "utun1024", scope: scope, directory: directory)).text
@@ -73,8 +73,8 @@ private let directory = "/Library/Application Support/Notchkeeper"
         #expect(!words.contains("group"))
     }
 
-    /// 系统的 pfctl 只解析不加载（`-n` 不要 root），抓语法错误；它认不认得出坏规则，第二条用例自证。
-    /// `-n` 也读表文件，所以放进临时目录
+    /// System pfctl validates parsing without loading (-n does not need root) to catch syntax errors; whether it catches bad rules is proven by second test case.
+    /// -n still reads table files, so written into temporary directory
     @Test(arguments: [FirewallRules.Scope.everyone, .testTable])
     func pfctlParsesTheRules(_ scope: FirewallRules.Scope) throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("rules-\(UUID().uuidString)")

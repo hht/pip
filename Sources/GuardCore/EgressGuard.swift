@@ -1,22 +1,22 @@
 import Foundation
 
-/// 回答：根据一轮观测，出口现在是 healthy、egressMismatch、unknown 还是 violated。
-/// 不知道观测从哪来（Clash 进程、路由表、HTTP 探针都在外层），也不知道判定结果拿去做什么。
+/// Answers: based on a round of observations, is egress healthy, egressMismatch, unknown, or violated.
+/// Agnostic of observation sources (Clash process, routing table, HTTP probes live outside), and agnostic of downstream usage.
 ///
-/// 规则（完整说明见 docs/egress-guard.md）：守卫只监测，不拦截；拦截归防火墙（docs/firewall.md）。
-/// 1. 去往公网的路由不走 utun（见 GuardProbes.RouteProbe，不是默认路由）→ 立即 violated（红卡）。
-/// 2. 探针拿到不在允许列表的 IP → egressMismatch：只亮琥珀色。回显服务可能被 Clash 分到和
-///    别的 App 不同的节点，这个信号只是间接证据。允许列表为空是配置问题，IP 一律算未知。
-/// 3. Clash 在、路由走 utun、IP 都在允许列表，三者都成立才 healthy；其余（Clash 不在、读不到路由、
-///    探针全超时）→ unknown。Clash 不在但路由和 IP 正常时流量并没有漏出去。
-/// 4. violated 是粘性的：只有一轮完整的 healthy 才能解除。断网时探针全失败，不能因此撤掉红卡。
-///    粘性跨进程：guardd 重启时用 `init(resuming:)` 从上一份 violated 状态文件接续（见 docs/egress-guard.md「guardd」一节）。
+/// Rules (detailed in docs/egress-guard.md): guard monitors only, never blocks; blocking belongs to firewall (docs/firewall.md).
+/// 1. Public route not traversing utun (GuardProbes.RouteProbe, not default route) -> immediately violated (red card).
+/// 2. Probes observe IP not in allowed list -> egressMismatch: solid amber. Echo services may be routed by Clash to different nodes,
+///    acting as indirect evidence only. Empty allowed list is a configuration issue, treating IP as unknown.
+/// 3. Clash running, route traverses utun, and all IPs in allowed list -> healthy; otherwise (Clash absent, route unreadable,
+///    probes timed out) -> unknown. If Clash is absent but route and IP are normal, no traffic leaked.
+/// 4. violated is sticky: cleared only by a full round of healthy. Probe failures during disconnection never dismiss red card.
+///    Stickiness applies within current App run only: App restart starts at unknown, and if route still bypasses utun, next round evaluates violated.
 
-/// 一轮观测。`nil` 表示这一路没拿到结果，即「未知」，不是「正常」。
+/// A single round of observations. `nil` represents missing results, i.e. "unknown", not "normal".
 public struct Observation: Sendable {
     public var clashRunning: Bool?
     public var routeInterface: String?
-    /// 各探针拿到的出口 IP；失败的探针不放进来。
+    /// Egress IPs obtained by probes; failed probes are omitted.
     public var egressIPs: [IPv4]
 
     public init(clashRunning: Bool?, routeInterface: String?, egressIPs: [IPv4]) {
@@ -25,18 +25,18 @@ public struct Observation: Sendable {
         self.egressIPs = egressIPs
     }
 
-    /// 路由走没走 utun；`nil` 是没读到路由。
+    /// Whether route traverses utun; `nil` means route unreadable.
     public var routeOnTunnel: Bool? { routeInterface.map { $0.hasPrefix("utun") } }
 
-    /// 拿到的 IP 是否全在允许列表；没拿到 IP、或允许列表为空（配置问题）都是 `nil`（未知）。
+    /// Whether obtained IPs are all in allowed list; missing IPs or empty allowed list evaluate to `nil` (unknown).
     public func egressMatches(_ allowlist: Set<IPv4>) -> Bool? {
         guard !allowlist.isEmpty, !egressIPs.isEmpty else { return nil }
         return egressIPs.allSatisfy(allowlist.contains)
     }
 
-    /// 这一轮报给 App 显示的出口 IP（状态文件的 `egressIP`）；没拿到 IP 是 `nil`，绝不拿上一轮的补。
-    /// 有不在允许列表的就只从这些里挑（出口不符时显示的是不符的那个）；回显服务说法不一时取出现次数最多的，
-    /// 一样多取数值最小的，和探针返回的先后无关。只用于显示，不参与判定。
+    /// Egress IP reported to App for display this round (`GuardDisplay.egressIP`); `nil` if not obtained, never carrying over previous round.
+    /// If disallowed IPs exist, picks among those; picks most frequent on divergence, lowest numeric on tie, invariant to probe arrival order.
+    /// Display only, non-participating in verdict.
     public func shownEgressIP(allowlist: Set<IPv4>) -> IPv4? {
         let outside = egressIPs.filter { !allowlist.contains($0) }
         let counts = Dictionary((outside.isEmpty ? egressIPs : outside).map { ($0, 1) }, uniquingKeysWith: +)
@@ -48,31 +48,22 @@ public struct Observation: Sendable {
 
 public enum Verdict: String, Codable, Sendable, Equatable {
     case healthy
-    /// 出口 IP 不在允许列表（规则 2）
+    /// Egress IP not in allowed list (Rule 2)
     case egressMismatch
     case unknown
-    /// 路由不走 utun（规则 1）
+    /// Route not traversing utun (Rule 1)
     case violated
 }
 
 public struct EgressGuard: Sendable {
     public private(set) var verdict: Verdict = .unknown
-    /// 这次违规从哪一轮开始：进入 violated 的那一轮设上，粘住期间不变，healthy 解除时清空。只有 violated 时才有。
-    /// App 用它区分「同一次违规」和「新的一次」（用户关掉红卡记的是它）。
+    /// Round when violation began: set upon entering violated, invariant while sticky, cleared on healthy. Present only when violated.
+    /// App uses it to distinguish the same violation incident from a new one.
     public private(set) var violatedSince: Date?
 
     public init() {}
 
-    /// 重启接续：上一份状态是 violated 时从 violated 开始，`violatedSince` 沿用原值（文件缺这个键就用那份的 `checkedAt`）。
-    /// 不看新旧：只有一轮 healthy 能解除，停了多久都一样。其他 verdict、`nil`（没有可信的上一份）都从头开始。
-    /// 只取 verdict 和 `violatedSince`；`egressIP` 等观测值不接续，下一轮按自己的观测重写。
-    public init(resuming previous: GuardState?) {
-        guard let previous, previous.verdict == .violated else { return }
-        verdict = .violated
-        violatedSince = previous.violatedSince ?? previous.checkedAt
-    }
-
-    /// `now` 只用来记 `violatedSince`，不影响判定。
+    /// `now` used only to record `violatedSince`, non-participating in verdict evaluation.
     public mutating func observe(_ o: Observation, allowlist: Set<IPv4>, at now: Date = Date()) -> Verdict {
         let route = o.routeOnTunnel, egress = o.egressMatches(allowlist)
         let next: Verdict
@@ -86,8 +77,8 @@ public struct EgressGuard: Sendable {
             next = .unknown
         }
 
-        if verdict == .violated, next != .healthy { return verdict } // 规则 4
-        violatedSince = next == .violated ? now : nil // 粘住时上面已经返回，这里的 violated 一定是新的一次
+        if verdict == .violated, next != .healthy { return verdict } // Rule 4
+        violatedSince = next == .violated ? now : nil // Sticky violation returns above; violated here is always a fresh incident
         verdict = next
         return verdict
     }

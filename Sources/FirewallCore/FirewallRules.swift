@@ -1,31 +1,31 @@
-/// 回答：本 anchor 里装什么规则。照搬 Mullvad 的 macOS pf 规则，偏差和原因见 docs/firewall.md §4。
-/// 不知道规则怎么装进 pf、装没装上，也不知道放行表里有什么。
+/// Answers: what rules are loaded into this anchor. Modeled after Mullvad's macOS pf rules; differences and rationale documented in docs/firewall.md §4.
+/// Unaware of how rules are loaded into pf, whether loading succeeded, or table contents.
 /// @see https://github.com/mullvad/mullvadvpn-app/blob/33a63e2916adf294d3b4332c4274e2aa1cb1f811/talpid-core/src/firewall/macos.rs
 public struct FirewallRules: Equatable, Sendable {
-    /// 交给 `pfctl -a <anchor> -f -` 的全文
+    /// Full text piped into `pfctl -a <anchor> -f -`
     public let text: String
 
-    /// block 拦谁
+    /// Targets of block rules
     public enum Scope: String, Codable, Sendable {
-        /// 正式规则：除隧道、局域网和两张放行表外一律拦
+        /// Production rules: blocks all traffic except tunnel, LAN, and the two allow tables
         case everyone
-        /// 测试规则：block 只拦去（来自）测试表 `<test>` 的流量，其余照常上网，测试时不真的断网（docs/firewall.md §7）
+        /// Test rules: block only targets traffic to/from test table `<test>`, leaving normal traffic unaffected during tests (docs/firewall.md §7)
         case testTable
     }
 
-    /// 两张放行表和测试表的文件名（在 `directory` 下）；恢复脚本和安装脚本里也有，改了一起改
+    /// File names of the two allow tables and test table (under `directory`); also referenced in rescue and install scripts, sync if modified
     public static let clashTableFile = "clash.table", cnTableFile = "cn.table", testTableFile = "test.table"
 
-    /// `tunnel` 是 Clash 的 TUN 网卡名；会原样拼进 root 加载的规则，只收 `utun` 加数字（macOS 的 TUN 网卡都叫 utunN），别的返回 `nil`。
-    /// 填成真实存在的物理网卡（en0）时第一条 `pass quick on $tun` 会把它上面的流量全放行，核对还照样过，所以不能只看像不像网卡名。
-    /// `directory` 是放行表文件所在的目录（root 0755，docs/firewall.md §4）。
-    /// 哪种规则都不写 `user` / `group`：它们让 pf 在内核里死锁、只能重启（§5）
+    /// `tunnel` is Clash's TUN interface name. Interpolated directly into rules loaded as root; only accepts `utun` followed by digits (macOS TUN interfaces are named utunN), returns `nil` otherwise.
+    /// Setting to a real physical interface (e.g. en0) would cause the first `pass quick on $tun` to pass all traffic on it while checks still pass, so verifying interface name prefix alone is insufficient.
+    /// `directory` is the directory containing table files (root 0755, docs/firewall.md §4).
+    /// Neither rule variant specifies `user` / `group`: they trigger kernel deadlocks in pf requiring reboot (§5).
     public init?(tunnel: String, scope: Scope = .everyone, directory: String) {
-        // 按 Unicode 标量比：按 Character 比时「1」后面跟一个组合符号也算数字
+        // Compare by Unicode scalar: Character comparison treats '1' followed by combining characters as numeric
         let digits = tunnel.unicodeScalars.dropFirst(4)
         guard tunnel.hasPrefix("utun"), !digits.isEmpty, digits.allSatisfy({ ("0"..."9").contains($0) }) else { return nil }
-        // 目录是调用方写死的常量，带引号或换行就是代码写错了
-        guard !directory.contains(where: { $0 == "\"" || $0.isNewline }) else { preconditionFailure("表目录不能带引号或换行") }
+        // Directory is a hardcoded constant passed by caller; containing quotes or newlines indicates programmer error
+        guard !directory.contains(where: { $0 == "\"" || $0.isNewline }) else { preconditionFailure("Table directory must not contain quotes or newlines") }
         let test = scope == .testTable
         let table = { (name: String, file: String) in "table <\(name)> file \"\(directory)/\(file)\"\n" }
         text = """

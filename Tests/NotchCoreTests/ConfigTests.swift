@@ -2,7 +2,7 @@ import Foundation
 import Testing
 import NotchCore
 
-/// 插件的设置（docs/ui.md「面板布局」）：缺省都开着、每段最多露 5 行，常驻插件是出口守卫
+/// Plugin configuration (docs/ui.md "Panel Layout"): default enabled, up to 5 rows per section, resident plugin is egress guard
 @Suite struct PluginConfig {
     private func decode(_ json: String) throws -> Config { try JSONDecoder().decode(Config.self, from: Data(json.utf8)) }
 
@@ -13,7 +13,7 @@ import NotchCore
         #expect(c.residentPlugin == "guard" && c.showsEarMascot && c.pluginOrder.isEmpty)
     }
 
-    /// 缺字段用默认值；行数压在 1…5
+    /// Missing fields use defaults; row counts clamped to 1...5
     @Test func partialEntries() throws {
         let c = try decode(#"{"plugins":{"claude":{"enabled":false},"terminal":{"maxRows":9},"dl":{"maxRows":0}}}"#)
         #expect(!c.isEnabled("claude") && c.maxRows("claude") == 5)
@@ -21,13 +21,13 @@ import NotchCore
         #expect(c.maxRows("dl") == 1)
     }
 
-    /// 空串是不常驻
+    /// Empty string means no resident plugin
     @Test func noResident() throws {
         #expect(try decode(#"{"residentPlugin":""}"#).resident == nil)
         #expect(Config().resident == "guard")
     }
 
-    /// 段的顺序：用户排过的在前，没排过的按给的默认顺序跟在后面；排过但已经没了的不出现
+    /// Section order: ranked sections first, unranked follow in default order; non-existent plugins omitted
     @Test func sectionOrder() throws {
         let c = try decode(#"{"pluginOrder":["terminal","gone","claude"]}"#)
         #expect(c.ordered(["claude", "dl", "terminal"]) == ["terminal", "claude", "dl"])

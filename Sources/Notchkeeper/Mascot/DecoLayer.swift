@@ -1,15 +1,15 @@
 import QuartzCore
 import MascotCore
 
-/// 一组装饰：每块部件一层、各自的锚点，以及进出场。同一份装饰既挂在 Pip 右上角，也原样挂到收起态的右耳
-/// （40pt 的装饰和右耳图标一样大，都是 1 画布单位 = 2pt，docs/mascot.md §2「右耳指示」）。
-/// 不知道部件怎么循环（`Choreography.loop` 按下标点名，由持有它的视图提交）。
+/// A group of decorations: one layer per part, respective anchor points, and entry/exit transitions. The same decoration mounts on Pip top-right and on retracted right ear
+/// (40pt decoration matches right ear icon scale: 1 canvas unit = 2pt, docs/mascot.md §2 "Right Ear Indicator").
+/// Agnostic to part looping (`Choreography.loop` targets indices, committed by the hosting view).
 @MainActor
 final class DecoLayer {
     let layer = CALayer()
     private(set) var parts: [CAShapeLayer] = []
 
-    /// map：画布坐标 → 父层坐标；unit：1 画布单位多少 pt（描边宽要换算）；center：整组缩放的中心（画布坐标）
+    /// map: canvas coordinates -> parent layer coordinates; unit: points per canvas unit (stroke width converted); center: group scale center (canvas coords).
     init(_ deco: [DecoPart], in parent: CALayer, center: CGPoint, map: CGAffineTransform, unit: CGFloat, scale: CGFloat) {
         func mount(_ l: CALayer, in p: CALayer, anchor: CGPoint) {
             let a = anchor.applying(map)
@@ -28,7 +28,7 @@ final class DecoLayer {
         }
     }
 
-    /// 旧装饰缩小淡出（ease-in），播完拿掉。淡出被撤掉（变得看不见）时 completion 也会调，旧装饰不会留下
+    /// Old decoration scales down and fades out (ease-in), removed upon completion. Completion block runs even when animation is removed, ensuring cleanup.
     /// @see https://developer.apple.com/documentation/quartzcore/catransaction/setcompletionblock(_:)
     func exit(_ c: LookChange, animated: Bool) {
         let l = layer
@@ -55,7 +55,7 @@ final class DecoLayer {
         CATransaction.commit()
     }
 
-    /// 延迟一会儿弹出：弹簧从 0.4 放大到 1（照 SF Symbols 的 Replace 效果），同时淡入
+    /// Pops up after brief delay: spring scales from 0.4 up to 1 (matching SF Symbols Replace effect), while fading in.
     /// @see https://developer.apple.com/videos/play/wwdc2023/10258/
     func enter(_ c: LookChange) {
         let begin = layer.convertTime(CACurrentMediaTime(), from: nil) + c.decoEnterDelay

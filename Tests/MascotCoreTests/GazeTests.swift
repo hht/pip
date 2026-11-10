@@ -7,7 +7,7 @@ private let deg = Double.pi / 180
 @Suite struct GazeTests {
     private func gaze(_ x: CGFloat, _ y: CGFloat) -> Gaze { Gaze(toward: CGVector(dx: x, dy: y)) }
 
-    /// docs/mascot.md §5「跟随鼠标」：两轴各自线性，yaw 25° × dx / 400，pitch 20° × dy / 400（dy 向上为正）
+    /// docs/mascot.md §5 "Follow mouse": linear per axis, yaw 25° * dx / 400, pitch 20° * dy / 400 (dy positive upwards)
     @Test func linearPerAxis() {
         #expect(abs(gaze(200, 0).yaw - 12.5 * deg) < 1e-9 && gaze(200, 0).pitch == 0)
         #expect(abs(gaze(0, -200).pitch - 10 * deg) < 1e-9)
@@ -15,14 +15,14 @@ private let deg = Double.pi / 180
         #expect(gaze(-400, 0).yaw == -25 * deg)
     }
 
-    /// 超过 400pt 停在最大角度，不跳回正
+    /// Clamps at maximum angle beyond 400pt, without jumping back to center
     @Test func clampsBeyondReach() {
         #expect(gaze(401, 0).yaw == 25 * deg)
         #expect(gaze(5000, -5000) == gaze(400, -400))
         #expect(gaze(0, 900).pitch == -20 * deg)
     }
 
-    /// 取整到 0.5°：鼠标挪一两个点结果不变，App 就不重新提交动画
+    /// Quantized to 0.5°: small movements of 1-2 points keep result constant, preventing App from resubmitting animations
     @Test func quantized() {
         #expect(gaze(200, 40) == gaze(201, 40.5))
         for x in stride(from: -390.0, through: 390, by: 7) {

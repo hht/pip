@@ -1,84 +1,84 @@
-# agent 状态：从哪读、什么时候提醒
+# Agent State: Where to Read, When to Alert
 
-只接 Claude Code（用户定；Grok 本机只有 `desktop-status.json` 的 `inflightCount`，分不出会话）：工作中、已停止、需要你介入，外加回合怎么结束的（做完、出错、被你取消）。判定归 `AgentCore`；读文件、监听、查进程在 App 外层。
+Only integrates with Claude Code (user decision; local Grok only provides `inflightCount` in `desktop-status.json`, unable to distinguish sessions): working, stopped, needs you, plus how the turn ended (done, failed, canceled). Verdicts belong to `AgentCore`; file reading, watching, and process queries belong to outer App layers.
 
-## 两个来源
+## Two Sources
 
-| 来源 | 谁写 | 管什么 |
+| Source | Written by | Concerns |
 |---|---|---|
-| `~/.claude/sessions/<pid>.json` | Claude Code | 有哪些会话、此刻状态、进程在不在、`sessionId` |
-| `~/Library/Application Support/Notchkeeper/turns/<sessionId>.json` | 自带的 mod（「Notchkeeper mod」） | 最近一次结束的主回合 |
+| `~/.claude/sessions/<pid>.json` | Claude Code | Active sessions, current state, process liveness, `sessionId` |
+| `~/Library/Application Support/Notchkeeper/turns/<sessionId>.json` | Built-in mod ("Pip mod") | Most recently ended primary turn |
 
-按 `sessionId` 对上。**回合结束只看 mod**，sessions 文件只管此刻的状态：它分不出 API 出错、Esc、拒绝批准（都只是变 `idle`），后台 agent 完成、排队消息开始时还会闪一下 `idle`（「实测」7）。
+Matched by `sessionId`. **Turn completion is determined solely by mod**; session files only reflect current state: unable to distinguish API errors, Esc, and rejected approvals (all become `idle`), and briefly flashes `idle` when background agents complete or queued messages begin ("Real-Device Testing" 7).
 
-- 用 mod，不用 settings.json 的 hooks（用户定）：hooks 每个事件起一个进程，Esc 打断时 `Stop` 不触发。
-- 没装 mod 或这个会话没加载 mod（没信任、`--bare`、`--safe-mode`、组织策略）：照常显示忙闲和介入，**不弹完成卡、出错卡**，不按 `idle` 猜。
-- 不用 `claude agents --json`：和 sessions 文件一样粗，每次 0.4s。
+- Uses mod, not settings.json hooks (user decision): hooks spawn a process per event, and `Stop` fails to fire when interrupted via Esc.
+- Sessions without mod installed or loaded (untrusted, `--bare`, `--safe-mode`, enterprise policy): display busy/idle and intervention normally, **never pop done or error cards**, and do not guess based on `idle`.
+- Do not use `claude agents --json`: coarse like session files, costs 0.4s per run.
 
-### sessions 文件只取这些字段
+### Session Files Read Only These Fields
 
-| 字段 | 用途 |
+| Field | Purpose |
 |---|---|
-| `pid`、`procStart` | 认进程，防 pid 复用 |
-| `sessionId` | 对上回合文件；会拼进要删的路径，不是 UUID 的整份按解不开处理 |
-| `kind`、`entrypoint` | 只看 `interactive` + `cli`，即终端里的 `claude`（用户定，「实测」1） |
-| `status` | 状态；还没有这个字段的是刚起来的会话，先不看 |
-| `waitingFor` | 等你回答还是等你批准 |
-| `statusUpdatedAt` | 状态从什么时候开始 |
-| `cwd` | 会话行显示路径；跳转 Ghostty 找窗口 |
+| `pid`, `procStart` | Process identity, protects against pid reuse |
+| `sessionId` | Matches turn file; concatenated into deletion paths, treated as undecodable if not a valid UUID |
+| `kind`, `entrypoint` | Accepts only `interactive` + `cli`, i.e., terminal `claude` (user decision, "Real-Device Testing" 1) |
+| `status` | State; newly started sessions without this field are ignored until populated |
+| `waitingFor` | Waiting for answer vs. waiting for approval |
+| `statusUpdatedAt` | Timestamp when current state began |
+| `cwd` | Path shown in session row; used to locate Ghostty window on jump |
 
-`name` 不读：可能是从对话推出来的，也和 Ghostty 标题对不上。
+`name` is not read: may be inferred from conversation and diverges from Ghostty title.
 
-## 状态
+## States
 
-| `status` | 状态 | 造型（`docs/mascot.md` §2） |
+| `status` | State | Mascot Look (`docs/mascot.md` §2) |
 |---|---|---|
-| `busy` | 工作中 | working；满 10 分钟变 longTurn |
-| `idle`、`shell` | 已停止（`shell` = 空闲但挂着后台 shell，「实测」6） | — |
-| `waiting` | 需要你介入 | 照 Claude Code 自己的归类（「实测」3）：`permission prompt`、`sandbox request`、`worker request`、`goal proposal` → approval；其余和没见过的 → question |
+| `busy` | working | working; becomes longTurn at 10 minutes |
+| `idle`, `shell` | stopped (`shell` = idle with background shell, "Real-Device Testing" 6) | — |
+| `waiting` | needsYou | Follows Claude Code's classification ("Real-Device Testing" 3): `permission prompt`, `sandbox request`, `worker request`, `goal proposal` → approval; others and unseen values → question |
 
-- 主回合结束、后台 agent 还在跑时，`status` 一直是 `busy`。
-- **回合**：Claude 回应一条消息（你发的，或后台 agent 完成送进来的通知）的全过程，由 mod 的 `turn.start` / `turn.complete` 界定；带 `agentId` 的是子 agent，不算。
-- **干了很久**：从已停止进入工作中起满 10 分钟（中间等你的时间也算），回到已停止清零。
-- **中途接手**（App 启动或第一次看到某个文件时已在工作中 / 需要你介入）：以 `statusUpdatedAt` 作为开始；不补弹介入卡、不补响。App 开始看之前就结束的回合（比 `at`）不补弹；之后结束的照常提醒。
+- When main turn ends while background agents are running, `status` remains `busy`.
+- **Turn**: entire process of Claude responding to a message (user prompt or background agent completion notice), bounded by mod's `turn.start` / `turn.complete`; events with `agentId` are subagents and do not count.
+- **Long turn**: working for 10 consecutive minutes since entering working from stopped (including waiting time), resets upon returning to stopped.
+- **Mid-turn takeover** (App starts or first observes a file already in working / needsYou): begins from `statusUpdatedAt`; suppresses intervention cards and sounds. Turns ending before App begins observing (compared against `at`) are suppressed; subsequent turn ends alert as normal.
 
-### 回合怎么结束的
+### How Turns End
 
-回合文件里 `turnId` 变了就算一次回合结束：
+A turn end occurs when `turnId` changes in turn file:
 
-| `reason` | 最后一步 `stopReason` | 结局 | 提醒 |
+| `reason` | Last Step `stopReason` | Outcome | Alert |
 |---|---|---|---|
-| `answer` | 不是 `tool_use` | 做完 | 后台 agent 数为 0：完成卡 + `Glass`；不为 0：等它们完成后那个回合结束再提醒 |
-| `answer` | `tool_use` | 取消（在批准框拒绝） | 无 |
-| `aborted` | — | 取消（Esc） | 无 |
-| `error`、`refusal` | — | 出错 | 出错卡 + `Funk`，不管后台 agent |
+| `answer` | not `tool_use` | done | Background agent count 0: done card + `Glass`; > 0: alert after subsequent turn ends when they finish |
+| `answer` | `tool_use` | canceled (rejected at prompt) | None |
+| `aborted` | — | canceled (Esc) | None |
+| `error`, `refusal` | — | failed | Error card + `Funk`, irrespective of background agents |
 
-- `reason` 的取值出自 Claude Code 的类型定义 `TurnCompleteReason`。正常回答最后一步一定是 `end_turn` / `max_tokens` / `stop_sequence`；停在 `tool_use` 说明工具结果之后没再请求模型。
-- 排队消息：上一回合照常提醒；下一回合开始时 mod 不动回合文件，App 晚一点读也看得到。
-- 两次读之间同一会话结束两个回合，只看得到后一个（推断）。
-- 回合文件比 sessions 文件先到（`/clear` 后 sessions 还是旧 `sessionId`）：先不记，下次会话对上再算。
-- `/clear` 换掉的旧 `sessionId` 的读过记录留着：`--resume <旧 id>` 回来时不补弹。
-- 两个终端 `--resume` 同一会话：提醒挂哪个进程不固定（少见，不处理）。
+- Values for `reason` come from Claude Code type definitions `TurnCompleteReason`. Normal responses end with `end_turn` / `max_tokens` / `stop_sequence`; stopping at `tool_use` indicates no further model query followed tool result.
+- Queued messages: previous turn alerts normally; mod does not touch turn file when next turn begins, visible even if App reads slightly later.
+- If two turns complete between reads on the same session, only the latter is observed (inference).
+- Turn file arrives before session file (`/clear` leaves old `sessionId` in sessions): defer recording until session catches up.
+- Seen records of old `sessionId` replaced by `/clear` are retained: `--resume <old id>` does not trigger duplicate alerts.
+- Two terminals `--resume` same session: alerting process attribution is non-deterministic (rare, unhandled).
 
-### 进程没了
+### Process Termination
 
-- 用 `proc_pidinfo(PROC_PIDTBSDINFO)` 查启动时刻：查不到或和 `procStart` 对不上，会话算没了，从列表去掉，不提醒。
-- `kill -9` 后文件留着、目录不变（「实测」4），所以每个 pid 挂进程退出通知（`DispatchSource.makeProcessSource(.exit)`），不轮询。
+- Query launch time using `proc_pidinfo(PROC_PIDTBSDINFO)`: if query fails or mismatches `procStart`, session is considered dead, removed from list, and suppressed from alerting.
+- After `kill -9`, file remains and directory mtime unchanged ("Real-Device Testing" 4), so attach process exit notification (`DispatchSource.makeProcessSource(.exit)`) per pid without polling.
 
-## Notchkeeper mod
+## Pip Mod
 
-Claude Code 官方插件里的 JS 模块（2.1.287 起默认开启），事件发生时被调用。<https://code.claude.com/docs/en/plugins/mods/overview>。源码 `ClaudeMod/`（本地 marketplace），`claude plugin test` 离线测。mod API 随版本变、不做兼容（用户定）：升级 Claude Code 后重跑测试和「实测」8。
+Official Claude Code plugin JS module (enabled by default since 2.1.287), invoked on events (<https://code.claude.com/docs/en/plugins/mods/overview>). Source in `ClaudeMod/` (local marketplace), tested offline via `claude plugin test`; manifests checked with `claude plugin validate ClaudeMod`. mod API evolves with versions without backward compatibility (user decision): re-run tests and "Real-Device Testing" 8 after upgrading Claude Code.
 
-- **只报事实**：`turnId`、`reason`、最后一步 `stopReason`、结束时的后台 agent 数、时刻。判定归 AgentCore。
-- **只在主回合结束时、只在交互式会话写**（`session.start` 的 `isInteractive`）；**只写元数据**，提示词、回答、工具参数一律不写。
-- **后台 agent 怎么数**：`agent.spawn` 时 `background` 为 true 的记下 `next(e)` 返回的 `agentId`；带这个 `agentId` 的 `turn.complete` 到了划掉（TaskStop 停掉也会来）。
-- **`/clear`** 换 `sessionId` 但不再触发 `session.start`：在 `session.end` 清掉正在跑的回合和后台 agent，写文件时按当时的 `$.session.id()` 取名。
-- `/reload-plugins` 会再触发 `session.start`（<https://code.claude.com/docs/en/plugins/mods/create>）。
-- 组织管理的机器上内置守卫 `cc-plugin-sec-default` 会跳过部分事件，不含 `turn.*`、`agent.spawn`、`session.*`（<https://code.claude.com/docs/en/plugins/mods/admin>）。
+- **Reports facts only**: `turnId`, `reason`, last step `stopReason`, background agent count at termination, timestamp. Verdict belongs to AgentCore.
+- **Writes only at main turn completion, only in interactive sessions** (`isInteractive` from `session.start`); **writes metadata only**, never prompts, answers, or tool parameters.
+- **Counting background agents**: on `agent.spawn` with `background: true`, record `agentId` returned by `next(e)`; scratch off when `turn.complete` arrives with matching `agentId` (TaskStop also triggers it).
+- **`/clear`** changes `sessionId` without firing `session.start`: clean active turn and background agents on `session.end`, naming files via `$.session.id()`.
+- `/reload-plugins` triggers `session.start` again (<https://code.claude.com/docs/en/plugins/mods/create>).
+- Built-in guard `cc-plugin-sec-default` on enterprise-managed machines skips some events, excluding `turn.*`, `agent.spawn`, `session.*` (<https://code.claude.com/docs/en/plugins/mods/admin>).
 
-### 回合文件
+### Turn File
 
-每个主回合结束时整份覆盖写。`$.fs.write` 不是原子写：读到半份按解不开处理，等下一次。
+Overwritten completely on every main turn completion. `$.fs.write` is non-atomic: partial reads treated as decode failure and deferred.
 
 ```json
 {
@@ -87,67 +87,67 @@ Claude Code 官方插件里的 JS 模块（2.1.287 起默认开启），事件�
 }
 ```
 
-`lastStop` 一步都没走完是 `null`；`at` 是 epoch 毫秒。进程退出时 App 删掉它的回合文件；启动时删掉 7 天没写过的。
+`lastStop` is `null` if no step completed; `at` is epoch milliseconds. App deletes turn file on process exit; cleans unwritten files older than 7 days on launch.
 
-### 安装和卸载（用户定）
+### Install and Uninstall (User Decision)
 
-设置页一个开关，App 跑 `claude` 命令，不手改配置文件：
+Single toggle in Settings; App executes `claude` commands without manual config edits:
 
-1. **装**：把 App 带的 `ClaudeMod/` 拷到 `~/Library/Application Support/Notchkeeper/ClaudeMod/`，跑 `claude plugin install notchkeeper --marketplace <该目录> --json`。Claude Code 写 `extraKnownMarketplaces` 和 `enabledPlugins`；本地目录 marketplace 的插件原地加载（<https://code.claude.com/docs/en/plugins/loading#in-place-and-copied-plugins>）。
-2. **卸**：`claude plugin marketplace remove notchkeeper`（连带去掉 `enabledPlugins`），再删目录。会留下空的 `"extraKnownMarketplaces": {}`，无害。
-3. **更新**：App 启动时目录在就整体换成新的；原地加载，下个会话生效，不用改版本号。开着的会话要 `/reload-plugins` 或重开。
-4. `claude` 只在 `~/.local/bin`、`/opt/homebrew/bin`、`/usr/local/bin` 找，不读 shell 配置；带 `DISABLE_AUTOUPDATER=1`（否则子进程占着输出管道），60 秒超时 SIGKILL。
+1. **Install**: copies App's `ClaudeMod/` to `~/Library/Application Support/Notchkeeper/ClaudeMod/`, running `claude plugin install pip --marketplace <dir> --json`. Claude Code updates `extraKnownMarketplaces` and `enabledPlugins`; plugins in local marketplace load in place (<https://code.claude.com/docs/en/plugins/loading#in-place-and-copied-plugins>).
+2. **Uninstall**: `claude plugin marketplace remove notifier` (removes `enabledPlugins`), deletes directory. Leaves empty `"extraKnownMarketplaces": {}`, harmless.
+3. **Update**: App replaces directory on launch if present; loads in place, taking effect next session without bumping version. Open sessions require `/reload-plugins` or restart.
+4. `claude` searched only in `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`, ignoring shell config; runs with `DISABLE_AUTOUPDATER=1` (prevents child process holding output pipe), SIGKILL on 60s timeout.
 
-## 跳转到 Ghostty（用户定）
+## Jump to Ghostty (User Decision)
 
-点会话行或卡片（× 以外），切到这个会话所在的 Ghostty 窗口、标签和分屏。会话是终端里的 claude，或终端插件发来的 shell（`focusTerminal`）。
+Clicking session row or card (outside ×) switches to corresponding Ghostty window, tab, and split. Session is either terminal claude or shell forwarded by terminal plugin (`focusTerminal`).
 
-- Ghostty 的 AppleScript（1.3 起）：`terminal` 有 `id`、`working directory`、`name`（标题），`focus` 拉到前面；**没有 tty、pid**。第一次用系统会问权限（`NSAppleEventsUsageDescription`）。
-- **认窗口靠 tty 标记**（照 [kovoor/claude-code-notifier](https://github.com/kovoor/claude-code-notifier)，改用 AppleScript 查标题）：
-  1. `sysctl(KERN_PROC_PID)` 查会话的控制终端和父进程链。不用 `proc_pidinfo`：Ghostty 的直接子进程是 setuid root 的 `login`，读它会 EPERM。
-  2. 往 tty 非阻塞写一次 OSC 2，标题设成 `notchkeeper-<UUID>`。
-  3. AppleScript 找标题等于它的 terminal，最多等 1 秒。
-  4. 把原标题（第 3 步前读的，去掉控制字符）写回去。必须写回：Claude Code 只在标题变了时才重写。
-  - 只在会话直接跑在 Ghostty 终端里时写（父进程链到得了 Ghostty，且 `login` 和会话进程同一个 tty）。tmux、nvim `:terminal` 会吃掉 OSC 2，写了会盖掉它们的标题。
-  - 写之前核对进程还是这个会话（卡片存的是快照）：claude 按启动时刻，shell 没有启动时刻，按「pid 的 tty 还是消息里的 tty」。
-  - 标题可能从对话推出来：只在内存里找标记、原样写回，不显示、不进日志。
-  - 已知小风险（推断）：OSC 插进一帧中间会花一帧；读到写回之间 Claude 换了状态字符，写回旧字符；Ghostty 卡 1 秒以上，标题停在标记上直到 Claude 下次改。
-- **退路**：没写标记或没等到，按 `working directory` 等于 `cwd` 找，唯一才算；还认不出就只把 Ghostty 拉到前面。会话不在 Ghostty 里也只打开 Ghostty，不报错。
-- **正看着就不弹**（用户 10-31 定，照 Ghostty `notify-on-command-finish = unfocused`）：终端插件的卡到达时，Ghostty 在前台、焦点正停在跑这条命令的那个 terminal 上才不弹；同窗口别的标签、分屏、别的窗口都照常弹。这时用户没点任何东西，所以不读标题、不写标记：先查进程（shell 的 tty 对得上、父进程链到得了 Ghostty，排除 VS Code、Terminal.app、tmux），再只读 `id` 和 `working directory`，聚焦的 terminal 目录对得上且是唯一在这个目录的才算；同目录开着两个、有 terminal 不报目录都算认不准，照常弹。
-- Apple Event 只在点击时和上一条发，在专用队列上，每个 `with timeout` 3 秒，不挡主线程。terminal id 拼进脚本前按 UUID 校验。
+- Ghostty AppleScript (1.3+): `terminal` exposes `id`, `working directory`, `name` (title), `focus` brings forward; **lacks tty and pid**. Requests permission on first use (`NSAppleEventsUsageDescription`).
+- **Terminal identification via tty marker** (modeled after [kovoor/claude-code-notifier](https://github.com/kovoor/claude-code-notifier), adapted to query title via AppleScript):
+  1. `sysctl(KERN_PROC_PID)` checks session controlling terminal and parent process chain. Avoid `proc_pidinfo`: direct child of Ghostty is setuid root `login`, returning EPERM.
+  2. Non-blocking OSC 2 write to tty sets title to `notchkeeper-<UUID>`.
+  3. AppleScript searches for terminal matching title, waiting at most 1 second.
+  4. Restores original title (read prior to step 3, stripping control characters). Mandatory writeback: Claude Code rewrites title only on change.
+  - Written only when session runs directly in Ghostty terminal (parent chain reaches Ghostty, `login` and session process share tty). tmux and nvim `:terminal` consume OSC 2, which would overwrite their titles.
+  - Verifies process identity before write (card holds snapshot): claude verified by launch time; shell lacks launch time, verified by "pid tty matches message tty".
+  - Title might be inferred from conversation: marker searched in memory and restored verbatim, never displayed or logged.
+  - Known minor risks (inference): OSC insertion mid-frame may glitch one frame; Claude changing status between read and restore overwrites new status; Ghostty hanging > 1s leaves marker until next Claude update.
+- **Fallback**: if marker unwritten or timed out, match `working directory` against `cwd`, requiring unique match; otherwise simply bring Ghostty forward. Sessions outside Ghostty also simply activate Ghostty without error.
+- **Suppress when focused** (decided 10-31, modeled after Ghostty `notify-on-command-finish = unfocused`): when terminal plugin card arrives, suppresses alert only if Ghostty is frontmost and focus rests on the exact terminal running the command; other tabs, splits, and windows alert as usual. User clicked nothing here, so avoids reading title or writing marker: checks process first (shell tty matches, parent chain reaches Ghostty, excluding VS Code, Terminal.app, tmux), reads only `id` and `working directory`, matching focused terminal directory uniquely; multiple instances in same directory or terminals withholding directory fall back to alerting.
+- Apple Events sent only on click and previous check, routed to dedicated queue with 3s `with timeout`, non-blocking to main thread. Terminal id validated as UUID before interpolation.
 
-## 提醒
+## Alerts
 
-| 事件 | 卡片 | 声音 |
+| Event | Card | Sound |
 |---|---|---|
-| 回合做完（后台 agent 都完成了） | 完成卡 | `Glass` |
-| 回合出错 | 出错卡 | `Funk` |
-| 回合被取消、进入工作中 | 无 | 无 |
-| 进入需要你介入 | 介入卡（自动收回，用户定） | `Ping` |
-| 不再需要你介入 | 撤掉这个会话的介入卡（`docs/ui.md`「卡片」2） | 无 |
+| Turn completed (all background agents finished) | Done card | `Glass` |
+| Turn failed | Error card | `Funk` |
+| Turn canceled, returns to working | None | None |
+| Enters needs you | Needs-you card (auto-collapses, user decision) | `Ping` |
+| Exits needs you | Dismisses needs-you card for this session (`docs/ui.md` "Cards" 2) | None |
 
-卡片怎么排队、和红卡怎么让见 `docs/ui.md`「卡片」。只用系统音效（`NSSound(named:)`），总开关 `soundEnabled`。出口 violated 响 `Basso`，防火墙守住时不响（`docs/firewall.md`）。
+Queueing and red card interaction detailed in `docs/ui.md` "Cards". Uses system sound effects exclusively (`NSSound(named:)`), with global switch `soundEnabled`. Egress violated plays `Basso`, silent when firewall active (`docs/firewall.md`).
 
-## 实测（Claude Code 2.1.296）
+## Real-Device Testing (Claude Code 2.1.296)
 
-方法：tmux 里起交互式 `claude`、跑 `claude -p`、派子 agent，每 0.1s 记元数据字段；再 `strings` 查二进制里写文件的代码。升级 Claude Code 后按这里重测。
+Methodology: launch interactive `claude` in tmux, run `claude -p`, spawn subagents, recording metadata fields every 0.1s; use `strings` to inspect file-writing logic in binary. Re-test after upgrading Claude Code.
 
-1. **`kind` 不分 `-p`**：取自 `CLAUDE_CODE_SESSION_KIND`，没设就是 `interactive`。`claude -p` 也写文件，`entrypoint: sdk-cli`，退出时删文件。`entrypoint` 见过：`cli`、`sdk-cli`、`sdk-ts`、`sdk-py`、`claude-vscode`、`claude-desktop`、`claude-in-teams`、`local-agent`、`remote`、`ssh-remote`、`bench`。
-2. **子 agent 不单独写文件。**
-3. **`waitingFor` 六个取值**：`permission prompt`（未配置的对话框也默认归它）、`sandbox request`、`worker request`、`goal proposal`、`input needed`（AskUserQuestion、MCP 输入）、`dialog open`（模型回退、设置确认等）。Claude Code 归类：前四个 → permission，`input needed` → question，`dialog open` 不归类。批准框按 Esc 直接 `idle`。
-4. **`kill -9` 后文件留下**，停在死前状态；Claude Code 下次列会话才删。正常退出删 `.json` 和 `.key`。
-5. 其他：
-   - 时间字段是 epoch 毫秒；新会话先写 `idle`；第一次写没有 `status`、`statusUpdatedAt`，之后原地补。
-   - `procStart` 是 `LC_ALL=C TZ=UTC ps -o lstart= -p <pid>` 的输出，如 `Thu Oct 29 17:54:44 2026`（日期个位数前补空格）。
-   - 工作区没信任时只有 `.key` 没有 `.json`。
-   - 状态变化**原地重写**（inode、目录 mtime 都不变）：每份文件要单独监听。
-   - `<pid>.<hex>.key`（600）是对等通信凭据，不读。
-6. **`shell`**：二进制里是 `status === "idle" && 有后台 shell ? "shell" : status`，是空闲的一种。
-7. **sessions 文件分不出回合怎么结束**：API 出错、Esc、拒绝批准都只变 `idle`；回合结束时还有后台 agent 则一直 `busy`，后台 agent 完成、送进通知那一刻闪 `idle`；排队消息开始时也闪 `idle`。
-8. **mod 事件**（`claude --plugin-dir <临时 mod>`）：
-   - 正常回答：`reason: "answer"`，最后一步 `end_turn`。
-   - 生成中 Esc：`reason: "aborted"`。
-   - 批准框 Esc：`reason: "answer"`，最后一步 `tool_use`，工具结果 `isError: true`。
-   - `ANTHROPIC_BASE_URL` 指向不存在的端口：`reason: "error"`。
-   - 后台子 agent：`agent.spawn` 带 `background`；主回合 `turn.complete` 先到，子 agent 的带 `agentId`，接着一个通知主回合开始、结束。`turn.start` 只在主回合触发。TaskStop 停掉同样来带 `agentId` 的 `turn.complete`。
-9. **装上 mod 端到端**：正常回答 → 做完；Esc → 无；拒绝批准 → 只有介入卡和介入结束；后台 agent → 只在最后弹一次；坏 `ANTHROPIC_BASE_URL` → 出错卡。
+1. **`kind` does not distinguish `-p`**: derived from `CLAUDE_CODE_SESSION_KIND`, defaulting to `interactive`. `claude -p` also writes files with `entrypoint: sdk-cli`, deleting on exit. Observed entrypoints: `cli`, `sdk-cli`, `sdk-ts`, `sdk-py`, `claude-vscode`, `claude-desktop`, `claude-in-teams`, `local-agent`, `remote`, `ssh-remote`, `bench`.
+2. **Subagents do not write separate files.**
+3. **Six values for `waitingFor`**: `permission prompt` (unconfigured dialogs default here), `sandbox request`, `worker request`, `goal proposal`, `input needed` (AskUserQuestion, MCP input), `dialog open` (model fallback, settings confirmation). Claude Code categories: first four → permission, `input needed` → question, `dialog open` unclassified. Esc at approval prompt transitions directly to `idle`.
+4. **Files persist after `kill -9`**, frozen in pre-crash state; Claude Code cleans up on next session listing. Normal exit removes `.json` and `.key`.
+5. Miscellaneous:
+   - Time fields are epoch milliseconds; new session writes `idle`; first write lacks `status` and `statusUpdatedAt`, populated subsequently in place.
+   - `procStart` is output of `LC_ALL=C TZ=UTC ps -o lstart= -p <pid>`, e.g. `Thu Oct 29 17:54:44 2026` (space-padded single-digit days).
+   - Untrusted workspaces produce `.key` without `.json`.
+   - State changes **overwritten in place** (inode and directory mtime unchanged): each file requires individual monitoring.
+   - `<pid>.<hex>.key` (600) is peer communication token, unread.
+6. **`shell`**: binary implements `status === "idle" && hasBackgroundShell ? "shell" : status`, representing an idle variant.
+7. **Session files cannot determine turn outcome**: API errors, Esc, rejected approvals all become `idle`; remains `busy` while background agents run, flashing `idle` briefly on agent completion and notice delivery; queued messages also flash `idle`.
+8. **mod events** (`claude --plugin-dir <temp_mod>`):
+   - Normal answer: `reason: "answer"`, final step `end_turn`.
+   - Esc during generation: `reason: "aborted"`.
+   - Esc at approval: `reason: "answer"`, final step `tool_use`, tool result `isError: true`.
+   - `ANTHROPIC_BASE_URL` pointing to closed port: `reason: "error"`.
+   - Background subagent: `agent.spawn` with `background: true`; main turn `turn.complete` arrives first, subagents arrive with `agentId`, followed by notice main turn start and complete. `turn.start` fired only on main turns up to 2.1.296; from 2.1.316 subagent turns also fire it, carrying `agentId` (mod ignores those). TaskStop termination also delivers `turn.complete` with `agentId`.
+9. **End-to-end with mod**: normal answer → done; Esc → none; reject approval → intervention card and intervention end only; background agents → single alert at completion; bad `ANTHROPIC_BASE_URL` → error card.

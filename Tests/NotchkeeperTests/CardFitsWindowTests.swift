@@ -5,10 +5,10 @@ import NotchCore
 @testable import Notchkeeper
 
 @Suite struct CardFitsWindow {
-    /// 卡片按内容的自然高度长；内容最满的卡也装得进刘海窗口（docs/ui.md「卡片」）
+    /// Card grows to the natural height of its content; the fullest card fits within the notch window (docs/ui.md "Card").
     @Test @MainActor func fullestCardFitsWindow() {
         let notch = CGSize(width: 185, height: 32)
-        let long = String(repeating: "很长的一句话", count: 40)
+        let long = String(repeating: "Very long sentence ", count: 40)
         let source = Card.Source.plugin(id: "x", name: long, symbol: "sparkles")
         let buttons = [Card.Button(title: long, action: .activate(bundleID: "x")), Card.Button(title: long, action: .activate(bundleID: "y"))]
         let cards = [

@@ -1,10 +1,10 @@
 import Foundation
 
-/// 临时卡片的倒计时：鼠标停在卡片上时暂停，移开后从剩下的时间继续
+/// Countdown for temporary cards: pauses when mouse hovers over card, resumes from remaining time when mouse leaves
 public struct CardCountdown: Equatable, Sendable {
     public let total: TimeInterval
     private var remainingAtResume: TimeInterval
-    /// nil 表示暂停中
+    /// nil means paused
     private var resumedAt: Date?
 
     public init(total: TimeInterval, now: Date) {

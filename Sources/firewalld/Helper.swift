@@ -3,25 +3,26 @@ import Foundation
 import FirewallCore
 import os
 
-/// 回答：一轮和一条命令具体怎么执行——加锁、读状态、按 `FirewallState` 给的动作调 pfctl、记结果、写两个文件。
-/// 不判定（在 FirewallCore），不知道是谁调的（launchd 或 osascript）。
+/// Answers: how a round and a command execute in detail — acquire lock, read state, invoke pfctl according to actions
+/// prescribed by `FirewallState`, record results, and write two files.
+/// Does not decide policy (in FirewallCore); agnostic of caller (launchd or osascript).
 enum Helper {
     enum Command: Equatable {
-        /// `clash` 是 Clash Verge 的目录，开启时从里面拍放行表的快照
+        /// `clash` is Clash Verge directory, snapshotted upon enabling
         case enable(clash: URL)
         case keep, disable
     }
 
     enum Failure: Error, Equatable {
         case command(FirewallCommandError)
-        /// 防火墙状态文件读不出来：不覆盖它（原文件留给人看），先跑恢复脚本
+        /// Firewall state file unreadable: do not overwrite (keep original for inspection), run rescue script first
         case stateUnreadable
         case snapshot(SnapshotFailure)
         case busy
         case io(String)
     }
 
-    /// LaunchDaemon 的启动参数：隧道网卡名、装哪种规则
+    /// LaunchDaemon startup arguments: tunnel interface name, rules scope to load
     struct RoundConfig: Equatable {
         let tunnel: String
         let scope: FirewallRules.Scope
@@ -35,7 +36,7 @@ enum Helper {
 
     static let log = Logger(subsystem: FirewallPaths.label, category: "helper")
 
-    /// 一轮（docs/firewall.md §4「LaunchDaemon 每一轮」）。等不到锁返回 `nil`，什么都不做，下一轮再来
+    /// One round (docs/firewall.md §4 "LaunchDaemon Rounds"). Returns `nil` if lock not acquired, doing nothing until next round
     static func round(_ sys: FirewallSystem, _ config: RoundConfig) -> FirewallStatus? {
         locked(sys) { () -> FirewallStatus in
             let moment = sys.moment()
@@ -43,7 +44,7 @@ enum Helper {
             let restored = restore(stateURL)
             var state = FirewallState(bootSession: moment.bootSession)
             if case .valid(let s) = restored { state = s }
-            // 读不出来的防火墙状态文件不覆盖：按 off 办，原文件留给人看
+            // Do not overwrite unreadable state file: treat as off, leave original for diagnosis
             let writable = restored != .unreadable
             func save() -> Bool {
                 guard writable else { return false }
@@ -51,7 +52,7 @@ enum Helper {
                     try AtomicFile.write(state.encoded(), to: stateURL, mode: 0o600)
                     return true
                 } catch {
-                    log.error("写防火墙状态文件失败：\(error, privacy: .public)")
+                    log.error("Failed to write firewall state file: \(error, privacy: .public)")
                     return false
                 }
             }
@@ -66,7 +67,7 @@ enum Helper {
             let snapshot = PFSnapshot(anchorEmpty: anchor.succeeded && anchor.stdout.allSatisfy(\.isWhitespace), tokens: references())
             var actions = state.tick(at: moment, pf: snapshot, rules: config.rules)
             var failed: [PFStep] = []
-            // 先确认防火墙状态文件写得进去：写不进去时拿到的 token 记不下来，下一轮又 -E，引用越涨越多
+            // Ensure state file is writable first: if unwritable, acquired token cannot be recorded, leading to unbounded token growth via -E
             if !save(), actions.contains(.enable) {
                 actions.removeAll { $0 == .enable }
                 failed.append(.enable)
@@ -79,12 +80,12 @@ enum Helper {
                 case .release(let token): pf(["-X", token], nil)
                 }
                 guard out.succeeded else {
-                    log.error("pfctl \(action.step.rawValue, privacy: .public) 失败（\(out.status)）：\(out.stderr, privacy: .public)")
+                    log.error("pfctl \(action.step.rawValue, privacy: .public) failed (\(out.status)): \(out.stderr, privacy: .public)")
                     failed.append(action.step)
                     continue
                 }
                 state.record(action, token: action == .enable ? PFOutput.token(fromEnable: out.stderr) : nil)
-                _ = save() // 做成一件就落盘：拿到 token 后中途崩了（恢复脚本 bootout 也算），下一轮和恢复脚本都知道引用在手里
+                _ = save() // Persist immediately on each success: crash after token acquisition (including bootout) leaves token known to next round and rescue script
                 if action == .enable {
                     state.confirmReference(liveTokens: references())
                     _ = save()
@@ -93,7 +94,7 @@ enum Helper {
 
             var check: FirewallCheck?
             if state.mode != .off {
-                // 哪条读失败了就传空串，对应的那项判不过
+                // Pass empty string on read failure; corresponding check item fails
                 let stdout = { (out: Output) in out.succeeded ? out.stdout : "" }
                 check = state.check(mainRules: stdout(pf(["-sr"], nil)),
                                     anchorRules: stdout(pf(["-a", FirewallPaths.anchor, "-vsr"], nil)),
@@ -103,7 +104,7 @@ enum Helper {
             _ = save()
 
             let now = sys.now()
-            // 换规则那轮装失败时 anchor 里还是旧规则，不能说成这一轮的
+            // If rule replacement fails in this round, anchor still has old rules; do not attribute to this round
             var status = FirewallStatus(mode: .off, scope: state.loadedRules == config.rules ? config.scope : nil, check: check,
                                         failedSteps: failed, checkedAt: now)
             switch state.mode {
@@ -116,17 +117,18 @@ enum Helper {
             do {
                 try AtomicFile.write(status.encoded(), to: sys.directory.appendingPathComponent(FirewallStatus.fileName), mode: 0o644)
             } catch {
-                log.error("写状态摘要失败：\(error, privacy: .public)")
+                log.error("Failed to write status summary: \(error, privacy: .public)")
             }
             return status
         }
     }
 
-    /// 开启 / 保留 / 关闭：只改文件（开启还先拍放行表的快照），再让守护进程马上跑一轮。对 pf 做什么只在一轮里决定。
-    /// 开启返回拍下的两张表（命令行打印条数给人核对），别的返回 `nil`
+    /// enable / keep / disable: modifies files only (enable also snapshots allow tables first), then kicks daemon to run an immediate round.
+    /// Actions on pf are decided solely inside a round.
+    /// enable returns the two snapshotted tables (printed on CLI for human verification); others return `nil`.
     @discardableResult
     static func command(_ command: Command, _ sys: FirewallSystem) throws(Failure) -> AllowTables? {
-        // 拍快照要读文件、问 DNS，放在锁外；只有开启成功才写下去
+        // Taking snapshot reads files and queries DNS, executed outside lock; written only if enable succeeds
         var tables: AllowTables?
         if case .enable(let clash) = command {
             do { tables = try AllowTables.take(from: clash, sys) } catch { throw .snapshot(error) }
@@ -138,7 +140,7 @@ enum Helper {
             switch restore(stateURL) {
             case .valid(let s): state = s
             case .missing: break
-            // 坏文件不覆盖。关闭照样算成功：读不出状态时每一轮本来就按 off 办
+            // Corrupt file is not overwritten. disable still succeeds: each round treats unreadable state as off anyway
             case .unreadable: if command == .disable { return } else { throw .stateUnreadable }
             }
             do throws(FirewallCommandError) {
@@ -150,21 +152,24 @@ enum Helper {
             } catch {
                 throw .command(error)
             }
-            // 先写表再写状态：守护进程看到 trial 时，要装的表已经在了
-            do { try tables?.write(to: sys.directory) } catch { throw .io("写放行表失败：\(error)") }
-            do { try AtomicFile.write(state.encoded(), to: stateURL, mode: 0o600) } catch { throw .io("写防火墙状态文件失败：\(error)") }
-            // 还拿着锁时重启守护进程：它此刻不可能在一轮当中（一轮也要这把锁），杀掉不会断在 pfctl -E 和落盘之间。
-            // 新起的那个等到锁就跑一轮；off 时守护进程本来不在跑，这一下就是把它拉起来
+            // Write tables before state: when daemon sees trial, required tables are already present
+            do { try tables?.write(to: sys.directory) } catch { throw .io("Failed to write allow tables: \(error)") }
+            do { try AtomicFile.write(state.encoded(), to: stateURL, mode: 0o600) } catch { throw .io("Failed to write firewall state file: \(error)") }
+            // Restart daemon while still holding lock: it cannot be mid-round right now (rounds require this lock too),
+            // so killing will not interrupt between pfctl -E and disk flush.
+            // Newly spawned daemon runs a round once lock acquired; when off, daemon was not running, so this brings it up
             let kick = sys.run("/bin/launchctl", ["kickstart", "-k", "system/\(FirewallPaths.label)"], nil)
-            guard kick.succeeded else { throw .io("状态已改，但没能让守护进程马上跑一轮（\(kick.stderr)）") }
+            guard kick.succeeded else { throw .io("State changed, but failed to kick daemon into immediate round (\(kick.stderr))") }
         }
         guard done != nil else { throw .busy }
         return tables
     }
 
-    /// 守护进程：一轮接一轮，每轮之间 `pause`（实际是睡 10 秒）；回到 off、并且这一轮清规则做成了才返回，off 时不轮询（docs/firewall.md §2）。
-    /// 清失败了就接着跑：退出之后没人再清，整机拦截规则会一直挂着。释放引用失败不管：多留一个引用不影响上网，
-    /// 为它每 10 秒跑一轮就成了 off 时的轮询；下次开启或恢复脚本会处理。等不到锁那一轮不算，照样等下一轮
+    /// Daemon: round after round, with `pause` (sleep 10s in practice) between rounds;
+    /// returns only after returning to off and successfully flushing rules in that round; no polling when off (docs/firewall.md §2).
+    /// Continues running if flush fails: nobody else flushes after exit, leaving host-wide block rule hanging.
+    /// Release failure ignored: an extra reference does not break internet access, running every 10s for it would constitute polling while off;
+    /// next enable or rescue script handles it. A round that fails to acquire lock does not count, waits for next round as usual
     static func serve(_ sys: FirewallSystem, _ config: RoundConfig, pause: () -> Void) {
         while true {
             if let status = round(sys, config), status.mode == .off || status.mode == .stateUnreadable,
@@ -179,28 +184,30 @@ enum Helper {
         } catch CocoaError.fileReadNoSuchFile {
             return .missing
         } catch {
-            log.error("读不了防火墙状态文件：\(error, privacy: .public)")
+            log.error("Cannot read firewall state file: \(error, privacy: .public)")
             return .unreadable
         }
     }
 
-    /// 一轮和命令互斥。锁文件 root 0600：普通用户打不开，锁不住它。等 `sys.lockTimeout` 还拿不到返回 `nil`；进程退出锁自动放开。
-    /// 锁文件打不开（目录没了）时照样往下做：同时在跑的只可能是另一个 root 的一轮或命令，比一轮不跑、试运行不回滚好
+    /// Rounds and commands are mutually exclusive. Lock file root 0600: non-root users cannot open or hold it.
+    /// Returns `nil` if lock not acquired within `sys.lockTimeout`; lock released automatically on process exit.
+    /// If lock file cannot be opened (directory missing), proceeds unlocked: concurrent runner can only be another root round or command,
+    /// preferable to skipping rounds or failing trial rollback
     private static func locked<T, E: Error>(_ sys: FirewallSystem, _ body: () throws(E) -> T) throws(E) -> T? {
         let fd = open(sys.directory.appendingPathComponent(FirewallPaths.lockFile).path, O_RDWR | O_CREAT | O_NOFOLLOW | O_CLOEXEC, 0o600)
         defer { if fd >= 0 { close(fd) } }
         if fd >= 0 {
-            // 按单调时钟等：等锁时系统时间被往回调，也不会一直等下去
+            // Wait using monotonic clock: not stuck indefinitely if system clock is stepped backward
             let deadline = ContinuousClock.now + .seconds(sys.lockTimeout)
             while flock(fd, LOCK_EX | LOCK_NB) != 0 {
                 guard ContinuousClock.now < deadline else {
-                    log.error("等了 \(Int(sys.lockTimeout)) 秒没拿到锁")
+                    log.error("Timed out waiting \(Int(sys.lockTimeout))s for lock")
                     return nil
                 }
                 usleep(100_000)
             }
         } else {
-            log.error("打不开锁文件（\(errno)），不加锁往下做")
+            log.error("Cannot open lock file (\(errno)), proceeding unlocked")
         }
         return try body()
     }

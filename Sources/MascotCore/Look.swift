@@ -1,13 +1,13 @@
 import CoreGraphics
 
-/// Pip 此刻是哪个造型、这个造型长什么样（颜色、头的朝向、睁不睁眼、装饰算哪一类、右耳）。
-/// 不知道造型从哪来（守卫、agent、鼠标），那是 App 的事；眼形见 `Eyes`，装饰见 `decoration(_:)`，怎么动见 `Choreography`。
-/// 数据全部出自 docs/mascot.md §2。
+/// Which look Pip currently exhibits and look properties (colors, rest pose, eyes open/closed, decoration category, right ear).
+/// Unaware of where look origins come from (guard, agent, mouse), which is App's concern; eye geometry in `Eyes`, decoration in `decoration(_:)`, motions in `Choreography`.
+/// All data follows docs/mascot.md §2.
 public enum Look: String, CaseIterable, Sendable {
     case idle, sleeping, thinking, working, longTurn, question, approval, finished, error, interrupted, dizzy
     case offline, mismatch, stale, danger, shielded
 
-    /// 身体的竖直渐变，上 → 下
+    /// Vertical body gradient, top -> bottom
     public var gradient: (top: RGB, bottom: RGB) {
         switch self {
         case .idle, .sleeping, .interrupted: return (RGB(0xF2EEE6), RGB(0xCFCAC0))
@@ -26,7 +26,7 @@ public enum Look: String, CaseIterable, Sendable {
         }
     }
 
-    /// 停在这个造型时头的朝向
+    /// Head rest pose when dwelling in this look
     public var pose: HeadPose {
         switch self {
         case .sleeping: return HeadPose(degrees: 0, -14, 0)
@@ -42,7 +42,7 @@ public enum Look: String, CaseIterable, Sendable {
         }
     }
 
-    /// 睁着眼：会眨眼、看鼠标、探头。闭眼、笑眼、> <、螺旋本身就是表情
+    /// Eyes open: enables blinks, mouse tracking, peek. Closed eyes, smiling eyes, > <, and spirals represent fixed expressions
     public var opensEyes: Bool {
         switch self {
         case .idle, .thinking, .working, .longTurn, .question, .approval, .offline, .mismatch, .stale, .shielded: return true
@@ -50,7 +50,7 @@ public enum Look: String, CaseIterable, Sendable {
         }
     }
 
-    /// 装饰是告示（sign）：收起时挪到右耳当图标，左耳只留脸。其余有装饰的是心情装饰（mood），留在 Pip 身上
+    /// Decoration is a sign: moves to right ear as an icon when collapsed, leaving only face on left ear. Other decorations are mood decorations staying on Pip
     public var isSign: Bool {
         switch self {
         case .error, .offline, .mismatch, .stale, .danger, .shielded: return true
@@ -59,7 +59,7 @@ public enum Look: String, CaseIterable, Sendable {
     }
 }
 
-/// 头的朝向，弧度。yaw + = 脸朝右，pitch + = 抬头，roll + = 顺时针（docs/mascot.md §1）
+/// Head pose, radians. yaw + = face right, pitch + = tilt up, roll + = clockwise (docs/mascot.md §1)
 public struct HeadPose: Equatable, Sendable {
     public var yaw: Double
     public var pitch: Double
@@ -81,32 +81,33 @@ public struct RGB: Hashable, Sendable {
     public var r: Double { Double((hex >> 16) & 0xFF) / 255 }
     public var g: Double { Double((hex >> 8) & 0xFF) / 255 }
     public var b: Double { Double(hex & 0xFF) / 255 }
+    public var cg: CGColor { CGColor(srgbRed: r, green: g, blue: b, alpha: 1) }
 
-    /// 眼睛、▲ 里的 !、气泡里的 ?、锁孔
+    /// Eyes, ! inside triangle, ? inside bubble, keyhole
     public static let ink = RGB(0x16171A)
-    /// 守卫的琥珀、红、灰（状态点、卡片、右耳灰环）
+    /// Guard amber, red, grey (status dots, cards, right ear grey ring)
     public static let amber = RGB(0xFFB020)
     public static let red = RGB(0xFF453A)
     public static let grey = RGB(0x8E8E93)
-    /// agent 状态的颜色：右耳和面板会话行的指示共用（docs/mascot.md §2「右耳指示」、docs/ui.md「面板布局」）
+    /// Agent state colors: shared between right ear and panel session rows (docs/mascot.md §2 "Right ear indicator", docs/ui.md "Panel layout")
     public static let working = RGB(0x3B9EFF)
     public static let question = RGB(0x3CC8DC)
     public static let approval = RGB(0xB5E04A)
 }
 
-/// 收起时右耳显示什么（docs/mascot.md §2「右耳指示」）。右耳只有一个位置：sign 盖过灰环，灰环盖过点
+/// What right ear displays when collapsed (docs/mascot.md §2 "Right ear indicator"). Right ear has one slot: sign overrides grey ring, grey ring overrides dots
 public enum EarIndicator: Equatable, Sendable {
     case none
-    /// 三蓝点 `#3B9EFF`，直径 3pt，依次亮
+    /// Three blue dots `#3B9EFF`, 3pt diameter, lighting up sequentially
     case dots
-    /// 一个 7pt 的点
+    /// A single 7pt dot
     case dot(RGB)
-    /// 灰色空心环，7pt、1pt 描边：探针没结果
+    /// Grey hollow ring, 7pt with 1pt stroke: probe gave no result
     case ring
-    /// 造型的装饰原样挂出来：sign 造型挂到右耳；面板会话行挂等你回答、等你批准的装饰（docs/ui.md「面板布局」）
+    /// Look's decoration displayed as-is: sign looks display on right ear; panel session rows display question/approval decorations (docs/ui.md "Panel layout")
     case decoration(Look)
 
-    /// probeFailed：守卫 unknown、原因是探针没结果。这种 unknown 不改造型，只在右耳表达
+    /// probeFailed: guard is unknown due to probe giving no result. This kind of unknown does not change look, expressed only on right ear
     public static func `for`(_ look: Look, probeFailed: Bool) -> EarIndicator {
         if look.isSign { return .decoration(look) }
         if probeFailed { return .ring }

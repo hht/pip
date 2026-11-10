@@ -18,7 +18,7 @@ import Testing
         }
     }
 
-    /// 恢复脚本用 `plutil -extract <key> raw` 读 token 和 bootSession：用真的 plutil 读一遍
+    /// Rescue script reads token and bootSession using plutil -extract <key> raw: verify using actual plutil
     @Test func rescueScriptCanReadTokenAndBootSession() throws {
         var s = FirewallState(bootSession: boot)
         try s.enable(at: at(100))
@@ -32,12 +32,12 @@ import Testing
 
     @Test func missingFileIsMissing() { #expect(FirewallState.restore(from: nil) == .missing) }
 
-    /// 缺字段用默认值：什么都没有就是 off、不知道是哪次开机的（下一轮按新开机处理）
+    /// Missing fields default to off: empty JSON means off with unknown boot session (handled as new boot next round)
     @Test func missingFieldsDefaultToOff() {
         #expect(FirewallState.restore(from: Data("{}".utf8)) == .valid(FirewallState(bootSession: nil)))
     }
 
-    /// 不知道是哪次开机的就不写这个字段：恢复脚本读不出它，不会拿去和本次开机比
+    /// Unknown boot session omits this field: rescue script cannot read it, so will not compare against current boot session
     @Test func unknownBootSessionIsOmitted() throws {
         let json = try JSONSerialization.jsonObject(with: FirewallState(bootSession: nil).encoded()) as? [String: Any]
         #expect(json?["bootSession"] == nil)
@@ -45,7 +45,7 @@ import Testing
 
     @Test(arguments: [
         "not json",
-        #"{"mode":"trial","bootSession":"B"}"#, // 试运行没有截止时间
+        #"{"mode":"trial","bootSession":"B"}"#, // Trial without deadline
         #"{"mode":"armed","bootSession":"B"}"#,
         #"{"mode":"on","bootSession":"B","token":"12ab"}"#,
         #"{"mode":"on","bootSession":"B","token":""}"#,

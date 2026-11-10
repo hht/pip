@@ -1,19 +1,20 @@
-/// 回答：mihomo 的 GEOIP 库（`Country.mmdb`）里，哪些网段算某个国家。照 mihomo 判 `GEOIP,CN` 的办法：GeoLite2 类型的库，
-/// 记录里 `country.iso_code` 转小写后等于规则里的国家。相邻的同国网段合并成一段。
-/// 只认 GeoLite2 的记录样子；不知道文件在哪。外部文件，越界、格式不对都报错，不崩溃。
+/// Answers: which IP networks belong to a specific country in mihomo's GEOIP database (`Country.mmdb`).
+/// Follows mihomo's method for matching `GEOIP,CN`: for GeoLite2 databases,
+/// the record's `country.iso_code` lowercased matches the country in the rule. Adjacent networks in the same country are merged.
+/// Only recognizes GeoLite2 record format; location of file is external. Out-of-bounds or invalid formats throw errors, never crashing.
 /// @see https://maxmind.github.io/MaxMind-DB/
 /// @see https://github.com/MetaCubeX/mihomo/blob/Meta/component/mmdb/reader.go
 public enum CountryDatabase {
-    /// 两张放行表合计最多几项。pf 的表项是全系统共用的（XNU 默认上限 20 万，推断），真库国内段 8928 段，留一个数量级的余量
+    /// Maximum combined entries for both allow tables. pf table entries are system-wide shared (XNU default limit ~200k, inferred). Real DB domestic CIDRs count 8928, keeping an order of magnitude margin.
     public static let maxTableEntries = 100_000
 
-    /// 合并之后超过 `limit` 段就报错：走到一半就停，内存和耗时也一起封顶
+    /// Throws an error if merged networks exceed `limit`: stops midway, capping both memory and execution time.
     public static func networks(country: String, in bytes: [UInt8], limit: Int = maxTableEntries) throws(CountryDatabaseError) -> [IPNetwork] {
         let marker: [UInt8] = [0xAB, 0xCD, 0xEF] + Array("MaxMind.com".utf8)
         guard let markerStart = lastIndex(of: marker, in: bytes) else { throw .malformed }
         let metadata = Decoder(bytes: bytes, base: markerStart + marker.count, end: bytes.count)
         let field = { (key: String) throws(CountryDatabaseError) -> Int? in try metadata.field(key, inMapAt: 0) }
-        // 外部数据：先和文件大小比，再参与乘法，免得溢出
+        // External data: compare against file size before multiplying to avoid overflow
         guard let nodeCount = try metadata.uint(at: field("node_count")), let recordSize = try metadata.uint(at: field("record_size")),
               let ipVersion = try metadata.uint(at: field("ip_version")), [24, 28, 32].contains(recordSize), [4, 6].contains(ipVersion),
               nodeCount <= UInt64(bytes.count)
@@ -29,10 +30,12 @@ public enum CountryDatabase {
         return try walker.networks(ipVersion: Int(ipVersion))
     }
 
-    /// 放行表的国内段像不像一个国家：合起来不超过 IPv4 地址空间的 1/8、IPv6 地址空间的 2^-14。按总量算：错开的小段合并不起来，
-    /// 只看前缀挡不住。真库（Clash Verge Rev 自带 mihomo v1.19.21 时目录里的 Country.mmdb）IPv4 覆盖 8.26%，IPv6 约 2^-17.4；中国已分配的 IPv6 约 2^-15.9（推断），收全了的库也要能过。库被改成大半个互联网都算 CN 时，正式规则等于什么都不拦、核对却全过
+    /// Checks whether domestic allow-table CIDRs resemble a plausible country: total coverage must not exceed 1/8 of IPv4 space and 2^-14 of IPv6 space.
+    /// Computed by total volume: staggered small blocks cannot be merged, prefix-only checks cannot guard against this.
+    /// In the real DB (Country.mmdb included with mihomo v1.19.21 in Clash Verge Rev), IPv4 covers 8.26%, IPv6 ~2^-17.4; allocated IPv6 in China is ~2^-15.9 (inferred), so complete databases must pass.
+    /// If a database were tampered with to classify most of the Internet as CN, formal rules would block nothing while checks would pass.
     public static func isPlausible(_ networks: [IPNetwork]) -> Bool {
-        // 用 Double 求和不会溢出（构造过的库段数可以很多）；2 的整数次幂在 Double 里是精确的
+        // Double summation will not overflow (crafted DBs could have many CIDRs); integer powers of 2 are exact in Double
         let share = { (family: Int) in
             networks.filter { $0.bytes.count == family }.reduce(0.0) { $0 + Double(sign: .plus, exponent: -$1.prefix, significand: 1) }
         }
@@ -48,15 +51,15 @@ public enum CountryDatabase {
 }
 
 public enum CountryDatabaseError: Error, Equatable {
-    /// 不是 mmdb，或者截断、越界
+    /// Not an mmdb, or truncated / out of bounds
     case malformed
-    /// mihomo 认得、这里不支持的库
+    /// mihomo recognized, but unsupported type here
     case unsupportedType(String)
-    /// 国内段超过上限：pf 装不下
+    /// Domestic networks exceed upper limit: pf cannot hold them
     case tooManyNetworks
 }
 
-/// 走一遍搜索树
+/// Traverses the search tree
 private final class Walker {
     let bytes: [UInt8]
     let nodeCount: Int
@@ -64,11 +67,11 @@ private final class Walker {
     let data: Decoder
     let country: String
     let limit: Int
-    /// 数据区偏移 → 是不是这个国家；GeoLite2 里大量网段共用同一份记录
+    /// Data section offset -> whether it matches this country; GeoLite2 shares records across many subnets
     var verdicts: [Int: Bool] = [:]
-    /// IPv6 库里 IPv4 子树的根（`::/96`），别处再指到它是别名（`::ffff:0:0/96`、`2002::/16`），不重复走
+    /// Root of IPv4 subtree in IPv6 DB (`::/96`); other references to it are aliases (`::ffff:0:0/96`, `2002::/16`), traversed only once
     var ipv4Root: Int?
-    /// 走过的节点。合法的树里除了上面的别名，每个节点只有一个父节点；再走到就是构造过的库（不拦的话按 2^深度 走不完）
+    /// Visited nodes. In a valid tree apart from aliases above, every node has only one parent; revisiting indicates a cyclic/crafted DB (which would take 2^depth without guarding)
     var visited: [Bool]
 
     init(bytes: [UInt8], nodeCount: Int, recordSize: Int, data: Decoder, country: String, limit: Int) {
@@ -87,12 +90,12 @@ private final class Walker {
         return try walk(0, path: [UInt8](repeating: 0, count: 16), depth: 0).networks
     }
 
-    /// 子树里属于这个国家的网段；`whole` 是整个子树都是（父节点据此把两半合成一段）
+    /// Networks in the subtree matching this country; `whole` indicates the entire subtree matches (parent merges both halves into one)
     private func walk(_ node: Int, path: [UInt8], depth: Int) throws(CountryDatabaseError) -> (networks: [IPNetwork], whole: Bool) {
         if node == ipv4Root, path.count == 16 {
-            // 只在 ::/96 那一处按 IPv4 走；别名处跳过
+            // Only traverse as IPv4 at ::/96; skip at aliases
             guard depth == 96, path.allSatisfy({ $0 == 0 }) else { return ([], false) }
-            // 不往上报 whole：IPv4 段不能和旁边的 IPv6 段合成一段
+            // Do not report `whole` upwards: IPv4 networks cannot be merged with neighboring IPv6 networks
             return (try walk(node, path: [0, 0, 0, 0], depth: 0).networks, false)
         }
         guard depth < path.count * 8, !visited[node] else { throw .malformed }
@@ -112,7 +115,7 @@ private final class Walker {
             }
         }
         if halves[0].whole, halves[1].whole { return ([IPNetwork(bytes: path, prefix: depth)!], true) }
-        // 每个子树合并后都不超过上限，拼起来最多两倍：数组不会大到拖住内存
+        // Merged subtree count does not exceed limit, combined at most 2x: array will not consume excessive memory
         guard halves[0].networks.count + halves[1].networks.count <= limit else { throw .tooManyNetworks }
         return (halves[0].networks + halves[1].networks, false)
     }
@@ -127,7 +130,7 @@ private final class Walker {
         return v
     }
 
-    /// 节点 `node` 的左（0）或右（1）记录
+    /// Left (0) or right (1) record of node `node`
     private func record(_ node: Int, _ side: Int) throws(CountryDatabaseError) -> Int {
         let width = recordSize * 2 / 8
         let start = node * width
@@ -144,23 +147,23 @@ private final class Walker {
     }
 }
 
-/// 解数据区，`base` 是数据区起点，指针相对它。只按键查、只解字符串和无符号整数，别的值跳过：跳过时不跟指针，
-/// 指针不许指向指针（规范如此）。很多记录指向同一个大 map、很多键指向同一个大字符串时，工作量还是会相乘，
-/// 所以读值头的次数加上解出的字符串字节数有总上限 `budget`
+/// Decodes data section. `base` is start of data section, pointers are relative to it. Only queries by key, only decodes strings and unsigned integers, skips other values: skips do not follow pointers,
+/// pointers cannot point to pointers (per spec). When multiple records point to the same large map and multiple keys point to the same large string, workload multiplies,
+/// so total count of value headers read plus decoded string bytes has an overall `budget` cap.
 private final class Decoder {
     let bytes: [UInt8]
     let base: Int
-    /// 这一区的终点：数据区止于元数据标记，元数据止于文件尾
+    /// End of this section: data section ends at metadata marker, metadata ends at EOF
     let end: Int
-    /// 还能读多少个值头、解多少字节字符串。给文件的字节数（加一点余量，查元数据要把几个短键名扫好几遍）：
-    /// 合法的库每个值至少一个字节，记录又按偏移缓存，用不到这么多
+    /// Remaining count of value headers to read and string bytes to decode. Initialized to file byte count (plus slight margin to scan metadata keys repeatedly):
+    /// In a valid DB, every value is at least 1 byte, and records are cached by offset, so budget is sufficient
     private var budget: Int
 
     init(bytes: [UInt8], base: Int, end: Int) {
         (self.bytes, self.base, self.end, budget) = (bytes, base, end, bytes.count + 4096)
     }
 
-    /// 偏移处一个值的头：类型、大小、内容从哪开始。指针的「大小」是它指向的偏移
+    /// Header of a value at offset: type, size, body start. For pointers, "size" is target offset.
     private func header(at offset: Int) throws(CountryDatabaseError) -> (type: Int, size: Int, body: Int) {
         budget -= 1
         guard budget >= 0 else { throw .malformed }
@@ -193,7 +196,7 @@ private final class Decoder {
         return (type, size, i)
     }
 
-    /// 顺着指针走到真正的值（只走一跳）
+    /// Resolves pointer to actual value (single hop only)
     private func resolve(_ offset: Int) throws(CountryDatabaseError) -> (type: Int, size: Int, body: Int) {
         let h = try header(at: offset)
         guard h.type == 1 else { return h }
@@ -202,7 +205,7 @@ private final class Decoder {
         return target
     }
 
-    /// 跳过偏移处的值，返回它后面的偏移。指针只跳过自己，不跟过去
+    /// Skips value at offset, returns following offset. Pointers only skip themselves without following.
     private func skip(_ offset: Int, depth: Int = 0) throws(CountryDatabaseError) -> Int {
         guard depth < 32 else { throw .malformed }
         let h = try header(at: offset)
@@ -223,7 +226,7 @@ private final class Decoder {
 
     func isMap(at offset: Int) throws(CountryDatabaseError) -> Bool { try resolve(offset).type == 7 }
 
-    /// 偏移处的 map 里键 `key` 的值从哪开始；不是 map 或没有这个键是 `nil`
+    /// Offset where value for `key` in map at offset begins; returns `nil` if not a map or key not found
     func field(_ key: String, inMapAt offset: Int) throws(CountryDatabaseError) -> Int? {
         let map = try resolve(offset)
         guard map.type == 7 else { return nil }
@@ -232,7 +235,7 @@ private final class Decoder {
         for _ in 0..<map.size {
             let k = try resolve(i)
             let value = try skip(i)
-            // 先比长度再逐字节比，不解成 String：很多键可以指向同一个大字符串，长度对不上就一步跳过
+            // Compare length first, then byte-by-byte without decoding to String: many keys can point to same large string; length mismatch skips in one step
             if k.type == 2, k.size == wanted.count, k.body >= 0, base + k.body + k.size <= end,
                bytes[(base + k.body)..<(base + k.body + k.size)].elementsEqual(wanted) { return value }
             i = try skip(value)
@@ -245,7 +248,7 @@ private final class Decoder {
         let h = try resolve(offset)
         guard h.type == 2 else { return nil }
         guard h.body >= 0, base + h.body + h.size <= end else { throw .malformed }
-        // 按字节扣额度：很多记录的值可以指向同一个大字符串，只按值头次数算挡不住，处理的总字节数就不超过文件大小
+        // Deduct budget by bytes: values of many records may point to the same large string; counting header reads alone is insufficient, ensuring total processed bytes <= file size
         budget -= h.size
         guard budget >= 0 else { throw .malformed }
         return String(decoding: bytes[(base + h.body)..<(base + h.body + h.size)], as: UTF8.self)

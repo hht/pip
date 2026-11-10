@@ -1,27 +1,28 @@
 import Foundation
 import GuardCore
 
-/// 回答：Notchkeeper 自带的 Claude Code mod 装没装、怎么装、怎么卸（docs/agent-integration.md「安装和卸载」）。
-/// 只拷 mod 文件、跑 `claude plugin` 命令；不手改任何配置文件，不读 shell 配置。
+/// Answers: Whether Notchkeeper's bundled Claude Code mod is installed, and how to install/uninstall it (docs/agent-integration.md "Installation & Uninstallation").
+/// Copies mod files and runs `claude plugin` commands; never manually edits config files or reads shell configuration.
 enum ClaudeMod {
     enum Status: Equatable {
         case installed
-        /// 装了，但在 Claude Code 里关掉了
+        /// Installed, but disabled in Claude Code.
         case disabled
         case notInstalled
-        /// 固定的几个位置都没有 `claude`
+        /// No `claude` executable found in standard candidate locations.
         case noClaude
-        /// `claude plugin list` 失败，附原因
+        /// `claude plugin list` failed, with error description.
         case unknown(String)
     }
 
-    private static let pluginID = "notchkeeper@notchkeeper"
-    private static let marketplace = "notchkeeper"
-    /// marketplace 的固定位置：插件从这里原地加载，App 挪了位置也不受影响
+    private static let pluginID = "pip@notifier"
+    /// Not `pip`: Claude Code reserves that marketplace name for Python package index plugins (`claude plugin validate` and `claude plugin install` reject it, Claude Code 2.1.316).
+    private static let marketplace = "notifier"
+    /// Fixed marketplace location: plugin loads in-place from here, resilient to App relocation.
     static let directory = GuardPaths.directory.appendingPathComponent("ClaudeMod", isDirectory: true)
-    /// App 包里带的那份；`swift run` 直接跑时没有
+    /// Bundled copy in App bundle; absent when running directly via `swift run`.
     private static var bundled: URL? { Bundle.main.url(forResource: "ClaudeMod", withExtension: nil) }
-    /// 只看这几个位置：原生安装、Homebrew（Apple 芯片、Intel）
+    /// Inspect only these candidate locations: native install, Homebrew (Apple Silicon, Intel).
     private static let candidates = [FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/bin/claude").path,
                                      "/opt/homebrew/bin/claude", "/usr/local/bin/claude"]
 
@@ -29,7 +30,7 @@ enum ClaudeMod {
         candidates.first { FileManager.default.isExecutableFile(atPath: $0) }.map { URL(fileURLWithPath: $0) }
     }
 
-    /// `claude plugin list --json` 的输出：一个数组，每项有 `id` 和 `enabled`
+    /// Output from `claude plugin list --json`: an array of entries with `id` and `enabled`.
     static func status(fromList data: Data) throws -> Status {
         struct Entry: Decodable {
             var id: String
@@ -49,47 +50,47 @@ enum ClaudeMod {
     }
 
     static func install() async throws {
-        guard let claude else { throw Failure(errorDescription: String(localized: "找不到 claude")) }
+        guard let claude else { throw Failure(errorDescription: String(localized: "Can't find claude")) }
         try copyBundled()
-        _ = try await run(claude, ["plugin", "install", "notchkeeper", "--marketplace", directory.path, "--json"])
-        Log.write("Claude Code mod：已安装")
+        _ = try await run(claude, ["plugin", "install", "pip", "--marketplace", directory.path, "--json"])
+        Log.write("Claude Code mod: installed")
     }
 
-    /// 去掉 marketplace 会连带卸掉插件、去掉 `enabledPlugins` 里那一项（<https://code.claude.com/docs/en/plugins/install#manage-marketplaces>）
+    /// Removing marketplace cascades to uninstall plugin and remove from `enabledPlugins` (<https://code.claude.com/docs/en/plugins/install#manage-marketplaces>).
     static func uninstall() async throws {
-        guard let claude else { throw Failure(errorDescription: String(localized: "找不到 claude")) }
+        guard let claude else { throw Failure(errorDescription: String(localized: "Can't find claude")) }
         _ = try await run(claude, ["plugin", "marketplace", "remove", marketplace, "--json"])
         do {
             try FileManager.default.removeItem(at: directory)
         } catch CocoaError.fileNoSuchFile {
-            // 已经卸掉了，目录本来就不在
+            // Already uninstalled, directory absent.
         }
-        Log.write("Claude Code mod：已卸载")
+        Log.write("Claude Code mod: uninstalled")
     }
 
-    /// App 启动时：装着的话换成 App 里带的这一版，下一个会话就用上（原地加载，不用改版本号）
+    /// On App launch: if installed, replace with bundled version so next session picks up changes without version bumps.
     static func refreshIfInstalled() {
         guard FileManager.default.fileExists(atPath: directory.path) else { return }
         do {
             try copyBundled()
         } catch {
-            Log.write("Claude Code mod：更新失败：\(error.localizedDescription)")
+            Log.write("Claude Code mod: update failed: \(error.localizedDescription)")
         }
     }
 
-    /// 插件从这里原地加载：拷到一半失败时原来那份还在（`replaceItem(at:withCopyOf:)`）
+    /// Plugins load in-place from here: atomic replace keeps previous copy on failure (`replaceItem(at:withCopyOf:)`).
     private static func copyBundled() throws {
-        guard let bundled else { throw Failure(errorDescription: String(localized: "这个构建不含 mod，要用 scripts/run.sh 打包")) }
+        guard let bundled else { throw Failure(errorDescription: String(localized: "This build doesn't include the mod; package it with scripts/run.sh")) }
         try FileManager.default.replaceItem(at: directory, withCopyOf: bundled)
     }
 
-    /// 跑一条 `claude` 命令，返回标准输出；退出码不是 0 就抛出，带输出的最后一行。60 秒没跑完就杀掉、抛出「超时」，
-    /// 不管它起的子进程有没有关掉输出管道，都一定会回来
+    /// Runs a `claude` command, returns stdout; throws with last output line if exit status != 0.
+    /// Kills process and throws timeout on 60s deadline regardless of child process pipes.
     private static func run(_ claude: URL, _ arguments: [String]) async throws -> Data {
         let process = Process()
         process.executableURL = claude
         process.arguments = arguments
-        // 别顺手起自动更新：子进程继承输出管道，读端就等不到 EOF
+        // Prevent background auto-updater: child processes inherit pipes preventing EOF.
         process.environment = ProcessInfo.processInfo.environment.merging(["DISABLE_AUTOUPDATER": "1"]) { $1 }
         process.standardInput = FileHandle.nullDevice
         let out = Pipe(), err = Pipe()
@@ -107,20 +108,20 @@ enum ClaudeMod {
                 run.finish(.failure(error))
                 return
             }
-            // 到点不管 claude 还在不在都收尾：它退出了、但它起的子进程还占着输出管道时，也等不到 EOF。已经交回过就什么也不做
+            // Force terminate after 60s deadline: handles cases where child processes hold pipes open.
             DispatchQueue.global().asyncAfter(deadline: .now() + 60) {
                 if process.isRunning { kill(process.processIdentifier, SIGKILL) }
-                run.finish(.failure(Failure(errorDescription: String(localized: "超时"))))
+                run.finish(.failure(Failure(errorDescription: String(localized: "Timed out"))))
             }
         }
     }
 
-    /// 一次命令的输出和结局：退出了、两路都读到 EOF 才算完；只交回一次
+    /// Single execution outcome: finished only after process exits and both streams hit EOF.
     private final class Run: @unchecked Sendable {
         private let lock = NSLock()
         private let handles: [FileHandle]
         private var continuation: CheckedContinuation<Data, Error>?
-        /// [标准输出, 标准错误]
+        /// [stdout, stderr]
         private var data = [Data(), Data()]
         private var closed = [false, false]
         private var status: Int32?
@@ -131,7 +132,7 @@ enum ClaudeMod {
             lock.withLock { continuation = c }
         }
 
-        /// 空数据是 EOF：摘掉这一路的回调，免得 EOF 之后还反复被叫
+        /// Empty data signifies EOF: remove handler to prevent repeated invocation.
         func append(_ chunk: Data, pipe: Int) {
             lock.withLock {
                 if chunk.isEmpty {
@@ -154,7 +155,7 @@ enum ClaudeMod {
                 guard let status, !closed.contains(false) else { return nil }
                 if status == 0 { return .success(data[0]) }
                 let last = String(decoding: data[1] + data[0], as: UTF8.self).split(whereSeparator: \.isNewline).last.map(String.init)
-                return .failure(Failure(errorDescription: last ?? String(localized: "退出码 \(status)")))
+                return .failure(Failure(errorDescription: last ?? String(localized: "Exit code \(status)")))
             }
             if let result { finish(result) }
         }

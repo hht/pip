@@ -1,8 +1,8 @@
 import AgentCore
 import MascotCore
 
-/// 回答：一个插件此刻多急、收起时 Pip 和右耳画什么；几个插件里谁上位（照灵动岛 relevanceScore：最急的那个显示在收起态）。
-/// 不知道插件开没开（App 只把开着的传进来）、也不知道面板里列什么（`PanelRow`）。
+/// Answers: How urgent a plugin is right now, what Pip and right ear show when collapsed, and which plugin takes precedence (following Dynamic Island relevanceScore: most urgent shows in collapsed state).
+/// Agnostic of whether plugin is enabled (App passes only enabled ones) and what panel lists (`PanelRow`).
 /// @see https://developer.apple.com/documentation/activitykit/activitycontent/relevancescore
 public struct PluginStatus: Equatable, Sendable {
     public enum Urgency: Int, Comparable, Sendable {
@@ -16,7 +16,7 @@ public struct PluginStatus: Equatable, Sendable {
     public let look: Look
     public let indicator: EarIndicator
 
-    /// 严重只有出口守卫能报（CLAUDE.md 硬规则「插件」）：别的插件报了降成要你看
+    /// Critical can only be reported by egress guard (CLAUDE.md hard rule "Plugins"): others downgraded to attention
     init(plugin: String, urgency: Urgency, look: Look, indicator: EarIndicator) {
         self.plugin = plugin
         self.urgency = urgency == .critical && plugin != PluginID.exitGuard ? .attention : urgency
@@ -24,17 +24,17 @@ public struct PluginStatus: Equatable, Sendable {
         self.indicator = indicator
     }
 
-    /// 违规（含关掉红卡后确认不了恢复）严重；不一致、断网、守卫没响应要你看；健康和探针没结果平静（探针没结果只在右耳画灰环）
+    /// Violated is critical; mismatch and offline need attention; healthy, initial checking, and probe failed are calm (probe failed shows gray ring on right ear)
     public init(guard p: GuardPresentation) {
         let urgency: Urgency = switch p.status {
-        case .healthy, .probeFailed: .calm
-        case .mismatch, .offline, .unresponsive: .attention
-        case .violated, .violationUnconfirmed: .critical
+        case .checking, .healthy, .probeFailed: .calm
+        case .mismatch, .offline: .attention
+        case .violated: .critical
         }
         self.init(plugin: PluginID.exitGuard, urgency: urgency, look: p.look, indicator: .for(p.look, probeFailed: p.status == .probeFailed))
     }
 
-    /// 等你回答、批准要你看；工作中、干了很久、刚做完进行中；没有要画的平静
+    /// Question/approval need attention; working, long turn, finished are active; idle is calm
     public init(agent: AgentActivity?) {
         let urgency: Urgency = switch agent {
         case nil: .calm
@@ -45,7 +45,7 @@ public struct PluginStatus: Equatable, Sendable {
         self.init(plugin: PluginID.claudeCode, urgency: urgency, look: look, indicator: .for(look, probeFailed: false))
     }
 
-    /// 外部插件：紧急程度是它开着的活动里最急的那个（`ActivityBoard`），造型跟着紧急程度走
+    /// External plugins: urgency matches highest urgency among active activities (`ActivityBoard`), look follows urgency
     public init(external plugin: String, urgency: Urgency) {
         let look: Look = switch urgency {
         case .calm: .idle
@@ -55,7 +55,7 @@ public struct PluginStatus: Equatable, Sendable {
         self.init(plugin: plugin, urgency: urgency, look: look, indicator: .for(look, probeFailed: false))
     }
 
-    /// 最急的上位，一样急时排在前面的上位（App 按守卫、再按面板段的顺序传）；都平静时是常驻插件，不常驻或它关着就没有
+    /// Most urgent takes precedence; ties broken by order passed by App (guard first, then panel section order); when all calm, falls back to resident plugin
     public static func lead(_ statuses: [PluginStatus], resident: String?) -> PluginStatus? {
         let top = statuses.reduce(nil as PluginStatus?) { best, s in s.urgency > (best?.urgency ?? .calm) ? s : best }
         return top ?? statuses.first { $0.plugin == resident }

@@ -3,16 +3,17 @@ import Darwin
 import Foundation
 import GuardCore
 
-/// 回答：Claude Code 各会话合起来此刻是什么 agent 动态、刚发生了哪些该提醒的事。
-/// 只做 I/O：监听 `~/.claude/sessions` 和 mod 写的 `turns/`（docs/agent-integration.md「两个来源」）、读文件、查进程、
-/// 挂进程退出通知和一个到点定时器；要不要看、什么状态、回合怎么结束的全归 AgentCore（`SessionFile`、`TurnFile`、`AgentBoard`），
-/// 这里不重复任何一条规则。可变状态只在 `queue` 上读写，所以标 `@unchecked Sendable`。
+/// Answers: What aggregate agent activity is currently ongoing across Claude Code sessions, and what recent events need user alerts.
+/// Handles I/O only: monitors `~/.claude/sessions` and the mod-written `turns/` (docs/agent-integration.md "Two Sources"),
+/// reads files, inspects processes, attaches process exit notifications and a scheduled timer;
+/// all decisions on whether to observe, what states mean, and how turns end belong to AgentCore (`SessionFile`, `TurnFile`, `AgentBoard`),
+/// without duplicating any rules here. Mutable state is only accessed on `queue`, marked `@unchecked Sendable`.
 ///
-/// 三种通知，来了都把两个目录整个重读一遍（会话只有几个，每份不到 1KB）：
-/// - 目录 `.write`：新会话加文件、正常退出删文件。
-/// - 每份 `.json` 自己的 `.write` / `.extend`：Claude Code 原地重写状态（inode 不变，目录收不到事件，实测）；
-///   文件被删或改名（`.delete` / `.rename`）就关掉它的监听，重读时按目录现状重开。
-/// - 每个会话进程的退出通知：`kill -9` 后文件留着、目录不变（docs/agent-integration.md「实测」4）。
+/// Three types of notifications trigger a full reread of both directories (only a few sessions, each < 1KB):
+/// - Directory `.write`: new session adds a file, normal exit deletes a file.
+/// - Individual `.json` file's `.write` / `.extend`: Claude Code rewrites state in-place (same inode, directory gets no event, verified);
+///   when file is deleted or renamed (`.delete` / `.rename`), its monitor is closed and reopened based on current directory state during scan.
+/// - Process exit notification for each session: after `kill -9`, file remains and directory does not change (docs/agent-integration.md "Empirical" 4).
 /// @see https://developer.apple.com/documentation/dispatch/dispatchsource/makefilesystemobjectsource(filedescriptor:eventmask:queue:)
 /// @see https://developer.apple.com/documentation/dispatch/dispatchsource/makeprocesssource(identifier:eventmask:queue:)
 final class AgentWatcher: @unchecked Sendable {
@@ -29,18 +30,18 @@ final class AgentWatcher: @unchecked Sendable {
                                               queue: queue) { [weak self] in self?.scan() }
     private lazy var turnFiles = WatchedDirectory(GuardPaths.directory.appendingPathComponent("turns", isDirectory: true),
                                            queue: queue) { [weak self] in self?.scan() }
-    /// 正在看的会话：pid → 它的退出通知
+    /// Active sessions being monitored: pid -> process exit dispatch source.
     private var exitSources: [Int32: DispatchSourceProcess] = [:]
     private var timer: DispatchSourceTimer?
     private var lastActivity: AgentActivity?
     private var lastSessions: [Session] = []
-    /// 解不开的文件：只在新出现时记一次日志（准则 5：计数、跳过，不覆盖原文件）
+    /// Unparseable files: log once when first encountered (Principle 5: count and skip, never overwrite original file).
     private var unreadable: Set<URL> = []
 
-    /// 回合文件这么久没写过，就是 `/clear` 或 App 没开时退出的会话留下的。还活着的会话下一个回合结束会重写，删了也不丢提醒
+    /// Turn files unwritten for this long are remnants from `/clear` or sessions that exited while App was closed. Active sessions will rewrite on turn completion; deleting won't lose alerts.
     private static let staleTurnFile: TimeInterval = 7 * 24 * 3600
 
-    /// `onUpdate` 在内部队列上调用，只在动态、会话列表变了或有事件时调用
+    /// `onUpdate` is invoked on internal queue only when activity, session list changes, or events occur.
     init(onUpdate: @escaping @Sendable (Update) -> Void) {
         self.onUpdate = onUpdate
     }
@@ -51,15 +52,15 @@ final class AgentWatcher: @unchecked Sendable {
             timer.setEventHandler { [weak self] in self?.publish(events: []) }
             self.timer = timer
             timer.activate()
-            if !sessionFiles.open() { Log.write("agent：打不开会话目录（errno \(errno)），不看 agent 状态") }
-            // 回合文件的目录归 App：先建好才能监听，mod 还没写过也一样
+            if !sessionFiles.open() { Log.write("agent: cannot open sessions directory (errno \(errno)), ignoring agent state") }
+            // The turns directory belongs to App: must be created before watching, even if mod hasn't written to it yet.
             do {
                 try FileManager.default.createDirectory(at: turnFiles.url, withIntermediateDirectories: true)
                 try pruneTurnFiles()
             } catch {
-                Log.write("agent：建不了或读不了回合文件目录：\(error.localizedDescription)")
+                Log.write("agent: cannot create or read turns directory: \(error.localizedDescription)")
             }
-            if !turnFiles.open() { Log.write("agent：打不开回合文件目录（errno \(errno)），不弹完成卡、出错卡") }
+            if !turnFiles.open() { Log.write("agent: cannot open turns directory (errno \(errno)), completed/error cards will not pop up") }
             scan()
         }
     }
@@ -74,13 +75,13 @@ final class AgentWatcher: @unchecked Sendable {
         }
     }
 
-    /// 本来就没有（mod 没装、这个会话里没加载）不算错
+    /// Non-existent file (mod not installed or not loaded in this session) is not an error.
     private func removeTurnFile(_ url: URL) {
         do {
             try FileManager.default.removeItem(at: url)
         } catch CocoaError.fileNoSuchFile {
         } catch {
-            Log.write("agent：删不掉回合文件：\(error.localizedDescription)")
+            Log.write("agent: cannot delete turn file: \(error.localizedDescription)")
         }
     }
 
@@ -91,7 +92,7 @@ final class AgentWatcher: @unchecked Sendable {
         do {
             names = try sessionFiles.list()
         } catch {
-            Log.write("agent：读会话目录失败，不看 agent 状态：\(error.localizedDescription)")
+            Log.write("agent: failed to read sessions directory, ignoring agent state: \(error.localizedDescription)")
             publish(events: exitSources.keys.compactMap(forget))
             return
         }
@@ -102,22 +103,22 @@ final class AgentWatcher: @unchecked Sendable {
             do {
                 session = try SessionFile.parse(Data(contentsOf: url))
             } catch CocoaError.fileReadNoSuchFile {
-                continue // 列目录之后、读之前进程正常退出删掉了
+                continue // Normal exit deleted file between directory listing and read
             } catch {
-                // 读不了、解不开都跳过，但不当成没了：上一次读到的状态留着
+                // If unreadable or unparseable, skip but do not treat as dead: preserve last read state
                 if let pid = Int32(name.dropLast(5)) { present.insert(pid) }
                 markUnreadable(url, error)
                 continue
             }
             unreadable.remove(url)
             guard let session else { continue }
-            watchExit(session.pid) // 先挂通知再查进程：查完到挂上之间退出的也收得到
+            watchExit(session.pid) // Attach exit watcher before process check: catch exits during the interval
             guard Self.isRunning(pid: session.pid, since: session.processStart) else { continue }
             present.insert(session.pid)
             if let event = board.update(session, at: now) { events.append(event) }
         }
         events += exitSources.keys.filter { !present.contains($0) }.compactMap(forget)
-        // 会话先于回合文件：新会话的回合文件对得上
+        // Sessions precede turn files: newly discovered session matches its turn file
         do {
             for name in try turnFiles.list() {
                 let url = turnFiles.url.appendingPathComponent(name)
@@ -132,18 +133,18 @@ final class AgentWatcher: @unchecked Sendable {
                 }
             }
         } catch {
-            Log.write("agent：读回合文件目录失败，不弹完成卡、出错卡：\(error.localizedDescription)")
+            Log.write("agent: failed to read turns directory, completed/error cards will not pop up: \(error.localizedDescription)")
         }
         publish(events: events)
     }
 
     private func markUnreadable(_ url: URL, _ error: Error) {
         if unreadable.insert(url).inserted {
-            Log.write("agent：\(url.deletingLastPathComponent().lastPathComponent) 里有文件解不开，跳过（共 \(unreadable.count) 份）：\(error)")
+            Log.write("agent: unreadable file in \(url.deletingLastPathComponent().lastPathComponent), skipped (\(unreadable.count) unreadable): \(error)")
         }
     }
-    /// 进程在，并且启动时刻和文件里的 `procStart` 一致（防 pid 复用）。查不到（进程没了或判不出来）都算不在
-    /// @see https://opensource.apple.com/source/xnu/xnu-7195.81.3/bsd/sys/proc_info.h （`proc_bsdinfo.pbi_start_tvsec`）
+    /// Process is alive and start time matches `procStart` in file (guards against PID reuse). Inability to query implies process is not running.
+    /// @see https://opensource.apple.com/source/xnu/xnu-7195.81.3/bsd/sys/proc_info.h (`proc_bsdinfo.pbi_start_tvsec`)
     static func isRunning(pid: Int32, since processStart: Date) -> Bool {
         var info = proc_bsdinfo()
         let size = Int32(MemoryLayout<proc_bsdinfo>.size)
@@ -162,7 +163,7 @@ final class AgentWatcher: @unchecked Sendable {
         source.activate()
     }
 
-    /// 不再看这个进程，删掉它的回合文件（mod 不会再写）；它正在需要你介入时返回介入结束
+    /// Stop observing process and delete its turn file (mod won't write again); returns intervention ended if currently awaiting user input.
     private func forget(_ pid: Int32) -> AgentEvent? {
         exitSources.removeValue(forKey: pid)?.cancel()
         if let session = board.sessions.first(where: { $0.pid == pid }) {

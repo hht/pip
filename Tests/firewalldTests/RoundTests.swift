@@ -10,14 +10,14 @@ import FirewallCore
         let status = try #require(rig.round())
         #expect(rig.pf.anchor == rig.rules.text)
         #expect(rig.pf.references == ["1864012227745836441"])
-        guard case .valid(let s) = rig.state else { Issue.record("防火墙状态文件读不出"); return }
+        guard case .valid(let s) = rig.state else { Issue.record("Cannot read firewall state file"); return }
         #expect(s.reference == .held(token: "1864012227745836441"))
         #expect(status.mode == .trial)
         #expect(status.check?.passed == true)
         #expect(rig.status == status)
     }
 
-    /// 稳态不再 -E、不重装：引用数不涨、Evaluations 不归零
+    /// Steady state neither calls -E nor reloads: reference count does not grow, Evaluations not reset
     @Test func steadyRoundsNeitherReEnableNorReload() throws {
         let rig = try Rig()
         try rig.enable()
@@ -29,8 +29,8 @@ import FirewallCore
         #expect(status.check?.evaluationsGrowing == true)
     }
 
-    /// 拿到 token 就落盘：-E 之后的下一步（再读一次引用列表）之前，防火墙状态文件里已经有它。
-    /// 恢复脚本 bootout 时正好杀在这一步，也找得到这个 token 去释放
+    /// Persist to disk as soon as token is acquired: state file already contains it before the next step after -E (re-reading reference list).
+    /// If rescue script bootout terminates exactly at this point, it can find this token to release
     @Test func tokenIsOnDiskBeforeTheNextStep() throws {
         let rig = try Rig()
         try rig.enable()
@@ -41,11 +41,11 @@ import FirewallCore
         }
         _ = rig.round()
         #expect(next == ["/sbin/pfctl", "-s", "References"])
-        guard case .valid(let s) = seen else { Issue.record("下一步时防火墙状态文件读不出"); return }
+        guard case .valid(let s) = seen else { Issue.record("Cannot read firewall state file on next step"); return }
         #expect(s.reference == .held(token: "1864012227745836441"))
     }
 
-    /// 防火墙状态文件坏了：按 off 办（清掉残留规则），不覆盖原文件，摘要里报出来
+    /// State file corrupt: treated as off (cleans leftover rules), does not overwrite original file, reported in summary
     @Test func unreadableStateIsTreatedAsOffAndKept() throws {
         let rig = try Rig()
         let url = rig.directory.appendingPathComponent(FirewallState.fileName)
@@ -57,7 +57,7 @@ import FirewallCore
         #expect(status.mode == .stateUnreadable)
     }
 
-    /// 做失败的动作报进摘要，下一轮重做
+    /// Failed action reported in summary, retried next round
     @Test func failedActionIsReportedAndRetried() throws {
         let rig = try Rig()
         try rig.enable()
@@ -82,7 +82,7 @@ import FirewallCore
         #expect(status.check == nil)
     }
 
-    /// 到期回滚由一轮执行，不靠 App；过期后点保留被拒
+    /// Expiration rollback executed by a round, independent of App; clicking keep after expiration is refused
     @Test func expiredTrialRollsBackAndCannotBeKept() throws {
         let rig = try Rig()
         try rig.enable()
@@ -102,7 +102,7 @@ import FirewallCore
         #expect(rig.round()?.trialEndsAt == rig.system.now().addingTimeInterval(90))
     }
 
-    /// 命令不碰 pf，只改文件，再重启守护进程让它马上跑一轮
+    /// Commands do not touch pf; they modify files only, then restart daemon to run an immediate round
     @Test(arguments: [Helper.Command.keep, .disable])
     func commandsRestartTheDaemon(_ command: Helper.Command) throws {
         let rig = try Rig()
@@ -114,7 +114,7 @@ import FirewallCore
         #expect(rig.pf.calls == [["/bin/launchctl", "kickstart", "-k", "system/com.notchkeeper.firewall"]])
     }
 
-    /// 防火墙状态文件只有 root 可读（里面有 token）；摘要给 App 读
+    /// Firewall state file is readable only by root (contains tokens); summary readable by App
     @Test func filePermissions() throws {
         let rig = try Rig()
         try rig.enable()
@@ -126,7 +126,7 @@ import FirewallCore
         #expect(try mode(FirewallStatus.fileName) == 0o644)
     }
 
-    /// 有人 pfctl -d：引用全作废、pf 停了。下一轮看出我们的 token 不在了，重新 -E，核对又过
+    /// Someone runs pfctl -d: references invalidated, pf stopped. Next round detects our token is gone, re-enables with -E, verification passes again
     @Test func recoversAfterSomeoneDisablesPF() throws {
         let rig = try Rig()
         try rig.enable()
@@ -139,7 +139,7 @@ import FirewallCore
         #expect(status.check?.pfEnabled == true)
     }
 
-    /// -E 给的号码在引用列表里找不到（格式对不上）：只拿一个引用，不每轮多拿
+    /// -E token not found in reference list (format mismatch): acquires only one reference, not accumulating every round
     @Test func unlistedTokenIsNotReEnabledEveryRound() throws {
         let rig = try Rig()
         rig.pf.listsOurReferences = false
@@ -150,7 +150,8 @@ import FirewallCore
         #expect(rig.pf.references.count == 1)
     }
 
-    /// 关闭那一轮清规则失败、守护进程还在跑时又开启：要装刚拍的快照，不能因为「规则文本没变、anchor 不空」就留着旧表
+    /// Flush fails in disable round, re-enabled while daemon is still running: reload freshly snapshotted tables,
+    /// cannot keep old tables just because "rule text unchanged, anchor not empty"
     @Test func enableAfterAFailedFlushReloads() throws {
         let rig = try Rig()
         try rig.enable()
@@ -164,7 +165,7 @@ import FirewallCore
         #expect(rig.pf.calls.filter { $0.contains("-f") }.count == 2)
     }
 
-    /// 锁被占着（另一轮或命令卡住）：等到上限就放弃，什么都不改
+    /// Lock is held (another round or command stuck): gives up when limit reached, modifies nothing
     @Test func givesUpWhenTheLockIsHeld() throws {
         let rig = try Rig()
         rig.lockTimeout = 0.2
@@ -175,10 +176,10 @@ import FirewallCore
         #expect(rig.round() == nil)
         #expect(rig.state == .missing)
         #expect(rig.table("clash") == nil)
-        #expect(rig.pf.calls.allSatisfy { $0.first == "/usr/bin/dig" }) // 拍快照问 DNS 在锁外，不算改动
+        #expect(rig.pf.calls.allSatisfy { $0.first == "/usr/bin/dig" }) // Snapshot DNS queries are outside lock, not counted as modification
     }
 
-    /// 坏掉的防火墙状态文件谁都不覆盖：开启被拒（先跑恢复脚本）；关闭照样算成功（每一轮本来就按 off 办）
+    /// Corrupted state file overwritten by neither: enable rejected (run rescue script first); disable still succeeds (each round treats unreadable as off anyway)
     @Test func commandsDoNotOverwriteAnUnreadableState() throws {
         let rig = try Rig()
         let url = rig.directory.appendingPathComponent(FirewallState.fileName)
@@ -200,7 +201,7 @@ import FirewallCore
         #expect(rig.pf.references.isEmpty)
     }
 
-    /// 摘要写明装的是哪种规则：测试规则不能让 App 显示「已保护」
+    /// Summary states which rules are loaded: test rules cannot cause App to display "protected"
     @Test func statusSaysWhichRules() throws {
         let rig = try Rig()
         try rig.enable()
@@ -208,7 +209,7 @@ import FirewallCore
         #expect(rig.pf.anchor == FirewallRules(tunnel: "utun1024", scope: .testTable, directory: FirewallPaths.directory.path)?.text)
     }
 
-    /// 读不出开机标识：开启报错、说得出原因；一轮照常按 off 办，防火墙状态文件里不写开机标识
+    /// Boot session unreadable: enable errors with descriptive reason; rounds proceed as off, state file omits boot session
     @Test func unreadableBootSession() throws {
         let rig = try Rig()
         rig.bootSession = nil
@@ -216,11 +217,11 @@ import FirewallCore
         rig.pf.anchor = "pass all\n"
         #expect(rig.round()?.mode == .off)
         #expect(rig.pf.anchor == "")
-        guard case .valid(let s) = rig.state else { Issue.record("防火墙状态文件读不出"); return }
+        guard case .valid(let s) = rig.state else { Issue.record("Cannot read firewall state file"); return }
         #expect(s.bootSession == nil)
     }
 
-    /// 换规则那轮装失败：anchor 里还是旧规则，摘要不能说成新规则
+    /// Rule replacement fails in round: anchor retains old rules, summary must not claim new rules
     @Test func statusHasNoScopeWhenTheseRulesAreNotLoaded() throws {
         let rig = try Rig()
         try rig.enable()
@@ -230,7 +231,7 @@ import FirewallCore
         #expect(rig.round(scope: .everyone)?.scope == nil)
     }
 
-    /// 防火墙状态文件写不进去时不 -E：拿到的 token 记不下来，下一轮又会 -E，引用越涨越多
+    /// Does not enable via -E if state cannot be saved: acquired token cannot be recorded, repeating -E every round with unbounded token growth
     @Test func doesNotEnableWhenStateCannotBeSaved() throws {
         let rig = try Rig()
         try rig.enable()
@@ -248,7 +249,7 @@ import FirewallCore
             == .round(Helper.RoundConfig(tunnel: "utun1024", scope: .testTable)!))
     }
 
-    /// 打印规则单独一个动词：只有它不要 root
+    /// Print rules is an independent command: the only one not requiring root
     @Test func rules() {
         #expect(Firewalld.parse(["rules", "--tunnel", "utun9999", "--test-rules"])
             == .rules(Helper.RoundConfig(tunnel: "utun9999", scope: .testTable)!))

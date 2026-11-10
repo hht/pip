@@ -3,7 +3,7 @@ import AppKit
 import AgentCore
 import NotchCore
 
-/// `scripts/demo.sh` 弹卡。分布式通知本机任何进程都能发，所以只在 DEBUG 构建（`CONFIG=debug scripts/run.sh`）里听
+/// `scripts/demo.sh` pop-up cards. Distributed notifications can be sent by any local process, so listen only in DEBUG builds (`CONFIG=debug scripts/run.sh`).
 extension AppDelegate {
     func listenForDemo() {
         DistributedNotificationCenter.default().addObserver(
@@ -12,63 +12,63 @@ extension AppDelegate {
             suspensionBehavior: .deliverImmediately)
     }
 
-    /// scripts/demo.sh：agent 的卡挂在最近变过状态的会话上，和真卡走同一条路（同样的文案，点了也跳 Ghostty）；alert 当一次新违规；blocks 弹五种内容块；
-    /// settings 打开设置的插件页（实机截设置页不用人去点）
+    /// scripts/demo.sh: agent cards attach to the most recently updated session, following the same pipeline as real cards (identical copy, click jumps to Ghostty); alert acts as new violation; blocks pops five content blocks;
+    /// settings opens plugin settings (for taking screenshots on physical devices without manual clicks).
     @objc func handleCardNotification(_ n: Notification) {
         let kind = n.object as? String ?? ""
         if kind == "settings" {
             settings.show(.plugins)
-            Log.write("外部触发：设置")
+            Log.write("External trigger: settings")
             return
         }
         if kind == "alert" {
             state.demoAlert()
-            Log.write("外部触发：红卡")
+            Log.write("External trigger: alert card")
             return
         }
         if kind == "blocks" {
             for card in Self.demoBlocks { notch.post(card, key: nil) }
-            Log.write("外部触发：内容块")
+            Log.write("External trigger: content blocks")
             return
         }
-        // 本机任何进程都能发这个通知：不认识的 kind 不进日志，免得伪造日志行
+        // Any local process can send this notification: do not log unrecognized kinds to prevent log spoofing.
         let make: (Int32) -> AgentEvent
         switch kind {
         case "done": make = { .turnDone(pid: $0) }
         case "failed": make = { .turnFailed(pid: $0) }
         case "question": make = { .needsYou(.question, pid: $0) }
         case "approval": make = { .needsYou(.approval, pid: $0) }
-        default: Log.write("外部触发：不认识的卡"); return
+        default: Log.write("External trigger: unrecognized card"); return
         }
         guard let s = state.sessions.max(by: { $0.stateSince < $1.stateSince }) else {
-            Log.write("外部触发：没有 Claude Code 会话，不弹")
+            Log.write("External trigger: no Claude Code sessions, will not show")
             return
         }
         notch.agentEvents([make(s.pid)], sessions: state.sessions)
-        Log.write("外部触发：\(kind)")
+        Log.write("External trigger: \(kind)")
     }
 
-    /// `demo.sh blocks`：五种内容块各一张，挂在一个假的外部插件上
-    /// 每次新造：卡的 id 和真卡一样每张不同
+    /// `demo.sh blocks`: one card for each of the five content block types, attached to a mock external plugin.
+    /// Created anew each time: card IDs differ per card just like real cards.
     static var demoBlocks: [Card] {
-        let source = Card.Source.plugin(id: "demo", name: "演示", symbol: "sparkles")
+        let source = Card.Source.plugin(id: "demo", name: "Demo", symbol: "sparkles")
         return [
-            Card(source: source, title: "npm 跑完了", subtitle: "~/Projects/notchkeeper", value: "2 分 13 秒", outcome: .done,
-                 block: .facts([.init(title: "退出码", value: "0"), .init(title: "分支", value: "design/panel"),
-                                .init(title: "耗时", value: "2:13"), .init(title: "测试", value: "373 个")]),
-                 buttons: [.init(title: "打开访达", action: .activate(bundleID: "com.apple.finder")),
-                           .init(title: "看 Swift 文档", action: .open(URL(string: "https://www.swift.org/documentation/")!))]),
-            Card(source: source, title: "swift test 失败了", subtitle: "~/Projects/notchkeeper", value: "41 秒", outcome: .failed,
+            Card(source: source, title: "npm finished", subtitle: "~/Projects/pip", value: "2m 13s", outcome: .done,
+                 block: .facts([.init(title: "Exit code", value: "0"), .init(title: "Branch", value: "design/panel"),
+                                .init(title: "Duration", value: "2:13"), .init(title: "Tests", value: "373")]),
+                 buttons: [.init(title: "Open Finder", action: .activate(bundleID: "com.apple.finder")),
+                           .init(title: "View Swift Docs", action: .open(URL(string: "https://www.swift.org/documentation/")!))]),
+            Card(source: source, title: "swift test failed", subtitle: "~/Projects/pip", value: "41s", outcome: .failed,
                  block: .log(["✘ Test cardGrowsWithBlock() failed", "Expectation failed: 156 <= 150", "NotchLayoutTests.swift:21"]),
-                 // 卡片和按钮都是被拦的 scheme（不同的两个）：点按钮只该记一次 ftp，点空白处只该记一次 http
+                 // Both card and button use intercepted schemes (different ones): clicking button logs ftp once, clicking blank area logs http once.
                  action: .open(URL(string: "http://example.com")!),
-                 buttons: [.init(title: "看日志", action: .open(URL(string: "ftp://example.com/log")!))]),
-            Card(source: source, title: "部署", subtitle: "app 0.3.1", outcome: .info,
-                 block: .checklist([.init(text: "编译", state: .ok), .init(text: "单元测试", state: .failed), .init(text: "上传", state: .pending)])),
-            Card(source: source, title: "下载中", subtitle: "Xcode_27.xip", value: "剩 1 分", outcome: .info,
+                 buttons: [.init(title: "View Logs", action: .open(URL(string: "ftp://example.com/log")!))]),
+            Card(source: source, title: "Deployment", subtitle: "app 0.3.1", outcome: .info,
+                 block: .checklist([.init(text: "Build", state: .ok), .init(text: "Unit tests", state: .failed), .init(text: "Upload", state: .pending)])),
+            Card(source: source, title: "Downloading", subtitle: "Xcode_27.xip", value: "1m remaining", outcome: .info,
                  block: .progress(0.62, label: "7.4 / 12 GB")),
-            Card(source: source, title: "构建说明", outcome: .attention,
-                 block: .text(["**3 个测试**没过，最慢的是 `GuardStateWatching`", "_其余_ 370 个都通过了", "[链接不会生效](https://example.com) ![图片也不会](file:///etc/hosts)"])),
+            Card(source: source, title: "Build notes", outcome: .attention,
+                 block: .text(["**3 tests** failed, slowest was `GuardStateWatching`", "_All other_ 370 passed", "[Link disabled](https://example.com) ![Image disabled](file:///etc/hosts)"])),
         ]
     }
 }

@@ -5,43 +5,43 @@ import NotchCore
 
 private let t0 = Date(timeIntervalSince1970: 1_800_000_000)
 private func at(_ s: TimeInterval) -> Date { t0.addingTimeInterval(s) }
-private let source = Card.Source.plugin(id: "dl", name: "下载", symbol: "arrow.down.circle")
+private let source = Card.Source.plugin(id: "dl", name: "Download", symbol: "arrow.down.circle")
 
 private func update(_ event: Message.Activity.Event = .update, id: String = "xcode", plugin: String = "dl", sent: TimeInterval = 0,
-                    title: String = "下载中", value: String? = nil, outcome: Card.Outcome = .info, block: Card.Block? = nil,
+                    title: String = "Downloading", value: String? = nil, outcome: Card.Outcome = .info, block: Card.Block? = nil,
                     alert: Bool = false, staleAt: Date? = nil) -> ActivityUpdate {
     ActivityUpdate(plugin: plugin, id: id, event: event, at: at(sent), staleAt: staleAt, alert: alert,
-                   card: Card(source: .plugin(id: plugin, name: "下载", symbol: "arrow.down.circle"), title: title, value: value,
+                   card: Card(source: .plugin(id: plugin, name: "Download", symbol: "arrow.down.circle"), title: title, value: value,
                               outcome: outcome, block: block))
 }
 
-/// 活动在面板里插件那一段占一行（照 ActivityKit）：start / update 原地刷新，end 撤掉；时间戳取新
+/// Activities occupy a row in plugin panel section (following ActivityKit): start / update refreshes in place, end removes; newest by timestamp
 @Suite struct ActivityRows {
     @Test func startAddsRow() {
         var board = ActivityBoard()
         _ = board.apply(update(.start, sent: 1), now: at(1))
-        #expect(board.rows(for: "dl") == [PanelRow(id: "dl:xcode", icon: .symbol("arrow.down.circle"), title: "下载中", indicator: .working,
+        #expect(board.rows(for: "dl") == [PanelRow(id: "dl:xcode", icon: .symbol("arrow.down.circle"), title: "Downloading", indicator: .working,
                                                    trailing: .since(at(1)))])
     }
 
     @Test func updateRefreshesInPlaceAndKeepsStart() {
         var board = ActivityBoard()
         _ = board.apply(update(.start, sent: 1), now: at(1))
-        _ = board.apply(update(sent: 5, title: "快好了", value: "剩 1 分"), now: at(5))
+        _ = board.apply(update(sent: 5, title: "Almost done", value: "1 min left"), now: at(5))
         let rows = board.rows(for: "dl")
-        #expect(rows.count == 1 && rows[0].title == "快好了" && rows[0].trailing == .value("剩 1 分"))
+        #expect(rows.count == 1 && rows[0].title == "Almost done" && rows[0].trailing == .value("1 min left"))
     }
 
-    /// 乱序到的旧消息不覆盖新的
+    /// Out-of-order older messages do not overwrite newer ones
     @Test func olderIgnored() {
         var board = ActivityBoard()
-        _ = board.apply(update(sent: 5, title: "新"), now: at(5))
-        #expect(board.apply(update(sent: 4, title: "旧"), now: at(6)) == nil)
-        #expect(board.apply(update(sent: 5, title: "同一刻"), now: at(6)) == nil)
-        #expect(board.rows(for: "dl").map(\.title) == ["新"])
+        _ = board.apply(update(sent: 5, title: "New"), now: at(5))
+        #expect(board.apply(update(sent: 4, title: "Old"), now: at(6)) == nil)
+        #expect(board.apply(update(sent: 5, title: "Same time"), now: at(6)) == nil)
+        #expect(board.rows(for: "dl").map(\.title) == ["New"])
     }
 
-    /// 没见过 start（App 晚开、start 过期了）也认：update 当开始
+    /// Updates without seeing start (App started late, start expired) admitted: update treated as start
     @Test func updateWithoutStartCreates() {
         var board = ActivityBoard()
         _ = board.apply(update(sent: 3), now: at(3))
@@ -55,7 +55,7 @@ private func update(_ event: Message.Activity.Event = .update, id: String = "xco
         #expect(board.rows(for: "dl").isEmpty)
         #expect(board.apply(update(sent: 8), now: at(10)) == nil)
         #expect(board.rows(for: "dl").isEmpty)
-        // 之后新开一次同名的算新的
+        // Subsequent new activity with same name treated as new
         _ = board.apply(update(.start, sent: 20), now: at(20))
         #expect(board.rows(for: "dl").count == 1)
     }
@@ -67,7 +67,7 @@ private func update(_ event: Message.Activity.Event = .update, id: String = "xco
         #expect(board.rows(for: "dl").map(\.indicator) == [.progress(0.4), .attention])
     }
 
-    /// 按开始先后排，更新了也不挪位置（同会话行）
+    /// Sorted by start time, updates do not reorder rows (consistent session row)
     @Test func orderedByStart() {
         var board = ActivityBoard()
         _ = board.apply(update(id: "a", sent: 1), now: at(1))
@@ -76,7 +76,7 @@ private func update(_ event: Message.Activity.Event = .update, id: String = "xco
         #expect(board.rows(for: "dl").map(\.id) == ["dl:a", "dl:b"])
     }
 
-    /// 每个插件至多 5 个：再开就丢最久没更新的
+    /// Max 5 per plugin: evict longest un-updated
     @Test func capPerPlugin() {
         var board = ActivityBoard()
         for i in 0..<6 { _ = board.apply(update(id: "a\(i)", sent: Double(i)), now: at(Double(i))) }
@@ -93,7 +93,7 @@ private func update(_ event: Message.Activity.Event = .update, id: String = "xco
     }
 }
 
-/// 插件的紧急程度是它开着的活动里最急的那个；没有活动是平静
+/// Plugin urgency is highest urgency among active activities; calm if no activities
 @Suite struct ActivityUrgencies {
     @Test func urgencies() {
         var board = ActivityBoard()
@@ -105,7 +105,7 @@ private func update(_ event: Message.Activity.Event = .update, id: String = "xco
     }
 }
 
-/// 活动最长 8 小时（照 ActivityKit），写了 staleAt 就到那时；过期的行撤掉。App 按 `deadline` 到点调 `expire`
+/// Activities max 8 hours (following ActivityKit), or when staleAt reached; expired rows removed. App calls `expire` on `deadline`
 @Suite struct ActivityExpiry {
     @Test func expiresAtStaleAtOrMaxAge() {
         var board = ActivityBoard()
@@ -119,7 +119,7 @@ private func update(_ event: Message.Activity.Event = .update, id: String = "xco
         #expect(board.deadline == at(1 + 8 * 3600))
     }
 
-    /// 更新不续命：8 小时从开始算（照 ActivityKit）
+    /// Updates do not extend lifetime: 8 hours counted from start (following ActivityKit)
     @Test func updatesDoNotExtendMaxAge() {
         var board = ActivityBoard()
         _ = board.apply(update(.start), now: t0)
@@ -128,33 +128,33 @@ private func update(_ event: Message.Activity.Event = .update, id: String = "xco
     }
 }
 
-/// 弹卡：alert 时交给 App 弹；同一个活动的卡 id 不变，App 认出是同一张，原地刷新
+/// Presenting cards: delivered to App on alert; card id remains stable across updates, App updates in-place
 @Suite struct ActivityCards {
     @Test func cardKeepsIDAcrossUpdates() {
         var board = ActivityBoard()
         let a = board.apply(update(.start, alert: true), now: t0)
-        let b = board.apply(update(sent: 1, title: "快好了"), now: at(1))
+        let b = board.apply(update(sent: 1, title: "Almost done"), now: at(1))
         #expect(a?.alert == true && b?.alert == false)
-        #expect(a?.card.id == b?.card.id && b?.card.title == "快好了")
+        #expect(a?.card.id == b?.card.id && b?.card.title == "Almost done")
         #expect(a?.key == .activity(plugin: "dl", id: "xcode"))
     }
 
-    /// 结束时的卡也沿用这个 id：排着或正在放的那张换成结局
+    /// End card also reuses id: queued or presenting card transitions to final state
     @Test func endCardKeepsID() {
         var board = ActivityBoard()
         let a = board.apply(update(.start, alert: true), now: t0)
-        let end = board.apply(update(.end, sent: 1, title: "下好了", outcome: .done, alert: true), now: at(1))
+        let end = board.apply(update(.end, sent: 1, title: "Downloaded", outcome: .done, alert: true), now: at(1))
         #expect(end?.card.id == a?.card.id && end?.card.outcome == .done && end?.alert == true)
     }
 }
 
-/// 时间戳一样时按步骤先后：start < update < end。脚本 start 后不到一秒就 end，end 也要撤掉那一行；同一刻的重复消息照旧不算
+/// When timestamps match, follows step order: start < update < end. If script ends within 1s of start, row is removed; duplicate messages at same instant still ignored
 @Suite struct ActivitySameInstant {
     @Test func endInSameInstantRemoves() {
         var board = ActivityBoard()
         _ = board.apply(update(.start, sent: 1), now: at(1))
-        _ = board.apply(update(sent: 1, title: "快好了"), now: at(1))
-        #expect(board.rows(for: "dl").first?.title == "快好了")
+        _ = board.apply(update(sent: 1, title: "Almost done"), now: at(1))
+        #expect(board.rows(for: "dl").first?.title == "Almost done")
         #expect(board.apply(update(.end, sent: 1), now: at(1)) != nil)
         #expect(board.rows(for: "dl").isEmpty)
     }
@@ -166,7 +166,7 @@ private func update(_ event: Message.Activity.Event = .update, id: String = "xco
         #expect(board.rows(for: "dl").isEmpty)
     }
 
-    /// 同一刻开始的两个活动按 id 排，不随字典遍历顺序跳
+    /// Activities started at the same instant sorted by id, deterministic order
     @Test func sameStartOrderedByID() {
         var board = ActivityBoard()
         for id in ["c", "a", "b"] { _ = board.apply(update(id: id, sent: 1), now: at(1)) }
@@ -174,7 +174,7 @@ private func update(_ event: Message.Activity.Event = .update, id: String = "xco
     }
 }
 
-/// 新来的活动比开着的 5 个都旧、一进来就被挤掉：不弹卡（面板里也没有它那一行）
+/// Newly arrived activity older than 5 active ones evicted immediately: no card presented (and no row in panel)
 @Suite struct ActivityDroppedOnArrival {
     @Test func noCardWhenSelfDropped() {
         var board = ActivityBoard()
@@ -183,14 +183,14 @@ private func update(_ event: Message.Activity.Event = .update, id: String = "xco
         #expect(!board.rows(for: "dl").contains { $0.id == "dl:old" })
     }
 
-    /// 卡的过期时刻跟着那一行：写了 staleAt 就到那时
+    /// Card expiration follows row: expires at staleAt if specified
     @Test func cardCarriesStaleAt() {
         var board = ActivityBoard()
         #expect(board.apply(update(alert: true, staleAt: at(30)), now: t0)?.staleAt == at(30))
     }
 }
 
-/// 结束了的活动（end、到 8 小时或 staleAt、被挤掉）不再收 update，只有新的 start 能重开（照 ActivityKit）
+/// Ended activities (end, 8 hours or staleAt reached, evicted) reject updates, only a new start can reopen (following ActivityKit)
 @Suite struct EndedActivity {
     @Test func updateAfterEndIgnored() {
         var board = ActivityBoard()

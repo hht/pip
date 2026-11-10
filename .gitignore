@@ -4,6 +4,6 @@ build/
 *.xcodeproj/
 xcuserdata/
 .DS_Store
-# claude plugin 加载 mod 时生成的类型声明（随 Claude Code 版本变）
+# Type declarations generated when claude plugin loads mod (evolves with Claude Code version)
 ClaudeMod/plugins/*/.claude-plugin/types/
 ClaudeMod/plugins/*/tsconfig.json

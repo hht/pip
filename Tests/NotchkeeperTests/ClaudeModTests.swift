@@ -2,18 +2,18 @@ import Foundation
 import Testing
 @testable import Notchkeeper
 
-/// `claude plugin list --json` 的输出（2.1.296 实测的字段，只留用到的）
+/// Output from `claude plugin list --json` (empirically tested on 2.1.296, keeping only used fields).
 private func list(_ entries: [(id: String, enabled: Bool)]) -> Data {
     try! JSONSerialization.data(withJSONObject: entries.map { ["id": $0.id, "version": "1.0.0", "scope": "user", "enabled": $0.enabled] })
 }
 
 @Suite struct ClaudeModStatus {
     @Test func installedWhenListedAndEnabled() throws {
-        #expect(try ClaudeMod.status(fromList: list([("swift-lsp@claude-plugins-official", true), ("notchkeeper@notchkeeper", true)])) == .installed)
+        #expect(try ClaudeMod.status(fromList: list([("swift-lsp@claude-plugins-official", true), ("pip@notifier", true)])) == .installed)
     }
 
     @Test func disabledWhenListedButOff() throws {
-        #expect(try ClaudeMod.status(fromList: list([("notchkeeper@notchkeeper", false)])) == .disabled)
+        #expect(try ClaudeMod.status(fromList: list([("pip@notifier", false)])) == .disabled)
     }
 
     @Test func notInstalledWhenAbsent() throws {

@@ -1,4 +1,0 @@
-{
-  "description": "Notchkeeper 的回合文件",
-  "modules": ["./register.js"]
-}

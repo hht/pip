@@ -1,11 +1,11 @@
-/// 回答：所有 Pip 共用的时钟下一次什么时候醒、醒来做什么——眨眼和空闲小动作（`IdleDirector`）、鼠标停下后注视回正、
-/// 鼠标久不靠近刘海就犯困、点一下晕一会儿（docs/mascot.md §2、§5）。
-/// 不知道鼠标在屏幕哪儿（App 说它近不近、Pip 在不在看它）、Pip 看不看得见（看不见时 App 不 tick、先 `suspend`，鼠标照样告诉它：犯困要清）。
-/// 时间是单调的秒数，从参数进来；App 按 `nextWake` 起一个定时器，到点调 `tick`
+/// Answers: when the shared Pip clock wakes next and what it does upon waking - blinks and idle motions (`IdleDirector`), gaze re-centering after mouse stops,
+/// falling drowsy when mouse stays away from the notch, and becoming dizzy briefly when poked (docs/mascot.md §2, §5).
+/// Unaware of mouse screen coordinates (App reports proximity and whether Pip looks at it) or Pip visibility (when invisible, App suspends clock ticks, but mouse proximity still resets drowsiness).
+/// Time is monotonic seconds passed as arguments; App sets a single timer matching `nextWake` and invokes `tick`.
 public struct MascotClock: Sendable {
-    /// 鼠标这么久没靠近刘海就睡着（docs/mascot.md §2）
+    /// Mouse absent from notch for this duration induces drowsiness (docs/mascot.md §2)
     public static let drowsyAfter = 120.0
-    /// 点一下晕这么久
+    /// Duration of dizziness after poke
     public static let dizzyFor = 1.6
 
     public private(set) var drowsy = false
@@ -14,7 +14,7 @@ public struct MascotClock: Sendable {
     private var idle: IdleDirector
     private var lastNear: Double
     private var dizzyUntil: Double?
-    /// 鼠标停下后这一刻眼睛回正；nil = 没在看鼠标
+    /// Timestamp when eyes re-center after mouse stops; nil = not tracking mouse
     private var restAt: Double?
 
     public init(seed: UInt64, now: Double) {
@@ -28,11 +28,11 @@ public struct MascotClock: Sendable {
 
     public struct Tick: Equatable, Sendable {
         public var cues: [Cue]
-        /// 这一刻该回正：看不见的 Pip 也要回正，回来时不会斜眼看着旧位置
+        /// Whether gaze should re-center at this moment: invisible Pips also re-center so they don't glance at stale coordinates when restored
         public var gazeRested: Bool
     }
 
-    /// mouseNear：鼠标此刻在刘海附近。鼠标一直停在那儿不动就没有移动事件，靠这里续上
+    /// mouseNear: whether mouse is currently near the notch. Stationary mouse does not generate move events, maintained here
     public mutating func tick(now: Double, mouseNear: Bool) -> Tick {
         if mouseNear { approached(now) }
         if !drowsy, now >= lastNear + Self.drowsyAfter { drowsy = true }
@@ -45,7 +45,7 @@ public struct MascotClock: Sendable {
         return Tick(cues: idle.cues(at: now), gazeRested: rested)
     }
 
-    /// near：鼠标在刘海附近；looking：有 Pip 在看鼠标。在看时不做小动作，停下 4s 后回正
+    /// near: mouse is near the notch; looking: at least one Pip is tracking mouse. Pauses idle motions while tracking; re-centers 4s after stopping
     public mutating func mouseMoved(near: Bool, looking: Bool, now: Double) {
         if near { approached(now) }
         guard looking else { return }
@@ -53,17 +53,17 @@ public struct MascotClock: Sendable {
         idle.postponeMotions(until: now + Choreography.gazeRestAfter)
     }
 
-    /// 关掉了跟随鼠标：眼睛已经回正，不用再等
+    /// Mouse tracking disabled: eyes already re-centered, no longer waiting
     public mutating func endGaze() { restAt = nil }
 
-    /// 点了一下 Pip；晕着再点从这一下重新算
+    /// Poked Pip; poking while dizzy resets dizzy timer
     public mutating func poke(now: Double) { dizzyUntil = now + Self.dizzyFor }
 
-    /// Pip 都看不见了，时钟要停：晕只有 `tick` 收得掉，停着时留下来会一直盖着别的造型。
-    /// 晕是对那一下的反应，看不见了就算过去了
+    /// All Pips became invisible, clock suspends: dizziness is normally cleared by `tick`; clearing it on suspend prevents masking other looks when restored.
+    /// Dizziness is a transient poke response that concludes once invisible.
     public mutating func suspend() { dizzyUntil = nil }
 
-    /// 看不见一段时间后回来：不补发攒下的眨眼和小动作
+    /// Restored after being invisible: skips accumulated blinks and motions
     public mutating func resume(at now: Double) { idle.resume(at: now) }
 
     private mutating func approached(_ now: Double) {
@@ -73,8 +73,8 @@ public struct MascotClock: Sendable {
 }
 
 extension Look {
-    /// 晕、睡着叠在插件给的造型上（docs/mascot.md §2「优先级」：守卫 > 晕 > agent > 睡着 > 空闲）。
-    /// 告示造型（守卫的、出错卡上的）不被盖掉；只有空闲时才睡着
+    /// Drowsy and dizzy overlay atop plugin-provided looks (docs/mascot.md §2 "Priority": guard > dizzy > agent > sleeping > idle).
+    /// Sign looks (guard alerts, error cards) are never masked; only idle look transitions to sleeping
     public func shown(drowsy: Bool, dizzy: Bool) -> Look {
         if isSign { return self }
         if dizzy { return .dizzy }

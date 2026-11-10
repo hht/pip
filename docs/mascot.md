@@ -1,159 +1,159 @@
-# Pip：造型与动效
+# Pip: Looks and Motion
 
-Pip 是 Notchkeeper 的原创吉祥物，在刘海左耳、展开面板和卡片里用表情说出此刻的状态。本文记每个造型的意思、谁压过谁、动效的规矩和原因。**数值以代码为准**：造型数据在 `Sources/MascotCore/Look.swift`、装饰形状在 `Shapes.swift`、眼形在 `Eyes.swift`、动画在 `Choreography.swift`、空闲调度在 `IdleDirector.swift`、时钟（犯困、回正、晕）在 `MascotClock.swift`、跟随鼠标在 `Gaze.swift`。这些数值用户逐条确认过；要改先问用户。
+Pip is Notchkeeper's original mascot, expressing current status via facial expressions in the left notch ear, expanded panel, and cards. This document records the meaning of each look, precedence rules, motion guidelines, and rationales. **Values are governed by code**: look data in `Sources/MascotCore/Look.swift`, decoration shapes in `Shapes.swift`, eye paths in `Eyes.swift`, choreographies in `Choreography.swift`, idle dispatching in `IdleDirector.swift`, clock (sleepiness, recentering, dizziness) in `MascotClock.swift`, mouse tracking in `Gaze.swift`. These values were individually confirmed by the user; consult the user before modifying.
 
-## 1. 几何
+## 1. Geometry
 
-### 画布
+### Canvas
 
-坐标用「画布单位」，原点在左上，+y 向下。40pt 的 Pip 1 单位 = 2pt。左耳那只是面板里的 32pt Pip 按 20/32 缩小来的，不另画（§5「收起与展开」）。
+Coordinates use "canvas units", origin at top-left, +y downward. For a 40pt Pip, 1 unit = 2pt. The left-ear instance is scaled down from the 32pt panel Pip by 20/32 without separate artwork (§5 "Collapse and Expand").
 
-- 身体是正圆，竖直渐变，没有描边、高光、阴影。
-- 墨色 `#16171A` 画眼睛和装饰里的符号。
-- 装饰区在右上，不跟头转，不压身体圆；第三个 Z 可以出框。
+- Body is a perfect circle with vertical gradient, no stroke, highlight, or drop shadow.
+- Ink color `#16171A` draws eyes and decoration symbols.
+- Decoration area sits at top-right, does not rotate with head, does not clip circular body; third Z may overflow canvas.
 
-### 球面模型（二维图形模拟三维）
+### Spherical Model (2D Simulating 3D)
 
-身体是一个球，眼睛贴在球面上。所有动作，包括跟随鼠标，都用**头的朝向**表达：yaw 左右转（正 = 脸朝右），pitch 上下点（正 = 抬头），roll 侧歪（正 = 顺时针）。
+The body is a sphere with eyes affixed to the spherical surface. All motions, including mouse tracking, are expressed via **head orientation**: yaw (positive = turns right), pitch (positive = tilts up), roll (positive = clockwise).
 
-- 眼睛按静止中心算出球面上的经纬度，两只眼各偏离正中约 20°，所以正脸时眼宽略窄于平面图，这是三维的正常结果。转到背面的眼睛不画。
-- **身体圆和渐变不转**：光从上面来，转头只动眼睛；圆不进旋转变换，轮廓的抗锯齿才稳定。
+- Eye positions calculate spherical latitude and longitude based on resting centers; each eye offsets ~20° from center, so frontal width is slightly narrower than flat projection, which is the expected 3D result. Eyes rotated to the back are culled.
+- **Body circle and gradient do not rotate**: light comes from above, head turns move only eyes; keeping circle out of rotation transforms stabilizes edge antialiasing.
 
-图层树（Core Animation，从外到内）：
+Layer tree (Core Animation, outside-in):
 
 ```
-stage ─┬─ body（呼吸，锚点在身体底部）
-       │   └─ disc（圆形遮罩，不转）
-       │       ├─ 渐变
-       │       └─ pose ⊃ yaw ⊃ pitch ⊃ roll ⊃ 左眼、右眼
-       └─ 装饰
+stage ─┬─ body (breathing, anchor at body bottom)
+       │   └─ disc (circular mask, non-rotating)
+       │       ├─ gradient
+       │       └─ pose ⊃ yaw ⊃ pitch ⊃ roll ⊃ left eye, right eye
+       └─ decorations
 ```
 
-pose 放造型的静止朝向；yaw / pitch 给跟随鼠标；动作叠加（additive）在 yaw / pitch / roll 上。实测（翻转视图）：`rotation.y` 正 = 脸朝右，`rotation.x` 正 = 抬头，`rotation.z` 正 = 顺时针。
+`pose` stores resting look orientation; yaw / pitch handle mouse tracking; motion layers additively onto yaw / pitch / roll. Verified in flipped view: `rotation.y` positive = faces right, `rotation.x` positive = tilts up, `rotation.z` positive = rotates clockwise.
 
-### 在刘海里的位置
+### Placement in Notch
 
-左耳 Pip 的身体圆心、右耳指示的中心，都在各自耳朵看得见的部分正中，左右对称、紧贴摄像头（HIG Live Activities compact：左右平衡）。右耳空着时宽度不变：工作中的三点常亮常灭，宽度跟着变反而打扰。位置按刘海尺寸现算。
+The center of left-ear Pip body and right-ear indicator sit exactly in the visible center of their respective ears, symmetrically flanking the camera (HIG Live Activities compact: horizontal balance). When right ear is empty its width remains unchanged: working dots pulsing on and off with varying width is distracting. Positions are dynamically calculated from notch dimensions.
 
-## 2. 16 个造型
+## 2. 16 Looks
 
-每个造型由身体渐变、眼形（§3）、头的静止朝向、装饰（§4）、右耳指示组成。装饰分两类：
+Each look consists of body gradient, eye paths (§3), resting head orientation, decorations (§4), and right-ear indicator. Decorations are split into two categories:
 
-- **心情装饰（mood）**：角色的一部分（Z、思考云、星星……），收起时留在左耳 Pip 身上。
-- **告示（sign）**：出了什么事（×、▲!、沙漏、!!、锁、断网），收起时挪到右耳当图标，左耳只留脸。展开后面板里的 Pip 也不带它，出口状态由面板右上的徽章表达（`docs/ui.md`「面板布局」）；卡片和设置页的 Pip 带着。
+- **Mood decoration**: part of the character (Z, thinking cloud, stars…), remaining on left-ear Pip when collapsed.
+- **Sign**: indicates an event (×, ▲!, hourglass, !!, lock, offline), moving to right ear as an icon when collapsed, leaving left ear with face only. Expanded panel Pip also omits signs, as egress status is conveyed by top-right badge (`docs/ui.md` "Panel Layout"); cards and Settings Pip retain them.
 
-| 造型 | 什么时候 | 朝向 | 装饰 | 右耳（收起） |
+| Look | When | Orientation | Decoration | Right Ear (Collapsed) |
 |---|---|---|---|---|
-| idle 空闲 | 默认 | 正 | 无 | 无 |
-| sleeping 睡着 | 鼠标 120s 没靠近刘海 | 头垂下 | mood：Z | 无 |
-| thinking 思考 | 暂不接线（sessions 文件没有这个信号） | 往斜上方想 | mood：思考云 | 三蓝点 |
-| working 工作 | agent 工作中 | 低头干活 | 无 | 三蓝点 |
-| longTurn 干了很久 | agent 工作中满 10 分钟（怎么算见 `docs/agent-integration.md`「状态」） | 低头干活 | mood：汗珠 | 三蓝点 |
-| question 等你回答 | agent 需要你介入，不是权限类（`docs/agent-integration.md`） | 歪头等你 | mood：带 ? 的气泡 | 青点 |
-| approval 等你批准 | agent 需要你介入，权限类 | 抬头看着你 | mood：举起的手 | 青柠点 |
-| finished 完成 | agent 回合结束；出口恢复（弹恢复卡时）。5.2s 后按优先级回落 | 得意地抬头 | mood：星星 | 无 |
-| error 出错 | 出错卡上；收起态不画 | 一缩 | sign：× | 告示图标 |
-| interrupted 被打断 | 暂不接线 | 正 | 无 | 无 |
-| dizzy 晕 | 点一下面板里的 Pip，1.6s | 正 | 无 | 无 |
-| offline 断网 | 守卫 unknown，原因是断网 | 正 | sign：Wi-Fi 加斜杠 | 告示图标 |
-| mismatch 出口不符 | 出口 IP 不在允许列表 | 正 | sign：▲! | 告示图标 |
-| stale 守卫没响应 | 状态文件不存在、读不了、过期或时钟跳变，且上次不是 violated | 没精神 | sign：沙漏 | 告示图标 |
-| danger 危险 | 出口 violated；或守卫没响应但上次是 violated（和红卡保留的规则一致） | 正 | sign：!! | 告示图标 |
-| shielded 防火墙守住 | 出口 violated，但防火墙拦住了（`docs/egress-guard.md`「怎么画」；第 5 步接上） | 镇定 | sign：锁 | 告示图标 |
+| idle | Default | Frontal | None | None |
+| sleeping | Mouse away from notch for 120s | Head drooping | mood: Z | None |
+| thinking | Unwired (sessions file lacks signal) | Tilts diagonally up | mood: thinking cloud | 3 blue dots |
+| working | Agent working | Head down working | None | 3 blue dots |
+| longTurn | Agent working for 10 min (`docs/agent-integration.md`) | Head down working | mood: sweat drop | 3 blue dots |
+| question | Agent needs intervention, non-permission (`docs/agent-integration.md`) | Cocking head waiting | mood: bubble with ? | Cyan dot |
+| approval | Agent needs intervention, permission | Looking up at you | mood: raised hand | Lime dot |
+| finished | Agent turn ended; egress recovered. Drops after 5.2s per priority | Looking up proudly | mood: stars | None |
+| error | On error cards; unrendered when collapsed | Flinches | sign: × | Sign icon |
+| interrupted | Unwired | Frontal | None | None |
+| dizzy | Clicking Pip in panel, lasts 1.6s | Frontal | None | None |
+| offline | Guard unknown, reason offline | Frontal | sign: Wi-Fi with slash | Sign icon |
+| mismatch | Egress IP not in allowed list | Frontal | sign: ▲! | Sign icon |
+| stale | Unwired (no "stale" after guard merged into App) | Listless | sign: hourglass | Sign icon |
+| danger | Egress violated | Frontal | sign: !! | Sign icon |
+| shielded | Egress violated, but blocked by firewall (`docs/egress-guard.md`; not yet wired) | Composed | sign: lock | Sign icon |
 
-「暂不接线」的造型照样实现，状态测试页可以手动切过去，有来源再接（用户定）。
+"Unwired" looks remain implemented and switchable in Status Test page, ready to connect when event sources appear (user decision).
 
-### 右耳指示
+### Right Ear Indicator
 
-右耳只有一个位置，和左耳说同一个状态，不拆成网络 / agent 两条通道。
+The right ear occupies a single slot conveying the same state as the left ear, without splitting into separate network/agent channels.
 
-- **告示图标**：sign 造型的装饰原样挂到右耳，大小和 40pt Pip 右上角的一样，循环节奏和面板里的一样。
-- **点**：三蓝点依次亮起；青点、青柠点常亮。
-- **灰色空心环**：探针没结果（probeFailed）。这种 unknown 不改造型，只靠右耳表达，收起态才不会被看成正常。层级：sign 图标 > 灰环 > 点（用户定）。
+- **Sign icon**: sign decorations migrate to right ear, matching 40pt Pip size and panel looping rhythms.
+- **Dots**: 3 blue dots illuminate sequentially; cyan and lime dots stay solid.
+- **Gray hollow ring**: probe returned no result (probeFailed). This unknown does not change mascot look, relying on right ear to prevent being misread as normal. Precedence: sign icon > gray ring > dots (user decision).
 
-### 优先级
+### Precedence
 
-几个状态同时成立时，画最高的那个；多个会话取最高的会话（用户定）。
+When multiple states hold simultaneously, render the highest; multiple sessions pick the highest session (user decision).
 
-1. 守卫：danger / shielded（互斥）> mismatch > stale > offline
-2. 晕
-3. agent：approval > question > longTurn > working > finished
-4. 睡着
-5. 空闲
+1. Guard: danger / shielded (mutually exclusive) > mismatch > offline
+2. Dizzy
+3. Agent: approval > question > longTurn > working > finished
+4. Sleeping
+5. Idle
 
-thinking、error、interrupted 不进优先级。
+thinking, error, interrupted do not enter precedence evaluation.
 
-## 3. 眼形
+## 3. Eye Paths
 
-每个造型有自己的眼形（圆眼、O 眼、笑眼、> <、螺旋……），右眼是左眼的镜像，少数「同向」的两只眼一起看同一边。
+Each look defines its eye paths (round, O, smiling, > <, spiral…); right eye mirrors left eye, with a few "aligned" looks looking in the same direction.
 
-**眼形补间**：Core Animation 只在两条路径点数、结构完全相同时才能逐点补间，所以所有眼形都先化成同样的 120 点闭合多边形（照 [Flubber](https://github.com/veltman/flubber)）：拍平、描边化成轮廓、按弧长等距重采样、统一绕向、旋转起点让对应点距离最小（补间时不打转）。眨眼也是眼形补间：压扁再回来。
+**Eye morphing**: Core Animation interpolates paths only when point counts and structures match identically, so all eye paths normalize to the same 120-point closed polygon (modeled after [Flubber](https://github.com/veltman/flubber)): flatten, stroke to outline, resample equidistantly by arc length, unify winding order, and rotate starting vertex to minimize sum of squared point distances (prevents spinning during interpolation). Blinking is also path morphing: squash and return.
 
-## 4. 装饰
+## 4. Decorations
 
-| 造型 | 类别 | 画的是什么 | 锚点（缩放、旋转的中心） |
+| Look | Category | Visual | Anchor (Scale/Rotation Center) |
 |---|---|---|---|
-| sleeping | mood | 三个 Z | 各自中心 |
-| thinking | mood | 云和三个点 | 装饰区中心 |
-| question | mood | 带 ? 的气泡 | 气泡中心 |
-| finished | mood | 一大一小两颗星 | 各自中心 |
-| longTurn | mood | 汗珠 | 装饰区中心 |
-| approval | mood | 举起的手 | 手腕 |
-| error | sign | 橙色 × | 中心 |
-| offline | sign | Wi-Fi 加斜杠 | 中心 |
-| mismatch | sign | 琥珀三角 ! | 中心 |
-| stale | sign | 沙漏 | 中心 |
-| danger | sign | 两个红 !，两个部件 | 各自中心 |
-| shielded | sign | 锁（锁梁、锁身、锁孔） | 中心 |
+| sleeping | mood | Three Zs | Respective centers |
+| thinking | mood | Cloud and three dots | Decoration area center |
+| question | mood | Bubble with ? | Bubble center |
+| finished | mood | Large and small star | Respective centers |
+| longTurn | mood | Sweat drop | Decoration area center |
+| approval | mood | Raised hand | Wrist |
+| error | sign | Orange × | Center |
+| offline | sign | Wi-Fi with slash | Center |
+| mismatch | sign | Amber triangle ! | Center |
+| stale | sign | Hourglass | Center |
+| danger | sign | Two red !s, two parts | Respective centers |
+| shielded | sign | Lock (shackle, body, keyhole) | Center |
 
-idle、working、interrupted、dizzy 没有装饰。
+idle, working, interrupted, dizzy have no decorations.
 
-## 5. 动效
+## 5. Motion
 
-**原则**：克制的幅度，活泼的节奏。每次只动一两个部件；进场稍慢、退场稍快；用弹簧和正弦缓动（星星自转是线性）。
+**Principles**: restrained amplitude, lively pacing. Move only 1-2 parts at a time; slightly slower entrance, faster exit; use springs and sinusoidal easing (star spin is linear).
 
-**渲染**：用 Core Animation，每个动作只在开始时提交一次，中间帧由系统合成。帧率交给系统按屏幕刷新率走（用户定画面优先；代价是 120Hz 下常驻循环的合成功耗记在 WindowServer 上）。看不见（遮挡、熄屏、锁屏）时撤掉全部动画，停掉时钟。
+**Rendering**: Core Animation; each motion commits once at start, intermediate frames synthesized by system compositor. Frame rate follows display refresh rate via system (user decided visual smoothness first; 120Hz continuous loop compositing cost attributed to WindowServer). Remove all animations and stop clocks when invisible (occluded, screen off, screen locked).
 
-- **disc 按屏幕倍率栅格化**：不这样做，头一转眼睛边缘就发软，展开时 Pip 总看着鼠标，用户看到的就是「一展开眼睛就糊」（机制推断是三维子树拍平时被重采样）。按两倍栅格化时左耳缩小倍数太大会出锯齿，所以用一倍。disc 里一动就重画，代价没量（`HANDOFF.md`）。
+- **Disc rasterization matches screen scale**: without this, head turns cause eye edges to soften; with gaze tracking in panel, users perceive "blur on expand" (mechanism inferred as resampling during 3D subtree flattening). 2x rasterization causes aliasing on left ear downscale, so 1x is used. Redraw on disc movement has unmeasured cost (`HANDOFF.md`).
 
-**缓动**：正弦是对称的 ease-in-out；弹簧用感知时长 response 和阻尼比 ζ 描述，换算成 `CASpringAnimation`（`Choreography.swift`）。
+**Easing**: sinusoidal is symmetric ease-in-out; springs parameterized by perceptual duration `response` and damping ratio `ζ`, mapped to `CASpringAnimation` (`Choreography.swift`).
 
-### 换造型
+### Changing Looks
 
-眼形、身体渐变、头的朝向、装饰一起补间，起点都从呈现层取，换到一半再换也接得上。旧装饰缩小淡出，新装饰稍后弹出（照 SF Symbols 的 Replace，[WWDC23 10258](https://developer.apple.com/videos/play/wwdc2023/10258/)）；新造型的循环稍后起播，旧循环从屏幕上的样子缓回静止值。进场动作：进 danger 横向抖几下，进 finished 播「完成跳转」，进 working 播「点头」。
+Eye paths, body gradient, head orientation, and decorations interpolate together, taking starting values from presentation layer to support interruptions mid-transition. Old decorations shrink and fade out, new decorations pop in shortly after (modeled after SF Symbols Replace, [WWDC23 10258](https://developer.apple.com/videos/play/wwdc2023/10258/)); new loops start with slight delay, old loops ease back to resting pose. Entrance motions: danger shakes horizontally, finished plays "jump completion", working plays "nodding".
 
-### 常驻节奏
+### Persistent Rhythms
 
-循环从换造型那一刻起按相位播，起步无缝。
+Loops play in-phase from the moment look changes, starting seamlessly.
 
-**身体和头**：所有造型都呼吸（睡着更慢更深）；睁眼的造型（idle、thinking、working、longTurn、question、approval、offline、mismatch、stale、shielded）随机眨眼，偶尔连眨两次。各造型的头部循环表达它在干什么：睡着点头打盹，思考左右琢磨，working 像一行行读字（慢慢扫过去、快速回行首），longTurn 同样但更急，晕像摆锤，断网左右找信号。
+**Body and Head**: all looks breathe (sleeping slower and deeper); open-eyed looks (idle, thinking, working, longTurn, question, approval, offline, mismatch, stale, shielded) blink randomly with occasional double blinks. Head loops express current activity: sleeping nods off, thinking ponders left and right, working mimics scanning lines of text (slow sweep, quick carriage return), longTurn does so more urgently, dizzy swings like a pendulum, offline searches for signal.
 
-**装饰**：Z 依次冒出上浮，云上下浮、点依次亮，气泡浮动、? 偶尔晃，星星慢转一闪，汗珠滑下，手招两下，× 晃一下，Wi-Fi 信号由里到外亮起，▲! 连闪，沙漏停一会儿翻过来，两个 ! 轮流跳像警报，锁「咔哒」一下。
+**Decorations**: Zs float up sequentially, cloud bobs with dots sequencing, bubble floats with ? wobbling, stars slowly spin and twinkle, sweat drop slides down, hand waves twice, × wobbles, Wi-Fi illuminates inside-out, ▲! flashes repeatedly, hourglass pauses and flips, two !s alternate jumping like alarms, lock clicks.
 
-### 动作
+### Idle Motions
 
-叠加在造型朝向和跟随鼠标之上：左右转圈、上下翻圈、东张西望、点头、歪头、摇头、抬头看天、低头看脚、侧身 90°、好奇歪看、完成跳转。
+Superimposed on look orientation and gaze tracking: turn left/right, flip up/down, look around, nod, tilt head, shake head, gaze up, gaze down, turn sideways 90°, curious tilt, jump completion.
 
-**空闲小动作**：只在 idle、鼠标停下超过 4s（注视已回正）时做，每 8–20s 一个，不连续重复同一个；转圈、翻圈各 5%，其余等概率。
+**Idle small motions**: trigger only in idle when mouse has stopped for > 4s (gaze recentered), firing every 8–20s without immediate repeats; turn and flip each 5%, others equiprobable.
 
-### 跟随鼠标
+### Gaze Tracking
 
-- 每只 Pip 按鼠标相对自己身体圆心的位移转头，两轴各自线性，400pt 处到最大角度（yaw 25°、pitch 20°），再远就停在最大角度，不跳回正。
-- 鼠标停 4s 后慢慢回正。
-- 只有睁眼的造型看鼠标；设置里可关（`config.json` 的 `mascotFollowsMouse`，默认开）。
-- 鼠标到刘海上时「探头」：身体和眼睛微微放大。条件同上。
+- Pip turns head based on mouse offset relative to body center, linear across both axes, reaching maximum angles (yaw 25°, pitch 20°) at 400pt; stays at maximum angle beyond that without snapping back.
+- Mouse motionless for 4s slowly recenters gaze.
+- Only open-eyed looks track mouse; toggleable in Settings (`mascotFollowsMouse` in `config.json`, defaults to on).
+- Peeking when mouse hovers over notch: body and eyes slightly enlarge, subject to same conditions.
 
-### 收起与展开
+### Collapse and Expand
 
-- 黑色形状收起是刘海加两只耳朵，展开长成面板或卡片；两种状态用同一种路径结构，才能补间。弹簧在 `Common.swift` 的 `NotchSpring`（用户定的手感）。
-- **Pip 是同一个角色**：左耳那只缩小的面板 Pip，展开时随形状的弹簧移动、放大到面板里的位置，收起时反向。补间时不重建图层，否则会重播进场、断掉循环相位；所以左耳的 mood 装饰也是大版缩小的。
-- 右耳和面板右上的出口徽章是同一个位置的两种样子：展开时右耳淡出、徽章放大淡入，跟着形状移到面板右上；收起反过来。
-- 卡片形态时 Pip 飞到卡片左侧，换成卡片的造型，告示画回来，右边一组淡出（`docs/ui.md`「卡片」）。透明的那组停掉动画（`MascotLayerView.playing`），因为窗口的遮挡状态看不出 SwiftUI 的透明度。
+- Black shape collapses to notch plus two ears, expanding into panel or card; both states use the same path structure to enable interpolation. Springs configured in `Common.swift` `NotchSpring` (user-tuned feel).
+- **Pip is the same character**: scaled left-ear panel Pip travels and expands to panel position via shape spring, reversing on collapse. Layers are not rebuilt during morphing to preserve loop phase and prevent replaying entrance; left ear mood decorations are also scaled down from large artwork.
+- Right ear and panel top-right egress badge are two forms of the same anchor: expanding fades out right ear and scales/fades in badge, moving to panel top-right; collapsing reverses.
+- In card mode Pip springs to card left side, assuming card look, restoring signs while right-hand group fades out (`docs/ui.md` "Cards"). Transparent group pauses animations (`MascotLayerView.playing`), as window occlusion does not reflect SwiftUI opacity.
 
-### 减弱动态效果
+### Reduce Motion
 
-只留不透明度：不位移、不缩放、不旋转，造型的朝向直接设值，动作和跟随鼠标都不做；颜色和眼形淡入淡出；保留眨眼和不透明度的闪烁（三蓝点、思考的点、断网信号）。形状照常变，Pip 和右耳 / 徽章换形态时旧的原地淡出、新的在新位置淡入。
+Retains opacity changes only: no translation, scaling, or rotation; look orientation applies directly; motions and gaze tracking disabled; colors and eye shapes crossfade; blinks and opacity pulsing preserved (3 blue dots, thinking dots, offline signal). Shape morphs as usual; Pip and right ear / badge crossfade in place when switching states.
 
-### 性能验收
+### Performance Acceptance
 
-刘海机型 120Hz 屏，收起空闲 60s，App CPU 平均 < 0.5%；鼠标持续移动 60s < 3%。用 `top -l 70 -s 1 -pid <pid>` 测，结果写进提交说明。
+Notch display 120Hz, collapsed idle for 60s, App CPU average < 0.5%; continuous mouse movement for 60s < 3%. Measured with `top -l 70 -s 1 -pid <pid>`, results recorded in commit messages.

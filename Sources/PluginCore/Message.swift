@@ -1,15 +1,15 @@
 import Foundation
 import NotchCore
 
-/// 回答：收件箱里的一份文件说了什么——哪个插件、哪张卡、同哪组替换、什么时候过期。
-/// 只解析 v1 消息（只有卡片）；不读文件，不知道插件登没登记、限没限流（`InboxGate`）。
-/// 内容块和动作照 Adaptive Cards 起名（TextBlock、FactSet、Action.OpenUrl，按钮是带 title 的动作），进度、勾叉列表、activate、focusTerminal 是扩展。
+/// Answers: what a file in inbox says — which plugin, which card, replacement group, expiration.
+/// Only parses v1 messages (card-only); does not read files, unaware of plugin registration or rate limits (`InboxGate`).
+/// Content blocks and actions follow Adaptive Cards naming (TextBlock, FactSet, Action.OpenUrl, buttons are actions with titles); progress, checklist, activate, and focusTerminal are extensions.
 /// @see https://github.com/microsoft/AdaptiveCards/tree/main/schemas/src
 public struct Message: Equatable, Sendable {
     public enum Action: Equatable, Sendable {
         case open(URL)
         case activate(bundleID: String)
-        /// 跳回这个终端：tty 是 `/dev/ttys` 加数字，pid 是用它的进程（shell）
+        /// Switch back to terminal: tty is `/dev/ttys` + number, pid is process using it (shell)
         case focusTerminal(tty: String, pid: Int32, cwd: String)
     }
 
@@ -18,11 +18,11 @@ public struct Message: Equatable, Sendable {
         public var action: Action
     }
 
-    /// 活动的哪一步（照 ActivityKit 的 start / update / end）。活动在面板里插件那一段占一行，`alert` 时弹卡、之后的更新原地刷新它
+    /// Step in an activity (following ActivityKit start / update / end). Activities occupy a row in plugin panel section; alert pops card, subsequent updates refresh it in-place
     /// @see https://developer.apple.com/documentation/activitykit/activity
     public struct Activity: Equatable, Sendable {
         public enum Event: Equatable, Sendable { case start, update, end }
-        /// 插件自己起的名字，同一个插件里认同一个活动
+        /// Plugin-defined name, identifies activity within plugin
         public var id: String
         public var event: Event
         public var alert: Bool
@@ -31,22 +31,22 @@ public struct Message: Equatable, Sendable {
     public var plugin: String
     public var id: UUID
     public var at: Date
-    /// 同一个插件里同组的卡只留最新
+    /// Cards with same group within plugin only keep latest
     public var group: String?
     public var title: String
     public var subtitle: String?
     public var value: String?
-    /// 只有 done、failed、attention、info：红色、绿色属于出口守卫
+    /// Only done, failed, attention, info: red and green belong to egress guard
     public var outcome: Card.Outcome
     public var block: Card.Block?
     public var action: Action?
     public var buttons: [Button]
-    /// 过了这个时刻还没放就不放；活动是这一行留到什么时候
+    /// Discard if not displayed before this timestamp; for activities, when this row expires
     public var staleAt: Date?
-    /// nil：这是一张普通卡，不是活动
+    /// nil: regular card, not an activity
     public var activity: Activity?
 
-    /// 一份消息至多这么大：卡上最多显示几百个字，再大的是写错了的
+    /// Max size for one message: cards display at most a few hundred chars, larger payloads are erroneous
     public static let maxBytes = 64 * 1024
 
     public static func parse(_ data: Data) throws(MessageError) -> Message {
@@ -59,13 +59,13 @@ public struct Message: Equatable, Sendable {
         return try Message(wire)
     }
 
-    /// 插件 id 会拼进 `plugins/<id>/manifest.json`：小写字母或数字开头，只有小写字母、数字和连字符，至多 32 个字符
+    /// Plugin id is formatted into `plugins/<id>/manifest.json`: starts with lowercase letter or digit, contains only lowercase letters, digits, and hyphens, up to 32 chars
     public static func isPluginID(_ s: String) -> Bool {
         guard let first = s.unicodeScalars.first, s.unicodeScalars.count <= 32, first != "-" else { return false }
         return s.unicodeScalars.allSatisfy { ("a"..."z").contains($0) || ("0"..."9").contains($0) || $0 == "-" }
     }
 
-    /// 脚本常用 `date -u +%FT%TZ`，JS 的 `toISOString()` 带毫秒：macOS 26.5 上实测 `.iso8601` 两种都认（测试覆盖）
+    /// Scripts often use `date -u +%FT%TZ`, JS `toISOString()` includes millis: macOS 26.5 `.iso8601` accepts both
     private static let decoder: JSONDecoder = {
         let d = JSONDecoder()
         d.dateDecodingStrategy = .iso8601
@@ -73,7 +73,7 @@ public struct Message: Equatable, Sendable {
     }()
 }
 
-/// 在 extension 里：保留编译器合成的逐成员 init（测试用）
+/// In extension: preserve compiler-synthesized memberwise init (used in tests)
 extension Message {
     private init(_ wire: Wire) throws(MessageError) {
         guard wire.v == 1 else { throw .unsupportedVersion }
@@ -153,7 +153,7 @@ extension Message {
             guard let id = a.bundleID, !id.isEmpty else { throw .badAction }
             return .activate(bundleID: id)
         case "focusTerminal":
-            // tty 会被打开来写标记：只认 macOS 伪终端的名字，拼不出别的路径
+            // tty will be opened to write mark: only accept macOS pseudo-terminal names, prevent path traversal
             guard let tty = a.tty, tty.hasPrefix("/dev/ttys"), tty.count > 9, tty.dropFirst(9).allSatisfy({ $0.isASCII && $0.isNumber }),
                   let pid = a.pid, pid > 1, let cwd = a.cwd else { throw .badAction }
             return .focusTerminal(tty: tty, pid: pid, cwd: cwd)
@@ -163,24 +163,24 @@ extension Message {
     }
 }
 
-/// 消息解不开的原因：App 计数、删掉文件。不带消息里的原文（外部来源，可能很长，也可能是伪造的日志行）
+/// Reason why message cannot be decoded: App counts and deletes file. Omits original message content (external input, may be lengthy or forged)
 public enum MessageError: Error, Equatable, Sendable {
-    /// 不是 JSON、缺必填字段或类型不对
+    /// Not JSON, missing required fields, or type mismatch
     case malformed
     case unsupportedVersion
     case badPluginID
     case missingTitle
-    /// 外部插件只能用 done、failed、attention、info
+    /// External plugins can only use done, failed, attention, info
     case unknownOutcome
-    /// 内容块类型不认识或缺字段
+    /// Unknown block type or missing fields
     case badBlock
-    /// 动作类型不认识、缺字段，或按钮没有标题
+    /// Unknown action type, missing fields, or button without title
     case badAction
-    /// 活动的 id 是空的或太长，或 event 不认识
+    /// Activity id is empty or too long, or unknown event
     case badActivity
 }
 
-/// 收件箱文件的 JSON 格式（`pipctl` 拼的也是它）。缺字段、类型不对在这里就解不开
+/// JSON format of inbox file (also assembled by `pipctl`). Missing fields or wrong types fail here
 private struct Wire: Decodable {
     var v: Int
     var plugin: String
@@ -190,7 +190,7 @@ private struct Wire: Decodable {
     var title: String
     var subtitle: String?
     var value: String?
-    /// 缺省是 info
+    /// Defaults to info
     var outcome: String?
     var block: Block?
     var action: Action?
@@ -200,12 +200,12 @@ private struct Wire: Decodable {
 
     struct Activity: Decodable {
         var id: String
-        /// start、update、end
+        /// start, update, end
         var event: String
         var alert: Bool?
     }
 
-    /// `type` 是 TextBlock、FactSet、checklist、progress，各用各的字段
+    /// `type` is TextBlock, FactSet, checklist, progress, each using its own fields
     struct Block: Decodable {
         var type: String
         var text: String?
@@ -222,12 +222,12 @@ private struct Wire: Decodable {
 
         struct Item: Decodable {
             var text: String
-            /// ok、failed、pending
+            /// ok, failed, pending
             var state: String
         }
     }
 
-    /// `type` 是 Action.OpenUrl（`url`）、activate（`bundleID`）或 focusTerminal（`tty`、`pid`、`cwd`）；做按钮时要有 `title`
+    /// `type` is Action.OpenUrl (`url`), activate (`bundleID`), or focusTerminal (`tty`, `pid`, `cwd`); button requires `title`
     struct Action: Decodable {
         var type: String
         var title: String?

@@ -13,10 +13,10 @@ import GuardCore
         #expect(snap(true, [("utun1024", false), ("en7", true)]).isUp)
     }
 
-    /// 只有 utun（Clash 的 TUN）满足不算有物理网络：断网时 TUN 网卡还在
+    /// Only utun (Clash's TUN) being satisfied does not count as having a physical network: TUN interface remains when disconnected
     @Test func onlyTunnelIsNotAPhysicalInterface() {
         #expect(!snap(true, [("utun1024", false)]).physicalInterfaceSatisfied)
-        // 名字是 utun 的一律不算，即使系统把它报成物理类型
+        // Interfaces named utun never count, even if reported as physical by system
         #expect(!snap(true, [("utun3", true)]).physicalInterfaceSatisfied)
     }
 

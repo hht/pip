@@ -1,29 +1,29 @@
 import Foundation
 
-/// 回答：config.json 里有哪些设置、缺了取什么默认值。存在 ~/Library/Application Support/Notchkeeper/config.json，读写在 App 的 `ConfigStore`。
-/// 缺失的字段用默认值，未知字段忽略；字段类型不对就整份解不开，由 `ConfigStore` 保留原文件。
+/// Answers: What settings exist in config.json and their default values. Saved at ~/Library/Application Support/Notchkeeper/config.json, read/written in App's `ConfigStore`.
+/// Missing fields use defaults, unknown fields ignored; mismatched field types prevent decoding and `ConfigStore` preserves original file.
 public struct Config: Codable, Equatable, Sendable {
-    // 通用
+    // General
     public var soundEnabled = true
     public var hoverExpand = true
-    /// Pip 的眼睛和身体跟着鼠标走、鼠标到刘海上时探头（docs/mascot.md §5）
+    /// Pip eyes and body follow mouse, peeks over notch when mouse hovers (docs/mascot.md §5)
     public var mascotFollowsMouse = true
-    // 出口守卫
-    // 不内置任何真实出口：空列表时 guardd 判不了出口（unknown），设置页会提示
+    // Egress Guard
+    // No real egress built in: empty list leaves egress unknown, prompted in settings view
     public var allowlist: [String] = []
     public var autoAlert = true
     public var alertPersistent = true
-    // 通知
+    // Notifications
     public var cardAutoDismissSeconds = 6.0
-    /// 卡片上「打开 URL」除 https 外还放行的 scheme（`URLPolicy`）
+    /// Additional schemes allowed for "Open URL" on cards besides https (`URLPolicy`)
     public var urlSchemes: [String] = []
-    // 插件：内置的按 `PluginID`，外部的按 `plugins/<id>/` 的目录名。没写的插件开着、每段最多露 5 行
+    // Plugins: built-in use `PluginID`, external use directory name under `plugins/<id>/`. Default enabled with max 5 rows
     public var plugins: [String: PluginSettings] = [:]
-    /// 面板里各段的顺序（出口守卫固定在顶上，不在这里）；没排过的跟在后面
+    /// Section ordering in panel (egress guard fixed at top, not included here); unranked follow behind
     public var pluginOrder: [String] = []
-    /// 都平静时收起态显示谁（docs/ui.md「面板布局」）；空串是不常驻
+    /// Displayed in collapsed state when all calm (docs/ui.md "Panel Layout"); empty string means no resident plugin
     public var residentPlugin = PluginID.exitGuard
-    /// 收起时左耳画 Pip；关掉后什么都没有要显示时就是一块纯黑的刘海（照 boring.notch 的空闲脸选项）
+    /// Shows Pip on left ear when collapsed; when disabled and idle, shows solid black notch (like boring.notch idle face option)
     public var showsEarMascot = true
 
     public init() {}
@@ -55,13 +55,13 @@ public struct Config: Codable, Equatable, Sendable {
     public mutating func setEnabled(_ on: Bool, for plugin: String) { plugins[plugin, default: PluginSettings()].enabled = on }
     public mutating func setMaxRows(_ n: Int, for plugin: String) { plugins[plugin, default: PluginSettings()].maxRows = PluginSettings.clamp(n) }
 
-    /// 排过的在前、没排过的按 `available` 原来的顺序跟在后面；排过但已经不在 `available` 里的不出现
+    /// Reordered plugins come first, unranked follow in original `available` order; ranked plugins no longer in `available` omitted
     public func ordered(_ available: [String]) -> [String] {
         let listed = pluginOrder.filter(available.contains)
         return listed + available.filter { !listed.contains($0) }
     }
 
-    /// 上移（-1）或下移（+1）一格；到头了不动。存下整份当前顺序
+    /// Move up (-1) or down (+1) by one slot; no-op at bounds. Stores full updated order
     public mutating func move(_ plugin: String, by offset: Int, in available: [String]) {
         var order = ordered(available)
         guard let i = order.firstIndex(of: plugin), order.indices.contains(i + offset) else { return }
@@ -72,7 +72,7 @@ public struct Config: Codable, Equatable, Sendable {
 
 public struct PluginSettings: Codable, Equatable, Sendable {
     public var enabled = true
-    /// 面板里这一段最多露几行，多的在段里滚
+    /// Maximum rows shown for this section in panel, scrolls if exceeded
     public var maxRows = 5
 
     public static let rowRange = 1...5

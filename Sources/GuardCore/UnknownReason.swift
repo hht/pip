@@ -1,15 +1,14 @@
-/// 回答：一轮判成 unknown 时，是因为本机根本没网（灰），还是网通着但探针没拿到结果。
-/// 只给 unknown 用：healthy、egressMismatch、violated 永远没有原因。UI 的颜色不看它（所有 unknown 同一个灰色空心环），
-/// 只用它选文字，见 docs/egress-guard.md「怎么画」一节。
-/// 新增取值要升 `GuardState.currentSchemaVersion`。
+/// Answers: when a round evaluates as unknown, is it because there is no network (offline), or network is up but probes failed to return a result.
+/// Used only for unknown: healthy, egressMismatch, and violated never carry a reason. UI colors do not inspect it (all unknown share gray ring),
+/// used only for selecting text (docs/egress-guard.md "How It Is Rendered").
 public enum UnknownReason: String, Codable, Sendable, Equatable {
-    /// 没有满足的非 utun 物理网卡，或没有默认路由
+    /// No satisfied non-utun physical interface, or no default route
     case offline
-    /// 网络通着（或没拿到网络快照），但路由 / Clash / 出口探针没给出能判定的结果
+    /// Network is satisfied (or snapshot unavailable), but routes / Clash / egress probes returned no evaluable result
     case probeFailed
 
-    /// 断网优先：断网时探针必然也失败，报 offline 才说得清。没拿到快照不能断言断网，算 probeFailed。
-    /// 不需要看这一轮的观测：unknown 本身已经说明探针没给出结果，网络快照决定是哪一种。
+    /// Offline takes priority: when disconnected, probes necessarily fail as well. Missing snapshot falls back to probeFailed.
+    /// Does not require inspecting round observations: unknown itself implies probe failure; network snapshot determines subtype.
     public static func decide(verdict: Verdict, path: NetworkPath?) -> UnknownReason? {
         guard verdict == .unknown else { return nil }
         if let path, !path.isUp { return .offline }
@@ -17,12 +16,12 @@ public enum UnknownReason: String, Codable, Sendable, Equatable {
     }
 }
 
-/// 回答：本机此刻有没有一条不经过 TUN 的物理网络。来自 Network.framework 的路径快照（GuardProbes），只读。
-/// 只存两个布尔值，不存网卡名、地址（CLAUDE.md「日志不记 IP」）。
+/// Answers: does the machine currently have a physical network route not traversing TUN? Read-only snapshot from Network.framework (GuardProbes).
+/// Stores two booleans only, never interface names or addresses (CLAUDE.md "logs never record IP").
 public struct NetworkPath: Sendable, Equatable {
-    /// 有状态为 satisfied 的非 utun 物理网卡（Wi-Fi、有线、蜂窝）
+    /// Satisfied non-utun physical interface exists (Wi-Fi, Ethernet, Cellular)
     public var physicalInterfaceSatisfied: Bool
-    /// 这条路径上有网关，即有默认路由
+    /// Gateway exists on this path, i.e. default route present
     public var hasDefaultRoute: Bool
 
     public init(physicalInterfaceSatisfied: Bool, hasDefaultRoute: Bool) {

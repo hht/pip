@@ -1,109 +1,108 @@
-# 界面：亮暗、多语言、面板布局、卡片
+# UI: Light and Dark, Localization, Panel Layout, Cards
 
-改界面前读完「原则」；细节按需看后面各节。Pip 的造型与动效见 `docs/mascot.md`，守卫怎么画见 `docs/egress-guard.md`。
+Read "Principles" before modifying UI; inspect subsequent sections as needed for details. Mascot looks and motions are in `docs/mascot.md`; guard rendering is in `docs/egress-guard.md`.
 
-## 原则
+## Principles
 
-- **动效**克制、节奏活泼：弹簧和正弦缓动，进场稍慢、退场稍快；「减弱动态效果」只淡入淡出；常驻动画交给 Core Animation，不在主线程逐帧重画。
-- **默认不打扰**：空闲收进刘海，悬停或点击展开；红卡挂到恢复，临时卡放完回到它。
-- **状态 = 颜色 + 图标 + 文案**：绿 healthy、琥珀 egressMismatch、灰 unknown、红 violated。
-- 贴刘海的部分永远黑底白字，只有设置窗口跟随亮暗；只有看得见的形状接收点击，透明区域穿透。
-- 文案源语言是简体中文、一句话说清，按钮写动作本身（「重新检测」）；走 String Catalog，同时给 English。
-- 照「灵动岛规范」一节；改了界面按「截图」一节附截图。
+- **Motion**: restrained amplitude with brisk pacing: spring and sinusoidal easing, slightly slower entrance and faster exit; "Reduce Motion" uses fade in/out only; continuous loops belong to Core Animation, never redrawn frame-by-frame on main thread.
+- **Unobtrusive by default**: collapses into notch when idle, expands on hover or click; red card stays until recovery, temporary cards return to it after playback.
+- **Status = Color + Icon + Text**: green healthy, amber egressMismatch, gray unknown, red violated.
+- Elements attached to notch are strictly white text on black background; only Settings window follows light/dark mode; only visible shapes receive clicks, transparent areas pass through.
+- Text source language is English, clear in a single sentence; buttons state the action itself ("Recheck"); managed via String Catalog with Simplified Chinese translation.
+- Follow "Dynamic Island Specs" section; attach screenshots per "Screenshots" section when modifying UI.
 
-## 亮色与暗色
+## Light and Dark Modes
 
-**贴着刘海的部分永远黑底白字**（耳朵、面板、所有卡片，外接屏上也画黑块）；只有设置窗口跟随系统（用户定）。
+**Elements attached to the notch are always white text on black background** (ears, panel, all cards; external displays also draw black blocks); only Settings window follows system appearance (user decision).
 
-- 依据见「灵动岛规范」1：背景色永远是黑的，不给背景加颜色、图案或光效的变化；要动效就加在内容上（Pip、文字、流星）。黑色形状本身照常用弹簧变形。
-- 刘海窗口要设 `appearance = .darkAqua`：只写死黑底白字不够，系统控件、`.secondary`、SF Symbols 分层色、tooltip 跟窗口外观走。设置窗口不设外观，也不设 `NSApp.appearance`。
-- 设置页的 Pip 放在黑底「舞台」上：Pip 配色按黑底设计，白底上几乎看不见；这样造型数据不用分亮暗。
-- 设置页的状态点在亮暗两种底上都要 ≥ 3:1（WCAG 1.4.11）。
+- Rationale per "Dynamic Island Specs" 1: background is permanently black, never varying in color, pattern, or lighting; motion is applied only to contents (Pip, text, meteor). The black shape itself morphs using springs as usual.
+- Notch window must set `appearance = .darkAqua`: hardcoded black background alone is insufficient; system controls, `.secondary`, SF Symbols hierarchical colors, and tooltips follow window appearance. Settings window sets neither appearance nor `NSApp.appearance`.
+- Pip in Settings is placed on a black-background "stage": Pip color palette is designed for black backgrounds and is nearly invisible on white; this avoids bifurcating look data across appearances.
+- Status dots in Settings must have contrast ratio ≥ 3:1 against both light and dark backgrounds (WCAG 1.4.11).
 
-## 多语言
+## Localization
 
-- 简体中文（源语言）和 English，**随系统语言**，App 不自己切；设置页放「在系统设置中更改语言…」跳到系统按 App 设语言的位置（WWDC19 403："do not attempt to set the application language manually in code"）。
-- String Catalog 在 `Resources/`：`Localizable.xcstrings`（键就是中文原文，用默认的 `Bundle.main`）和 `InfoPlist.xcstrings`（权限说明）。改了文案跑 `scripts/strings.sh`：和 Xcode 一样靠编译器抽字符串，新的加进来、删掉的标 stale，再补 English。
-- 坑：先存成 `String` 再 `Text(someString)` 不会本地化，存之前就用 `String(localized:)` 取出译文（<https://developer.apple.com/documentation/swiftui/text/init(_:tablename:bundle:comment:)>）。
-- 坑：`swift build` 不编译 `.xcstrings`，只原样拷贝；由 `scripts/run.sh` 用 `xcrun xcstringstool compile` 编进 `.lproj`（用户同意依赖 Xcode 工具）。
-- 坑：Info.plist 写 `CFBundleDevelopmentRegion = zh-Hans`、`CFBundleLocalizations = [zh-Hans, en]`，不写 `CFBundleAllowMixedLocalizations`（实测日文环境下判成 en 却显示中文）。
-- 不翻译：出口 IP、项目名；日志、文档、注释、提交说明仍是中文。
-- 测试：`swift test` 解析 catalog，要求每个键都有 en 译文、没有 stale 的键（参考 bitchat 的 `LocalizationCoverageTests`）。
+- English (source language) and Simplified Chinese, **following system language**; App does not switch internally; Settings page offers "Change Language in System Settings…" jumping to per-app language settings in macOS (WWDC19 403: "do not attempt to set the application language manually in code").
+- String Catalogs are located in `Resources/`: `Localizable.xcstrings` (keys are English source strings using default `Bundle.main`) and `InfoPlist.xcstrings` (permission descriptions). Run `scripts/strings.sh` after modifying UI text: extracts strings via compiler like Xcode, adding new keys and marking deleted ones stale, then supply translations.
+- Pitfall: storing as `String` before `Text(someString)` fails to localize; retrieve translation via `String(localized:)` before storage (<https://developer.apple.com/documentation/swiftui/text/init(_:tablename:bundle:comment:)>).
+- Pitfall: `swift build` does not compile `.xcstrings`, copying them verbatim; compiled into `.lproj` by `scripts/run.sh` using `xcrun xcstringstool compile` (user agreed to depend on Xcode tools).
+- Pitfall: Info.plist declares `CFBundleDevelopmentRegion = en` and `CFBundleLocalizations = [zh-Hans, en]`, omitting `CFBundleAllowMixedLocalizations` (tested: under Japanese locale judges en but displays Chinese).
+- Do not translate: egress IP, project names; repository content is in English, chat with me in Chinese.
+- Testing: `swift test` parses catalog, requiring every key to have translation and no stale keys (referenced bitchat's `LocalizationCoverageTests`).
 
-## 面板布局
+## Panel Layout
 
-尺寸在 `NotchCore` 的 `NotchLayout`、`PanelShape`，画法在 `Notch.swift` 的 `NotchRoot.corners`、`NotchDashboard`，以代码为准。
+Dimensions in `NotchLayout` and `PanelShape` in `NotchCore`; rendering in `NotchRoot.corners` and `NotchDashboard` in `Notch.swift`, governed by code.
 
-- **版式**（HIG：展开态和收起态元素相对位置不变）：左上 Pip（左耳那只放大），右上出口状态徽章（右耳的位置），刘海正下方是出口标题和 IP，中间各插件的段，底栏只有右边的齿轮（用户 10-31：底栏是全局的，不放某个插件自己的东西，哪个插件都不是必须的）。面板、卡片同宽，切换时形状只变高度。
-- **按插件分段**（用户 10-31）：出口守卫那一段就是顶上的状态区和徽章，固定在最上面，关掉守卫就都不画。Claude Code 和外部插件各一段（内嵌圆角容器），行用同一个模板 `PanelRow`：图标、标题、可选副标题、状态指示、右侧「距今多久」或短值、点了去哪。用户在设置 › 插件里定每段开不开、顺序、最多露几行；各段合起来至多露 6 行，排在前面的先拿，多的在段里滚。空的段不画，段都空时一行占位；一个插件都没开时是「没有开启的插件」和「打开插件设置」。
-- **外部插件的活动**（照 ActivityKit）：start / update / end，时间戳取新，最长 8 小时，在插件那一段占一行；`alert` 时弹卡，之后的更新原地刷新这张卡，不重放、不响。
-- **收起态谁上位**（照灵动岛 relevanceScore）：每个开着的插件报一个紧急程度（平静 / 进行中 / 要你看 / 严重，严重只有守卫能报；外部插件取它开着的活动里最急的）。收起时 Pip 和右耳显示最急的那个，一样急时守卫在前、其余按段的顺序；都平静时显示常驻插件（默认守卫，可选不常驻），不常驻就是空闲的 Pip、右耳空着。设置 › Pip 可以关掉收起时的 Pip：右耳也没东西时就是一块纯黑的刘海（照 boring.notch 的空闲脸）。
-- **对齐线**：Pip 按身体圆心和会话图标中心对齐；徽章、齿轮、时间列右缘对齐。
-- Pip 和徽章 32pt（用户定：40pt 偏大）。
-- **会话行**（Claude Code 那一段）：不垫底色（用户定）；agent 厂商标志 + `cwd` 完整路径（`~` 缩写，太长从前面截）+ 状态指示 + 时间（用户定）。
-  - 不显示会话名：它可能从对话推出来。
-  - 状态只用指示不写字：工作中三蓝点，等你回答 / 批准用 Pip 这两个造型的装饰；已停止不画、标志和路径变暗，时间不变暗（保住对比度）。不用绿色（绿只表示出口正常）。
-  - 时间统一是「状态变化距今多久」，系统相对时间格式。
-  - 按进程启动先后排，状态变了不挪位置；点行跳到 Ghostty（`docs/agent-integration.md`「跳转到 Ghostty」）。
-- 小字（≤ 17pt）对黑底至少 4.5:1（HIG Accessibility）。
+- **Layout** (HIG: relative positions of elements preserved between expanded and collapsed states): top-left Pip (enlarged version of left ear), top-right egress status badge (position of right ear), directly under notch is egress title and IP, middle contains plugin sections, bottom bar contains only gear icon on the right (user 10-31: bottom bar is global, hosts no plugin-specific items; no plugin is indispensable). Panel and cards share same width, morphing only height when switching.
+- **Sectioned by plugin** (user 10-31): egress guard section is the top status area and badge, fixed at top, not rendered if guard is disabled. Claude Code and external plugins each have a section (rounded container), rows use common template `PanelRow`: icon, title, optional subtitle, status indicator, right-hand "relative time" or short value, click destination. User configures enabled state, ordering, and max rows in Settings › Plugins; all sections together display at most 6 rows, earlier sections take priority, excess rows scroll within section. Empty sections do not render; if all sections empty, a single-line placeholder renders; if no plugins enabled, shows "No enabled plugins" and "Open Plugin Settings".
+- **External plugin activities** (modeled after ActivityKit): start / update / end, latest timestamp wins, up to 8 hours duration, occupying one row in plugin section; pops card on `alert`, subsequent updates refresh that card in place without re-popping or sound.
+- **Collapsed lead selection** (modeled after Dynamic Island relevanceScore): each enabled plugin reports an urgency (calm / active / attention / critical; critical reserved for guard; external plugins take maximum urgency among active activities). When collapsed, Pip and right ear show the most urgent; if equally urgent, guard takes precedence, others follow section order; when all calm, shows resident plugin (defaults to guard, optionally none), if none shows idle Pip with empty right ear. Settings › Pip can turn off Pip when collapsed: with empty right ear, renders as a pure black notch (modeled after boring.notch idle face).
+- **Alignment lines**: Pip body center aligns with session icon center; badge, gear icon, and time column align to right edge.
+- Pip and badge are 32pt (user decided: 40pt is overly large).
+- **Session rows** (Claude Code section): no background pill (user decision); agent vendor logo + `cwd` full path (`~` abbreviation, head-truncated if too long) + status indicator + time (user decision).
+  - Never display session name: it might be inferred from conversation.
+  - Status indicated by visual cues without text: working uses 3 blue dots, waiting for answer / approval uses corresponding Pip look decorations; stopped is unrendered, dimming logo and path, keeping time undimmed (preserves contrast). Never use green (green reserved for normal egress).
+  - Time uniformly formatted as "relative time since status change", using system relative time format.
+  - Ordered by process launch time, invariant to status changes; clicking row jumps to Ghostty (`docs/agent-integration.md` "Jump to Ghostty").
+- Small text (≤ 17pt) against black background must maintain at least 4.5:1 contrast (HIG Accessibility).
 
-## 卡片
+## Cards
 
-刘海上一次只放一张卡，由 `NotchCore` 的 `CardQueue` 决定放哪张、放多久、响不响。两层：
+Only one card displays under the notch at a time, governed by `CardQueue` in `NotchCore` regarding selection, duration, and sound. Two tiers:
 
-- **红卡**：违规挂着时的底层（挂不挂由 `ViolationAlert` 判，`docs/egress-guard.md`）。关掉「红卡一直保留」时，红卡放满一次「卡片停留」就收起，算你关掉了这一次。
-- **临时卡**：完成卡（Glass）、出错卡（Funk）、介入卡（Ping）、恢复卡（Glass）。按「卡片停留」倒计时，恢复卡固定 4 秒；到时收起，红卡还挂着就回到红卡。
+- **Red card**: bottom layer during active violation (presence decided by `ViolationAlert`, `docs/egress-guard.md`). When "Keep red card resident" is disabled, red card collapses after one "card duration", counting as dismissed for this instance.
+- **Temporary cards**: done card (Glass), error card (Funk), needs-you card (Ping), recovery card (Glass). Count down per "card duration", recovery card fixed at 4 seconds; auto-collapses on expiration, returning to red card if still active.
 
-规则：
+Rules:
 
-1. **一个队列**：所有临时卡先进先出，一次放一张。两个会话同时结束也不会互相顶掉。
-2. **同一个会话只留最新**：排着的旧卡被同会话后来的卡原地替换；恢复卡同时只排一张；外部插件同组（消息的 `group`）的也一样。**介入卡过期就撤**：它说的是「此刻在等你」，会话一不再需要你介入，排着或正在放都撤；完成卡、恢复卡说的是已经发生的事，不撤。
-3. **声音跟着卡响**：卡放出来那一刻才响；被打断后重放不再响。听到的和看到的一一对应。
-4. **违规开始插到最前**：正在放的临时卡回到队首，红卡先完整放一次「卡片停留」再接着放队列。
-5. **之后盖在红卡上**：红卡放过第一次后，新来的内置插件的临时卡盖在上面，放完回到红卡；外部插件的卡排着，红卡撤了再放（恢复卡排在它们前面）。每个外部插件至多排 3 张，再来就丢它最旧的那张（用户 10-31）。关掉一个插件，它排着的、正在放的卡都撤。
-6. **介入卡也自动收回**（用户定）：之后还在等你，靠收起态的 Pip 造型和右耳提示。
-7. **Pip**：卡上的 Pip 就是左耳那只，跟形状的弹簧飞到卡片左侧（和面板左上那只在同一条竖线上，面板和卡片互切时只上下走、不横移），换成这张卡的造型（完成、恢复 finished，介入 question / approval，出错 error，红卡 danger）；收起时飞回（用户定：要从原来的位置缓动过来）。
-8. **看不见就不放**：熄屏或锁屏时倒计时停住，新卡排着不放不响；新违规照样挂上红卡，Basso 等回来再响；离开期间已恢复的不补响。
+1. **Single queue**: all temporary cards queue FIFO, displaying one at a time. Two sessions finishing simultaneously will not preempt each other.
+2. **Latest only per session**: queued old cards are replaced in place by subsequent cards from the same session; only one recovery card queues at any time; same applies to external plugins sharing the same `group`. **Needs-you cards expire**: they represent "waiting for you right now"; once session no longer needs intervention, queued or playing cards are immediately dismissed; done and recovery cards represent completed events and are not dismissed.
+3. **Sound follows card**: plays sound at the exact moment card appears; interrupted cards do not re-play sound on resume. What is heard matches what is seen.
+4. **Violation start preempts to head**: playing temporary card returns to head of queue, red card plays for one full "card duration" before queue resumes.
+5. **Layering over red card thereafter**: after red card finishes its first playback, new temporary cards from built-in plugins layer on top, returning to red card upon completion; external plugin cards wait in queue and play after red card dismisses (recovery card queues ahead of them). Each external plugin queues at most 3 cards, dropping oldest on overflow (user 10-31). Disabling a plugin dismisses its queued and active cards.
+6. **Needs-you cards also auto-collapse** (user decision): subsequent waiting state conveyed via collapsed Pip look and right-ear indicator.
+7. **Pip**: Pip on card is the left-ear instance, springing to card left side (on same vertical line as panel top-left Pip, moving strictly vertically when switching between panel and card without horizontal shift), adopting the card's look (finished for done/recovery, question / approval for needs-you, error for error, danger for red card); springs back on collapse (user decision: must ease back from original position).
+8. **Never display when invisible**: timers pause when screen is off or locked; new cards queue without displaying or playing sound; new violations still attach red card, deferring Basso until return; recoveries occurring while absent do not play sound.
 
-- **流星**：卡片弹出时两颗流星从顶部两端沿边流到底边中间，只走一趟，**不代表倒计时**（用户定）。形状和时长在 `CardEdge.swift`（照 Magic UI Border Beam）。常驻红卡、减弱动态效果时只画一条淡的同色细边（灵动岛 `keylineTint`）。用户否掉过：进度条、循环流光、彩色泛光、没有实体头的光晕。
-- **分区与内容块**（用户定，照灵动岛展开态分区）：第一行 Pip + 标题 / 副标题 + 右侧短值 + ×；下面至多一个内容块——正文（Markdown 子集）、日志尾巴（等宽，留最后几行）、键值、勾叉列表、进度。块名照 Adaptive Cards（TextBlock、FactSet）。内容按自然大小排（正文可换行、最多 3 行；日志每行截断），App 量出高度，形状用弹簧平滑长过去，不预先算高度（用户定）。正文只认粗体、斜体、行内代码，链接去掉（动作只走点卡片和按钮）。外部插件的卡在副标题前标插件图标和名字。版式不用 HTML：WebView 是另一个进程，接不上 Pip 和形状的动画。
-- **点卡片和按钮**：卡片可以带一个点击动作和至多两个按钮，动作只有三种：打开 URL（https 和设置 › 插件「链接白名单」里的 scheme；拦下的只记 scheme）、切换 App、跳回终端。点了都算关掉这张卡。Claude Code 的卡点了跳回 Ghostty 里这个会话；红卡、恢复卡没有动作。
-- **颜色**（流星和细边）：完成和普通消息银白、出错浅橙、等你回答和「要你看」青、等你批准青柠、恢复绿、红卡红；普通消息不响。绿色只给出口正常；Claude 橙在黑底上发红，不用。
-- **文案**：标题说谁怎么了（「Claude Code 做完了」），副标题是会话路径。弹卡时 VoiceOver 念标题。
-- **悬停按卡算**：鼠标在卡上动了才暂停倒计时；卡弹到不动的鼠标底下照常倒计时。
+- **Meteor**: when card appears, two meteors travel from top corners along edges to bottom center once, **not representing a countdown** (user decision). Shape and duration in `CardEdge.swift` (modeled after Magic UI Border Beam). Resident red card and reduced motion draw a faint hairline in matching color instead (Dynamic Island `keylineTint`). Rejected alternatives: progress bars, looping beams, colorful glows, diffused glows without solid head.
+- **Sections and Content Blocks** (user decision, modeled after Dynamic Island expanded sections): first row has Pip + title / subtitle + right-hand short value + ×; underneath at most one content block — text body (Markdown subset), log tail (monospace, last few lines), key-value facts, checklist, progress bar. Block names follow Adaptive Cards (TextBlock, FactSet). Natural size layout (body text wraps up to 3 lines; log lines truncate), App measures height, shape smoothly morphs via springs without precalculating height (user decision). Text body supports only bold, italic, inline code, stripping links (interactions routed through card click and buttons). External plugin cards prefix subtitle with plugin icon and name. Avoid HTML layout: WebView runs in separate process, breaking animation coordination with Pip and shape.
+- **Card clicks and buttons**: cards may carry one click action and up to two buttons, with three actions supported: open URL (https and schemes in Settings › Plugins link whitelist; blocked requests log scheme only), activate App, jump to terminal. Any click dismisses the card. Claude Code cards jump to Ghostty session; red and recovery cards carry no actions.
+- **Colors** (meteor and hairline): done and normal messages silver-white, error light orange, waiting for answer and attention cyan, waiting for approval lime, recovery green, red card red; normal messages silent. Green reserved for normal egress; Claude orange looks reddish on black and is avoided.
+- **Copywriting**: title states who experienced what ("Claude Code is done"), subtitle is session path. VoiceOver reads title when card appears.
+- **Hover calculated per card**: hovering pauses countdown only after mouse moves over card; card appearing under stationary mouse counts down as usual.
 
-## 灵动岛规范
+## Dynamic Island Specs
 
-刘海上的东西照 iPhone 灵动岛的规矩做。Apple 还没有 Mac 灵动岛的章节，等出了再对一遍（`HANDOFF.md`）。出处：[HIG Live Activities](https://developer.apple.com/design/human-interface-guidelines/live-activities)（下称 HIG）、[Displaying live data](https://developer.apple.com/documentation/activitykit/displaying-live-data-with-live-activities)、[HIG Accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility)、[HIG Motion](https://developer.apple.com/design/human-interface-guidelines/motion)、WWDC23 10194「Design dynamic Live Activities」、WWDC23 10158「Animate with springs」、WWDC18 803「Designing Fluid Interfaces」。
+Notch UI follows iPhone Dynamic Island principles. Apple has not yet published Mac Dynamic Island guidelines; cross-check when released (`HANDOFF.md`). References: [HIG Live Activities](https://developer.apple.com/design/human-interface-guidelines/live-activities) (HIG), [Displaying live data](https://developer.apple.com/documentation/activitykit/displaying-live-data-with-live-activities), [HIG Accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility), [HIG Motion](https://developer.apple.com/design/human-interface-guidelines/motion), WWDC23 10194 "Design dynamic Live Activities", WWDC23 10158 "Animate with springs", WWDC18 803 "Designing Fluid Interfaces".
 
-| # | 规矩（出处） | 我们怎么做 |
+| # | Guideline (Reference) | Our Implementation |
 |---|---|---|
-| 1 | 背景纯黑不透明，不能改（HIG："use a black opaque background"） | 贴刘海的部分永远黑底；背景色不变，动效加在内容上 |
-| 2 | 深色时有一圈 keyline，颜色和内容一致（HIG、`keylineTint`） | 面板白 0.08 细边；常驻红卡和减弱动态效果时卡片画同色细边 |
-| 3 | 换形态时现有元素移到新位置，不消失再进场；列表里只让真正移动的那一行动（HIG："animating existing elements to their new positions"） | Pip 从左耳飞到面板 / 卡片，右耳变徽章；面板和卡片同宽，只变高度；会话行状态变了不挪位置 |
-| 4 | 自定义动画最长 2 秒；动效要有目的，经常出现的交互少加（HIG、HIG Motion） | 形状、内容进场、流星 2 秒内放完；流星只走一趟，不循环 |
-| 5 | 文本内容变化用模糊过渡，数字用 `numericText`，符号用 Replace（Displaying live data） | 卡片内容模糊淡入；IP 数字滚动；徽章图标 Replace |
-| 6 | 弹簧拿不准用 bounce 0，不超过约 0.4；没有向外动量的收起用 100% 阻尼（WWDC23 10158、WWDC18 803） | 展开和弹卡用同一组弹簧（用户定），带轻微弹性；收起几乎不回弹（`NotchSpring`） |
-| 7 | 只提醒要紧的事；提醒时展开、响通知音；强调触发提醒的那一项（HIG、WWDC23 10194） | 卡片标题说谁怎么了，Pip 换成这张卡的造型；卡片右侧不另放状态指示、不额外弹图标 |
-| 8 | 一次只展开一个；不重要的自己消失（HIG） | 一次一张卡，临时卡自动收回，红卡常驻 |
-| 9 | 点按打开 App 里相关的位置；展开态的交互尽量只有一个（HIG） | 点卡片跳到 Ghostty 里这个会话；卡上唯一的按钮是 × |
-| 10 | 收起态左右平衡、紧贴摄像头（HIG compact） | 右耳指示在耳朵可见部分正中，和左耳 Pip 对称；不随内容收窄（三点常亮常灭，宽度跟着变反而打扰） |
-| 11 | 字用 medium 以上，小字少用；≤ 17pt 对比度至少 4.5:1；macOS 最小字号 10pt（HIG、HIG Accessibility、HIG Typography） | 小字 medium、白 0.5 以上；× 的 10pt 已在下限 |
-| 12 | 减弱动态效果：位移、缩放换成淡入淡出，不做模糊进出，收紧弹簧（HIG Accessibility） | 内容、Pip、徽章只淡入淡出；黑色形状的弹簧收紧到不回弹（`NotchSpring`） |
-| 13 | VoiceOver 能读到状态；动效不能是传达重要信息的唯一途径（HIG Accessibility、HIG Motion） | Pip 有 `accessibilityValue`，弹卡时播报标题；状态 = 颜色 + 图标 + 文案 + 声音 |
-| 14 | 同心：内圆角 = 外圆角 − 边距；内容紧贴顶部，不留「额头」（HIG、WWDC23 10194） | 面板满足（外圆角 28、边距 14、会话容器 14）；卡片左右边距按 Pip 对齐线定，不按这条；面板里的 Pip 在刘海左侧、紧贴刘海 |
+| 1 | Solid opaque black background, immutable (HIG: "use a black opaque background") | Elements attached to notch are strictly black background; background color invariant, motion applied to content |
+| 2 | Keyline outline in dark appearance matching content color (HIG, `keylineTint`) | Panel has white 0.08 hairline; resident red card and reduced motion draw matching color hairline |
+| 3 | Existing elements move to new positions on state change without disappearing and re-entering; only moved items animate (HIG: "animating existing elements to their new positions") | Pip flies from left ear to panel / card, right ear morphs into badge; panel and cards share width, varying only height; session row positions invariant to status changes |
+| 4 | Custom animations at most 2 seconds; purposeful motion, restrained on frequent interactions (HIG, HIG Motion) | Shape, content entrance, meteor finish within 2 seconds; meteor runs once without looping |
+| 5 | Text changes use blur transitions, numbers use `numericText`, symbols use Replace (Displaying live data) | Card content blurs in; IP numbers roll; badge icons use Replace |
+| 6 | Springs default to bounce 0, not exceeding ~0.4; collapse without outward momentum uses 100% damping (WWDC23 10158, WWDC18 803) | Expand and card pop use same spring configuration (user decision) with subtle bounce; collapse has minimal bounce (`NotchSpring`) |
+| 7 | Alert only for critical events; expand and play sound on alert; emphasize triggering item (HIG, WWDC23 10194) | Card title states who experienced what, Pip morphs into card look; card right side omits duplicate status cues or extra icons |
+| 8 | Only one expanded at a time; low-priority dismisses itself (HIG) | One card at a time, temporary cards auto-collapse, red card stays resident |
+| 9 | Tapping opens related location in App; expanded state aims for single primary interaction (HIG) | Clicking a card goes to its target (Claude Code cards jump to the Ghostty session); besides ×, only external plugin cards carry buttons, at most two |
+| 10 | Collapsed state balanced symmetrically around camera (HIG compact) | Right ear indicator centered in visible ear area, symmetrical with left ear Pip; does not shrink with content (three dots pulsing on/off with shifting width is distracting) |
+| 11 | Typography uses medium weight or heavier, minimal small text; ≤ 17pt contrast ratio at least 4.5:1; macOS minimum font size 10pt (HIG, HIG Accessibility, HIG Typography) | Small text uses medium weight, white ≥ 0.5; × at 10pt touches lower bound |
+| 12 | Reduce Motion: replace translation and scaling with fade in/out, remove blur transitions, tighten springs (HIG Accessibility) | Content, Pip, badge fade in/out; black shape springs tightened to eliminate overshoot (`NotchSpring`) |
+| 13 | VoiceOver reads status; motion must not be sole channel for critical info (HIG Accessibility, HIG Motion) | Pip exposes `accessibilityValue`, card announces title; Status = Color + Icon + Text + Sound |
+| 14 | Concentricity: inner radius = outer radius − padding; content hugs top, no empty forehead (HIG, WWDC23 10194) | Panel conforms (outer radius 28, margin 14, session container 14); cards align left/right per Pip alignment line; Pip in panel sits left of notch hugging top |
 
-有意偏离：
+Intentional Deviations:
 
-- 熄屏时不亮屏，卡压着等回来再放（「卡片」8，用户定）。
-- 面板比展开态的 84–160pt 高：它是用户主动唤出的详情。
-- 出口 IP 完整显示（用户定，只在悬停面板上）；卡片副标题是完整路径，不按「精度低一点」缩成项目名（用户定）。
-- Pip 和右耳指示保留常驻循环（星星转、!! 跳、三蓝点）：Pip 是角色，不是一次性的动画。
-- 收起态的耳朵没贴紧摄像头：耳朵宽度固定，指示在可见部分正中。
-- 会话行的厂商标志带一层淡底（HIG 说 logo 不放容器）。
-- 流星是灵动岛 alert 没有的额外动效（用户定要，只走一趟）。
-- 悬停就展开，不像 Apple 在 Mac 上用点击：没出现误触，出现了再按实测调延迟。
+- Screen remains off during lock/sleep; cards queue until user returns ("Cards" 8, user decision).
+- Panel is taller than expanded 84–160pt: it serves as user-invoked detail inspection.
+- Egress IP displayed in full (user decision, on hover panel only); card subtitle displays full path without shortening to project name (user decision).
+- Pip and right-ear indicators maintain persistent loops (stars spinning, !! jumping, 3 blue dots): Pip is a character, not a one-off animation.
+- Collapsed ears do not tightly hug camera: ear widths are fixed, indicators centered in visible region.
+- Meteor is an extra animation not in Dynamic Island alerts (user requested, single run).
+- Expands on hover rather than click as Apple does on Mac: no false triggers observed; tune delay based on measurement if issues arise.
 
-## 截图
+## Screenshots
 
-改了界面要附截图：刘海机型亮、暗各一张（贴刘海部分两张都应是黑的）；改了文案的中、英各一张；有外接屏时补一张无刘海的。
+Attach screenshots when changing UI: light and dark mode on notch display (both should have black background attached to notch); English and Chinese versions for text changes; additional notchless screenshot if external display is connected.

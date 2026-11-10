@@ -5,25 +5,25 @@ import MascotCore
 import NotchCore
 import PluginCore
 
-/// 卡片的样子和声音：写什么在 NotchCore 的 `Card`，这里按 `outcome` 取流星颜色、Pip 造型、提示音（docs/ui.md「卡片」）。
-/// 什么时候放由 `CardQueue` 决定
+/// Card appearance and sound: Content defined in NotchCore `Card`; resolves shooting star tint, Pip look, and alert sound per `outcome` (docs/ui.md "Card").
+/// Timing of presentation is governed by `CardQueue`.
 extension Card {
-    static func exitAlert(detail: String) -> Card {
-        Card(source: .exitGuard, title: GuardPresentation.violatedTitle, subtitle: detail, outcome: .violation)
+    static var exitAlert: Card {
+        Card(source: .exitGuard, title: GuardPresentation.violatedTitle, subtitle: String(localized: "Internet traffic is routed outside Clash's tunnel"), outcome: .violation)
     }
     static var recovered: Card {
-        Card(source: .exitGuard, title: String(localized: "出口已恢复"), subtitle: String(localized: "流量又全部走代理了"), outcome: .recovered)
+        Card(source: .exitGuard, title: String(localized: "Egress recovered"), subtitle: String(localized: "All traffic is going through the proxy again"), outcome: .recovered)
     }
-    /// 恢复卡固定 4 秒，不跟「卡片停留」设置走（docs/ui.md「卡片」）
+    /// Recovery card duration fixed at 4s, independent of "Card Duration" setting (docs/ui.md "Card").
     static let recoveredSeconds: TimeInterval = 4
 
-    /// Claude Code 的卡：副标题是会话的路径，和会话行一样；点了跳回它的终端
-    static func turnDone(_ session: Session) -> Card { claude(String(localized: "Claude Code 做完了"), .done, session) }
-    static func turnFailed(_ session: Session) -> Card { claude(String(localized: "Claude Code 出错了"), .failed, session) }
+    /// Claude Code cards: subtitle is session directory path matching session row; click switches to its terminal.
+    static func turnDone(_ session: Session) -> Card { claude(String(localized: "Claude Code is done"), .done, session) }
+    static func turnFailed(_ session: Session) -> Card { claude(String(localized: "Claude Code hit an error"), .failed, session) }
     static func needsYou(_ need: AgentState.Need, _ session: Session) -> Card {
         switch need {
-        case .question: return claude(String(localized: "Claude Code 在等你回答"), .question, session)
-        case .approval: return claude(String(localized: "Claude Code 在等你批准"), .approval, session)
+        case .question: return claude(String(localized: "Claude Code is waiting for your answer"), .question, session)
+        case .approval: return claude(String(localized: "Claude Code is waiting for your approval"), .approval, session)
         }
     }
 
@@ -32,7 +32,7 @@ extension Card {
              action: .terminal(TerminalRef(session)))
     }
 
-    /// 流星和细边的颜色：完成低饱和银白，出错是 error 造型身体下端的浅橙；绿色只给出口正常，Claude 橙在黑底上晕开发红，不用
+    /// Shooting star and keyline tint: done uses desaturated silver-white, failed uses light orange from lower body of error look; green reserved for healthy egress.
     var tint: Color {
         switch outcome {
         case .done, .info: return Color(white: 0.85)
@@ -44,7 +44,7 @@ extension Card {
         }
     }
 
-    /// 卡上的 Pip 换成这张卡自己的造型（docs/ui.md「卡片」7）
+    /// Pip on card updates to this card's specific look (docs/ui.md "Card" 7).
     var look: Look {
         switch outcome {
         case .done, .recovered: return .finished
@@ -56,7 +56,7 @@ extension Card {
         }
     }
 
-    /// 放出来那一刻响的系统音效（docs/agent-integration.md「提醒」、docs/egress-guard.md）；普通消息不响
+    /// System alert sound played at moment of presentation (docs/agent-integration.md "Alerts", docs/egress-guard.md); standard messages are silent.
     var sound: NSSound.Name? {
         switch outcome {
         case .done, .recovered: return "Glass"
@@ -68,7 +68,7 @@ extension Card {
     }
 }
 
-/// 「状态测试」的覆盖（StateTest.swift）：只在内存里，只经 NotchController 改，重开 App 就没了
+/// "State Testing" overrides (StateTest.swift): in-memory only, mutated via NotchController only, reset on App restart.
 @MainActor
 final class NotchOverrides: ObservableObject {
     @Published fileprivate(set) var look: Look?
@@ -76,24 +76,24 @@ final class NotchOverrides: ObservableObject {
 
     var isReal: Bool { look == nil && pin == .auto }
 
-    /// Pip 实际显示的造型：强制的优先，否则是真实的（上位插件的）
+    /// Actual Pip look rendered: forced takes precedence, otherwise real look (from dominant plugin).
     func mascot(real: Look) -> Look { look ?? real }
-    /// 右耳实际显示的指示：强制时跟着强制的造型
+    /// Actual right ear indicator: tracks forced look when overridden.
     func ear(real: EarIndicator) -> EarIndicator { look.map { .for($0, probeFailed: false) } ?? real }
 }
 
 extension AppState {
-    /// 面板此刻的形状：视图和命中测试按同一份算
+    /// Current panel shape: view rendering and hit testing evaluate same model.
     var panel: PanelShape { PanelShape(guardEnabled: store.config.isEnabled(PluginID.exitGuard), sections: sections) }
 
-    /// 收起时长不长耳朵：左耳画 Pip，或右耳有东西
+    /// Whether retracted notch has ears: left ear renders Pip, or right ear has content.
     func ears(_ overrides: NotchOverrides) -> Bool {
         store.config.showsEarMascot || overrides.ear(real: lead?.indicator ?? .none) != .none
     }
 }
 
-/// 点卡片、按钮、面板里的行都走这里：动作只有三种（CLAUDE.md 硬规则「插件」）。
-/// 打开 URL 按 `urlSchemes` 白名单放行，拦下时只记 scheme（截短：外部来源）
+/// Handlers for clicking cards, buttons, and panel rows: three actions only (CLAUDE.md hard rule "Plugins").
+/// URL opening filtered via `urlSchemes` allowlist; rejected URLs log scheme only (truncated).
 @MainActor
 enum CardActions {
     static func perform(_ action: Card.Action) {
@@ -102,10 +102,10 @@ enum CardActions {
             if URLPolicy(schemes: ConfigStore.shared.config.urlSchemes).allows(url) {
                 NSWorkspace.shared.open(url)
             } else {
-                Log.write("卡片：链接的 scheme 不在白名单里，没打开（\((url.scheme ?? "无").prefix(32))）")
+                Log.write("Card: URL scheme not in allowlist, not opened (\((url.scheme ?? "none").prefix(32)))")
             }
         case .activate(let bundleID):
-            if !Apps.activate(bundleID) { Log.write("卡片：没装要切换的 App") }
+            if !Apps.activate(bundleID) { Log.write("Card: target App not installed") }
         case .terminal(let terminal):
             Ghostty.focus(terminal)
         }
@@ -115,16 +115,16 @@ enum CardActions {
 @MainActor
 final class NotchModel: ObservableObject {
     @Published var card: Card?
-    @Published var expanded = false      // 卡片是否展开
-    /// 悬停（或点击）展开了面板：`PanelHover` 的镜像，只由 `NotchController.updateHover` 写
+    @Published var expanded = false      // Whether card is expanded
+    /// Hover (or click) expanded panel: mirror of `PanelHover`, written by `NotchController.updateHover` only.
     @Published var hovering = false
     @Published var notchSize: CGSize = CGSize(width: 190, height: 32)
     @Published var countdown: CardCountdown?
-    /// 卡片内容按自然大小排，量出来的高度；形状和悬停命中区都按它
+    /// Measured natural height of card content; drives shape geometry and hover hit target.
     @Published var cardContentHeight = NotchLayout.cardRowHeight
     let overrides = NotchOverrides()
 
-    /// 卡片压过一切（固定收起也挡不住真的红卡）；其余由固定方式决定，自动时跟悬停走
+    /// Cards override everything (Always Closed never suppresses real alert cards); otherwise governed by pin mode, Auto tracks hover.
     var mode: NotchMode {
         if expanded, card != nil { return .card }
         switch overrides.pin {
@@ -135,25 +135,25 @@ final class NotchModel: ObservableObject {
     }
 }
 
-/// 刘海区域的透明窗口。收起时黑色形状与刘海重合（看不见），展开时从刘海里弹出。
-/// 收起时窗口不接收鼠标：悬停和刘海上的点击都靠全局监听判断鼠标是否在刘海热区里，
-/// 所以不会抢焦点，也不会挡住别处的点击。
+/// Transparent window over notch area. When retracted, black shape coincides with physical notch (invisible); pops out when expanded.
+/// Retracted window does not capture mouse: hover and clicks rely on global monitors checking notch hit area,
+/// preventing focus stealing and blocking clicks elsewhere.
 @MainActor
 final class NotchController {
-    /// 收起时的层级：在系统菜单栏之上，但在下拉菜单之下
+    /// Retracted window level: above system menu bar, below pull-down menus.
     static let restLevel = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 3)
-    /// 展开时的层级：要压过铺满顶部的第三方菜单栏覆盖层，否则卡片上沿会被盖住一截。
-    /// 只在展开期间用，收起后降回 restLevel，平时不挡下拉菜单。
-    /// 实测（CGWindowListCopyWindowInfo，macOS 26.5）：控制中心 25 层，
-    /// Vibe Island 27 层（同 mainMenu + 3），iBar Pro 101 层（popUpMenu，铺满菜单栏），
-    /// 红卡期间打开刘海旁的下拉菜单未被遮挡。
+    /// Expanded window level: raised above third-party menu bar overlays to avoid top clipping.
+    /// Active only during expansion, returning to restLevel when retracted without obstructing pull-down menus.
+    /// Verified (CGWindowListCopyWindowInfo, macOS 26.5): Control Center level 25,
+    /// Vibe Island level 27 (mainMenu + 3), iBar Pro level 101 (popUpMenu, covering menu bar);
+    /// pull-down menus beside notch remained unoccluded during alert cards.
     static let openLevel = NSWindow.Level(rawValue: NSWindow.Level.popUpMenu.rawValue + 1)
 
     private let window: NSPanel
     private let model = NotchModel()
     private let state = AppState.shared
     private var queue = CardQueue<Card>()
-    /// 红卡的内容：挂着时台面上放它；副标题跟着守卫状态换
+    /// Alert card content: displayed on stage when active; subtitle updates with guard status.
     private var alertCard: Card?
     private var tickWork: DispatchWorkItem?
     var hasNotch: Bool { NotchLayout.hasEars(model.notchSize) }
@@ -166,11 +166,11 @@ final class NotchController {
     private var hoverWork: DispatchWorkItem?
     private var screenFrame: NSRect = .zero
 
-    /// 齿轮按钮、「打开插件设置」：打开设置（nil 是上次的页）
+    /// Gear button, "Open Plugin Settings": opens settings (nil restores previous page).
     var onOpenSettings: (SettingsPane?) -> Void = { _ in }
-    /// 在刘海或展开的形状上右键时弹出
+    /// Pops up on right-click over notch or expanded shape.
     var contextMenu: NSMenu?
-    /// 红卡没等到 healthy 就收起（用户点 ×，或非常驻红卡到时）：记作用户关掉了这一次违规
+    /// Alert card retracted before healthy (user clicks close, or non-resident card times out): marks violation as dismissed.
     var onAlertDismissed: () -> Void = {}
 
     init() {
@@ -184,18 +184,18 @@ final class NotchController {
         window.ignoresMouseEvents = true
         window.isReleasedWhenClosed = false
         window.animationBehavior = .none
-        // 贴刘海的部分永远黑底白字：系统控件、.secondary、SF Symbols 分层色、tooltip 都跟窗口外观走，只写死颜色不够（docs/ui.md「亮色与暗色」）
+        // Notch elements permanently use white-on-black: system controls, .secondary, SF Symbols rendering, and tooltips follow window appearance (docs/ui.md "Light and Dark").
         window.appearance = NSAppearance(named: .darkAqua)
-        // 面板不激活 App，Notchkeeper 几乎从不在前台：不开这个，会话行、齿轮的 .help 永远不出现
+        // Panel does not activate App; enabling this ensures session rows and gear tooltips appear while app is in background.
         // @see https://developer.apple.com/documentation/appkit/nswindow/allowstooltipswhenapplicationisinactive
         window.allowsToolTipsWhenApplicationIsInactive = true
 
         let host = FirstMouseHostingView(rootView: NotchRoot(model: model, overrides: model.overrides, state: state, store: ConfigStore.shared, onDismiss: { [weak self] in
-            // 点了卡片的 ×
+            // Clicked card close button
             guard let self else { return }
             self.apply(self.queue.dismiss(now: Date()))
         }, onOpenCard: { [weak self] action in
-            // 点了卡片 × 以外的地方或按钮：去它说的地方，这张卡算关掉（docs/ui.md「卡片」）
+            // Clicked card outside close button or clicked action button: execute action, dismiss card (docs/ui.md "Card").
             guard let self else { return }
             CardActions.perform(action)
             self.apply(self.queue.dismiss(now: Date()))
@@ -208,8 +208,8 @@ final class NotchController {
         host.sizingOptions = []
         host.frame = NSRect(origin: .zero, size: NotchLayout.windowSize)
         window.contentView = host
-        // 窗口接收鼠标后，全局监听收不到发给本 App 的事件，而这个面板不会成为 key window；
-        // 用 activeAlways 的 tracking area 接住移动和移出，鼠标离开形状时才能及时恢复穿透
+        // Once window captures mouse, global monitor misses events targeted at App, while panel never becomes key window;
+        // activeAlways tracking area captures movement and exit to restore mouse passthrough when cursor leaves shape.
         // @see https://developer.apple.com/documentation/appkit/nstrackingarea/options/activealways
         // @see https://developer.apple.com/documentation/appkit/nsevent/addglobalmonitorforevents(matching:handler:)
         tracker.onMove = { [weak self] in self?.mouseMoved() }
@@ -232,7 +232,7 @@ final class NotchController {
 
     private func position() {
         guard let s = targetScreen() else { return }
-        // 没有刘海的屏幕：从屏幕顶端中间“长”出来
+        // Displays without hardware notch: emerges from top center of screen.
         var notch = CGSize(width: 180, height: 0)
         if s.safeAreaInsets.top > 0, let l = s.auxiliaryTopLeftArea, let r = s.auxiliaryTopRightArea {
             notch = CGSize(width: s.frame.width - l.width - r.width, height: s.safeAreaInsets.top)
@@ -244,37 +244,37 @@ final class NotchController {
                                width: NotchLayout.windowSize.width, height: NotchLayout.windowSize.height), display: true)
     }
 
-    // MARK: 卡片
+    // MARK: Cards
 
     private func orderFront() { window.orderFrontRegardless() }
 
-    /// 活动的卡：排着或正在放就原地刷新（不重放、不响、不重新倒计时）；不在且要弹才弹
+    /// Activity cards: refreshes in-place if queued or active (no replay, no sound, no timer reset); posts if absent and requested.
     func activityCard(_ change: ActivityBoard.CardChange) {
         if queue.update(change.card, key: change.key) {
             apply(CardQueue.Change())
         } else if change.alert {
-            // 和普通卡一样排久了就不放：红卡挂了几个小时，撤掉后不补放早就结束了的活动
+            // Expired cards dropped like regular cards: after hours of alert card, does not replay long-completed activities.
             post(change.card, key: change.key, staleAt: min(change.staleAt ?? .distantFuture, Date().addingTimeInterval(InboxGate.lifetime)))
         }
     }
 
-    /// 关掉了插件：它排着的、正在放的卡都撤
+    /// Plugin disabled: dismiss its queued and active cards.
     func discard(where shouldGo: (CardQueue<Card>.Notice) -> Bool) {
         apply(queue.discard(where: shouldGo, now: Date()))
     }
 
-    /// 临时卡进队列（docs/ui.md「卡片」）。seconds 默认是「卡片停留」设置
+    /// Enqueues transient card (docs/ui.md "Card"). seconds defaults to "Card Duration" setting.
     func post(_ card: Card, key: CardQueue<Card>.Key?, seconds: TimeInterval? = nil, lapses: Bool = false, staleAt: Date? = nil) {
         let notice = CardQueue.Notice(card: card, key: key, seconds: seconds ?? ConfigStore.shared.config.cardAutoDismissSeconds,
                                       lapses: lapses, externalPluginID: card.externalPluginID, staleAt: staleAt)
         apply(queue.post(notice, now: Date()))
     }
 
-    /// AgentCore 的事件变成卡，或撤掉过期的介入卡（docs/ui.md「卡片」2）
+    /// Converts AgentCore events to cards, or dismisses expired intervention cards (docs/ui.md "Card" 2).
     func agentEvents(_ events: [AgentEvent], sessions: [Session]) {
-        // 事件和会话列表出自同一次更新：弹卡的会话一定在列表里
+        // Events and session list originate from same update: target session is guaranteed to exist.
         func session(_ pid: Int32) -> Session {
-            guard let s = sessions.first(where: { $0.pid == pid }) else { preconditionFailure("事件的会话不在列表里") }
+            guard let s = sessions.first(where: { $0.pid == pid }) else { preconditionFailure("event session not in list") }
             return s
         }
         for event in events {
@@ -287,20 +287,13 @@ final class NotchController {
         }
     }
 
-    /// 新的一次违规：红卡插到最前。sound 为 false 时不响（守卫不响应时保留的红卡不再响 Basso）
-    private func raiseAlert(_ card: Card, sound: Bool) {
-        alertCard = card
-        let cfg = ConfigStore.shared.config
-        apply(queue.raiseAlert(persistent: cfg.alertPersistent, sound: sound, seconds: cfg.cardAutoDismissSeconds, now: Date()))
-    }
-
-    /// 台面跟着队列走：换卡或收起、响这张卡的声音、定下一次到点
+    /// Stage tracks queue: swap or dismiss card, play card sound, schedule next deadline.
     private func apply(_ change: CardQueue<Card>.Change) {
         let card: Card?
         switch queue.showing {
         case .notice(let c): card = c
         case .alert:
-            guard let a = alertCard else { preconditionFailure("红卡挂着时一定有内容") }
+            guard let a = alertCard else { preconditionFailure("alert card must have content when active") }
             card = a
         case nil: card = nil
         }
@@ -308,14 +301,14 @@ final class NotchController {
             if card.id != model.card?.id || !model.expanded {
                 present(card)
             } else if card != model.card {
-                // 同一张卡换了内容（活动原地刷新）：不重新进场
+                // Same card updated in-place (activity refresh): skip re-entrance animation.
                 model.card = card
             }
             if change.sound, ConfigStore.shared.config.soundEnabled, let sound = card.sound { NSSound(named: sound)?.play() }
         } else if model.expanded {
             collapse()
         }
-        // 常驻红卡没有倒计时：边缘不流星，只画细边（docs/ui.md「卡片」）
+        // Persistent alert cards have no countdown: edge does not sweep, drawing static keyline only (docs/ui.md "Card").
         model.countdown = queue.showing == .alert(persistent: true) ? nil : queue.countdown
         scheduleTick()
         if change.alertDismissed {
@@ -333,14 +326,14 @@ final class NotchController {
             withAnimation(NotchSpring.notchOpen) { model.expanded = true }
         }
         updateMouseCapture()
-        // 弹卡时 VoiceOver 念出标题，看不见卡的人也知道发生了什么（docs/ui.md「卡片」）。
-        // 面板不激活 App、没有 main window，所以挂在面板上发，优先级高才会打断正在念的内容
+        // VoiceOver announces title when card pops up (docs/ui.md "Card").
+        // Posted from panel window with high priority to interrupt ongoing speech without activating App.
         // @see https://developer.apple.com/documentation/appkit/nsaccessibility/notification/announcementrequested
         NSAccessibility.post(element: window, notification: .announcementRequested,
                              userInfo: [.announcement: card.title, .priority: NSAccessibilityPriorityLevel.high.rawValue])
     }
 
-    /// 熄屏或锁屏：台面上的卡停住，新卡不放、不响；回来接着放
+    /// Display sleep or lock screen: pauses active card, holds queue; resumes on return.
     func setScreenAway(_ away: Bool) {
         apply(queue.setAway(away, now: Date()))
     }
@@ -356,31 +349,30 @@ final class NotchController {
         DispatchQueue.main.asyncAfter(deadline: .now() + max(0, at.timeIntervalSinceNow), execute: work)
     }
 
-    /// 鼠标在卡片上：倒计时暂停；移开：从剩下的时间继续
+    /// Mouse hovered over card: pauses countdown; resumes remaining time when moved away.
     func setCardHover(_ over: Bool) {
         guard over != queue.hovering else { return }
         apply(queue.setHovering(over, now: Date()))
     }
 
-    /// 守卫读完一次，红卡要做的事（判定在 `ViolationAlert`）
+    /// Action for alert card after guard round check (evaluated in `ViolationAlert`).
     func alertAction(_ action: ViolationAlert.Action) {
         switch action {
         case .none: return
-        case .raise(let alert): raiseAlert(.exitAlert(detail: alert.detail), sound: alert.sounds)
-        case .replaceDetail(let alert):
-            guard var shown = alertCard else { preconditionFailure("换副标题时红卡一定挂着") }
-            shown = shown.replacingSubtitle(alert.detail)
-            alertCard = shown
-            if model.card?.id == shown.id { model.card = shown }
+        case .raise:
+            // New violation: insert alert card at front, play Basso.
+            alertCard = .exitAlert
+            let cfg = ConfigStore.shared.config
+            apply(queue.raiseAlert(persistent: cfg.alertPersistent, seconds: cfg.cardAutoDismissSeconds, now: Date()))
         case .clear(let recovered):
-            // 恢复卡先排上，红卡撤了马上轮到它，不排在违规期间攒下的外部卡后面
+            // Queue recovery card first, presenting immediately once alert card is dismissed ahead of accumulated cards.
             if recovered { post(.recovered, key: .recovered, seconds: Card.recoveredSeconds) }
             apply(queue.clearAlert(now: Date()))
             alertCard = nil
         }
     }
 
-    /// 卡片的内容留到收起动画做完才清掉，收的时候看得见缩回去的是哪张卡；中途又弹了卡就不清
+    /// Card content preserved until retract animation finishes so collapsing card is visible; retained if interrupted by new card.
     /// @see https://developer.apple.com/documentation/swiftui/withanimation(_:completioncriteria:_:completion:)
     private func collapse() {
         withAnimation(model.hovering ? NotchSpring.page : NotchSpring.notchClose) {
@@ -392,18 +384,18 @@ final class NotchController {
         updateMouseCapture()
     }
 
-    // MARK: 状态测试（只在内存里，见 StateTest.swift）
+    // MARK: State Testing (in-memory only, see StateTest.swift)
 
     var mode: NotchMode { model.mode }
 
-    /// 强制 Pip 显示某个状态；nil 回到真实状态。只换 Pip 的样子：不碰 AppState 和红卡，
-    /// 所以强制「危险」不弹红卡、不响，也不动「这次违规已关掉」的记录
+    /// Force Pip to display specific look; nil reverts to real state. Changes visual look only: leaves AppState and alert cards untouched,
+    /// so forcing "Danger" does not pop up alert cards, play sounds, or alter dismissal state.
     func force(_ l: Look?) {
         guard overrides.look != l else { return }
         overrides.look = l
     }
 
-    /// 固定展开 / 固定收起 / 自动。换的时候清掉悬停，回到自动时按当前鼠标重新判断
+    /// Always Open / Always Closed / Auto. Resets hover on change, re-evaluating mouse position when returning to Auto.
     func setPin(_ p: NotchPin) {
         guard overrides.pin != p else { return }
         let opening = p == .open && model.mode == .closed
@@ -415,21 +407,21 @@ final class NotchController {
         updateMouseCapture()
     }
 
-    /// 「恢复真实状态」：两项覆盖一起清掉
+    /// "Restore Real State": clears both override settings.
     func restoreRealState() {
         force(nil)
         setPin(.auto)
     }
 
-    // MARK: 悬停展开
+    // MARK: Hover Expansion
 
     func setHoverEnabled(_ on: Bool) {
         hoverEnabled = on
         if !on { updateHover { $0.close() } }
     }
 
-    /// 鼠标监听常驻：卡片的点击穿透也靠它，所以不随「悬停展开」开关装卸。
-    /// 收起时点击发给的是别的 App，只有全局监听看得到；展开后窗口接收鼠标，点击改由本地监听接住。
+    /// Persistent mouse monitors: card click-through relies on this, so not toggled by "Expand on Hover".
+    /// When retracted, clicks pass to other apps and are visible to global monitor only; when expanded, window captures mouse and local monitor handles clicks.
     /// @see https://developer.apple.com/documentation/appkit/nsevent/addlocalmonitorforevents(matching:handler:)
     private func installMouseMonitors() {
         if let g = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged], handler: { _ in
@@ -439,13 +431,13 @@ final class NotchController {
             let right = e.type == .rightMouseDown
             Task { @MainActor in _ = self.mouseDown(right: right) }
         }) { moveMonitors.append(g) }
-        // 鼠标在收起的耳朵上时窗口接收鼠标（见 captures），左键点击也只有本地监听看得到
+        // Window captures mouse when over retracted ears (see captures); left click handled by local monitor only.
         if let l = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown], handler: { e in
             self.mouseDown(right: e.type == .rightMouseDown) ? nil : e
         }) { moveMonitors.append(l) }
     }
 
-    /// 点刘海展开；在刘海或展开的形状上右键弹出菜单。返回 true 表示事件已处理
+    /// Click notch to expand; right-click over notch or expanded shape opens context menu. Returns true if handled.
     private func mouseDown(right: Bool) -> Bool {
         let p = NSEvent.mouseLocation
         let onShape = triggerRect.contains(p) || (model.mode != .closed && shapeRect.contains(p))
@@ -460,15 +452,15 @@ final class NotchController {
         return true
     }
 
-    /// 刘海本体在屏幕上的位置（Pip MascotDirector 贴着它走）
+    /// Screen bounds of physical notch (Pip MascotDirector tracks this).
     var anchorRect: NSRect {
         let h = NotchLayout.topInset(model.notchSize)
         let w = model.notchSize.width
         return NSRect(x: screenFrame.midX - w / 2, y: screenFrame.maxY - h, width: w, height: h)
     }
 
-    /// 窗口收不收鼠标、在哪一层只由这里决定：鼠标落在当前看得见的形状里才接收，
-    /// 其余（包括 580×320 窗口的透明部分）一律穿透，不挡菜单栏和别的 App
+    /// Determines whether window captures mouse and layer level: captures only when cursor falls within visible shape,
+    /// passing through transparent areas (including 580x320 window padding) without blocking menu bar or other apps.
     private func updateMouseCapture() {
         let open = model.mode != .closed
         let level = open ? Self.openLevel : Self.restLevel
@@ -477,13 +469,13 @@ final class NotchController {
         if window.ignoresMouseEvents == capture { window.ignoresMouseEvents = !capture }
     }
 
-    /// 这一点上窗口要不要接收鼠标：展开时是整个形状；收起时是刘海加两只黑色耳朵（耳朵挡在菜单栏上，
-    /// 点它不能漏给后面的菜单栏），没有刘海的屏幕收起时形状高 0，一律穿透
+    /// Whether window captures mouse at point: full shape when expanded; notch plus retracted black ears when retracted
+    /// (ears overlay menu bar and must not leak clicks behind); notchless screens have height 0 when retracted, passing through.
     func captures(_ p: NSPoint) -> Bool {
         (model.mode != .closed || hasNotch) && shapeRect.contains(p)
     }
 
-    /// 收起的形状（刘海加两只耳朵，或无刘海屏顶端中间一条细带）略放大一点作为悬停、点击热区
+    /// Retracted shape (notch plus ears, or top thin strip on notchless displays) slightly expanded as hover/click hit region.
     var triggerRect: NSRect {
         let f = screenFrame
         let n = NotchLayout.size(.closed, notch: model.notchSize, panel: state.panel, cardContent: 0, ears: state.ears(overrides))
@@ -492,24 +484,24 @@ final class NotchController {
         return NSRect(x: f.midX - w / 2, y: f.maxY - h, width: w, height: h + Self.topEdgeSlack)
     }
 
-    /// 鼠标顶到屏幕最上沿时 NSEvent.mouseLocation.y 恰好等于 frame.maxY，而 NSRect.contains 不含上边界，
-    /// 所以命中区要越过屏幕顶边 1pt，否则贴顶的鼠标永远判在区外（在刘海机型上用 CGWarpMouseCursorPosition 实测）
+    /// When cursor hits very top edge of screen, NSEvent.mouseLocation.y equals frame.maxY while NSRect.contains excludes top boundary;
+    /// hit region extends 1pt beyond top edge so top-pinned cursor remains inside target.
     /// @see https://developer.apple.com/documentation/appkit/nsevent/mouselocation
     /// @see https://developer.apple.com/documentation/corefoundation/cgrect
     private static let topEdgeSlack: CGFloat = 1
 
-    /// 当前可见形状的屏幕区域（与视图共用 NotchLayout 的尺寸）
+    /// Screen rect of currently visible shape (shares dimensions with NotchLayout).
     private var shapeRect: NSRect {
         let s = NotchLayout.size(model.mode, notch: model.notchSize, panel: state.panel, cardContent: model.cardContentHeight, ears: state.ears(overrides))
         let f = screenFrame
         return NSRect(x: f.midX - s.width / 2, y: f.maxY - s.height, width: s.width, height: s.height + Self.topEdgeSlack)
     }
 
-    /// 判断悬停是否离开时多留 10pt 余量
+    /// 10pt margin when checking if hover exited.
     private var visibleRect: NSRect { shapeRect.insetBy(dx: -10, dy: -10) }
 
-    /// 卡片换了高度、鼠标没动：透明区要穿透、看得见的要接住点击；鼠标已不在卡上就不算悬停。
-    /// 不因此算作悬停开始（docs/ui.md「卡片」：鼠标在这张卡上动了才暂停）
+    /// Card height changed while mouse stationary: transparent area passes through, visible area captures clicks;
+    /// does not count as hover start (docs/ui.md "Card": mouse must move over card to pause).
     private func cardResized() {
         updateMouseCapture()
         if queue.hovering, !shapeRect.contains(NSEvent.mouseLocation) { setCardHover(false) }
@@ -524,7 +516,7 @@ final class NotchController {
         updateHover { $0.mouseMoved(onNotch: onNotch, nearShape: nearShape, canOpen: canOpen, now: Date()) }
     }
 
-    /// 悬停状态机改完：面板跟着展开或收起，定下一次到点
+    /// Hover state updated: expands or collapses panel, schedules next timer.
     private func updateHover(_ change: (inout PanelHover) -> Void) {
         change(&hover)
         if hover.isOpen != model.hovering {
@@ -540,7 +532,7 @@ final class NotchController {
     }
 }
 
-/// 接住宿主视图 tracking area 的鼠标事件，转给 NotchController
+/// Captures mouse events from host view tracking area, forwards to NotchController.
 final class NotchMouseTracker: NSResponder {
     var onMove: () -> Void = {}
     override func mouseMoved(with event: NSEvent) { onMove() }
@@ -551,7 +543,7 @@ final class NotchMouseTracker: NSResponder {
 struct NotchShape: Shape {
     var topRadius: CGFloat
     var bottomRadius: CGFloat
-    /// false 时不画顶边（描边用）：卡片顶部和刘海连成一体，不出现一条线
+    /// When false, omits top edge (used for border): card top blends into physical notch without seam line.
     var closed = true
 
     var animatableData: AnimatablePair<CGFloat, CGFloat> {
@@ -559,13 +551,13 @@ struct NotchShape: Shape {
         set { topRadius = newValue.first; bottomRadius = newValue.second }
     }
 
-    /// 顶角外翻和底角实际用的半径：太小的矩形里压到放得下
+    /// Effective radii for top corner outward flares and bottom rounded corners, clamped to fit small bounds.
     private func radii(in r: CGRect) -> (top: CGFloat, bottom: CGFloat) {
         let t = min(topRadius, r.width / 4, r.height / 2)
         return (t, max(0, min(bottomRadius, r.height - t, (r.width - 2 * t) / 2)))
     }
 
-    /// 左半边：从左上外翻的顶端，沿左边、左下角走到底边中点。卡片边缘的流星沿它走，右边一颗走它的镜像
+    /// Left half: from top-left outward flare tip, along left edge and corner to bottom center. Left shooting star travels this path, right star mirrors it.
     func leftHalf(in r: CGRect) -> Path {
         var p = Path()
         guard r.width > 0, r.height > 0 else { return p }
@@ -599,11 +591,11 @@ struct NotchRoot: View {
     @ObservedObject var model: NotchModel
     @ObservedObject var overrides: NotchOverrides
     let state: AppState
-    /// 插件开关、顺序、常驻插件、左耳画不画 Pip 都在配置里
+    /// Plugin enablement, ordering, resident plugin, and ear mascot visibility configured in settings.
     @ObservedObject var store: ConfigStore
     let onDismiss: () -> Void
     let onOpenCard: (Card.Action) -> Void
-    /// 卡片量出了新高度：命中区跟着变
+    /// Measured new card height: hit target updates accordingly.
     let onCardResized: () -> Void
     let onSettings: (SettingsPane?) -> Void
 
@@ -626,7 +618,7 @@ struct NotchRoot: View {
                 .overlay(alignment: .top) { content(mode, panel: panel, inset: t) }
                 .overlay(alignment: .topLeading) { corners(mode, size: size, flare: t) }
                 .overlay {
-                    // 面板是一条很淡的白线；卡片的边缘是流星，画在裁切外面（见下）
+                    // Panel has faint keyline; card edge has shooting stars rendered outside clipping (see below).
                     if mode != .card {
                         NotchShape(topRadius: t, bottomRadius: b, closed: false)
                             .stroke(Color.white.opacity(open ? 0.08 : 0), lineWidth: 1)
@@ -634,12 +626,12 @@ struct NotchRoot: View {
                 }
                 .clipShape(shape)
                 .overlay {
-                    // 卡片边缘的流星（docs/ui.md「卡片」）：压在边缘正中，柔光往里外两边晕开，所以放在裁切外面
+                    // Shooting stars along card edge (docs/ui.md "Card"): centered on edge with soft glow blooming inside and out, placed outside clipping.
                     if mode == .card, let card = model.card {
-                        // 圆角是跟着弹簧变的，流星按最终外形画：等形状快长好再淡入，免得拐角错开；
-                        // 一开始收起就立刻撤掉，不淡出，免得光团停在原处、跟不上缩回刘海的形状（灵动岛收起时也是内容先撤）
+                        // Corner radius changes with the spring; shooting stars are drawn according to the final shape: fade in when shape is almost ready to avoid misaligned corners;
+                        // Remove immediately as soon as closing starts, without fading out, to avoid light clusters remaining in place and falling behind the shape retracting into the notch (Dynamic Island also dismisses content first when retracting).
                         CardEdge(topRadius: t, bottomRadius: b, tint: card.tint, countdown: model.countdown)
-                            // 盖满整张卡，点击交给下面的 × 和卡片
+                            // Covers card, passing clicks to close button and card content beneath.
                             .allowsHitTesting(false)
                             .transition(.asymmetric(insertion: .opacity.animation(.easeOut(duration: 0.25).delay(CardEdgeView.appearDelay)),
                                                     removal: .opacity.animation(.linear(duration: 0))))
@@ -651,13 +643,13 @@ struct NotchRoot: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
-    /// Pip 和右边的指示：收起、面板、卡片里是**同一个视图**，只按形态改位置和缩放，
-    /// 跟着形状的同一个弹簧走（HIG Live Activities：「Maintain the relative placement of elements」，
-    /// 展开态是收起态放大，元素不移除再进场）。布局尺寸固定、只动 position / scaleEffect，
-    /// 嵌进来的 Core Animation 视图在 macOS 14 上也会被逐帧插值（实测）。
-    /// Pip 在左耳 → 面板左上 → 卡片左侧之间飞，到卡片上换成这张卡的造型、告示画回来（docs/ui.md「卡片」7）；
-    /// 右边的一组在卡片形态时淡出，透明时停掉动画。
-    /// 减弱动态效果时不飞：换形态就换一个新视图，旧的原地淡出、新的在新位置淡入（docs/mascot.md §5）
+    /// Pip and the indicators on the right: the **same view** across closed, dashboard, and card modes, only changing position and scale per mode,
+    /// following the same spring as the shape (HIG Live Activities: "Maintain the relative placement of elements",
+    /// expanded state scales up from collapsed state without removing and re-entering elements). Layout size is fixed, only animating position / scaleEffect,
+    /// embedded Core Animation views on macOS 14 are also interpolated frame-by-frame (verified).
+    /// Pip flies between left ear -> dashboard top-left -> card left side; switches to this card's pose on the card, and announcement returns (docs/ui.md "Card" 7);
+    /// the group on the right fades out in card mode, pausing animations when transparent.
+    /// Does not fly when reduce motion is enabled: replaces with a new view on mode change, old fades out in place, new fades in at new position (docs/mascot.md §5).
     @ViewBuilder
     private func corners(_ mode: NotchMode, size: CGSize, flare: CGFloat) -> some View {
         if NotchLayout.hasEars(model.notchSize) || mode != .closed {
@@ -671,10 +663,10 @@ struct NotchRoot: View {
             let look = card?.look ?? overrides.mascot(real: lead?.look ?? .idle)
             let shown = overrides.look != nil || card != nil ? look : director.shown(look)
             let ear = overrides.ear(real: lead?.indicator ?? .none)
-            // 右边跟着左边实际画的造型走（犯困时左耳睡着、晕的时候，右耳就不亮）；探针没结果的灰环不随造型变
+            // Right indicator tracks active left look (dims during drowsiness/dizziness); probe grey ring does not change with look.
             let indicator = shown == look ? ear : EarIndicator.for(shown, probeFailed: ear == .ring)
             let guardOn = store.config.isEnabled(PluginID.exitGuard)
-            // 关掉了左耳的 Pip：收起时不画，展开时照常飞出来
+            // Left ear Pip disabled: omitted when retracted, flies in normally when expanded.
             let mascotHidden = mode == .closed && !store.config.showsEarMascot
             let mascotAt: CGPoint = switch mode {
             case .closed: CGPoint(x: NotchLayout.earCenterInset, y: notch.height / 2)
@@ -682,7 +674,7 @@ struct NotchRoot: View {
             case .card: CGPoint(x: flare + NotchLayout.cardPadding + c / 2, y: NotchLayout.cardTop(notch) + NotchLayout.cardRowHeight / 2)
             }
             ZStack(alignment: .topLeading) {
-                // 告示（sign）在右边，Pip 只管表情；卡片上没有右边，画回来
+                // Sign decoration resides on right ear, Pip holds expression only; restored on cards where right ear is absent.
                 MascotView(look: look, size: c, hidesSigns: card == nil, playing: !mascotHidden)
                     .environment(\.mascotLiteral, overrides.look != nil || card != nil)
                     .scaleEffect(mode == .closed ? NotchLayout.earMascotSize / c : 1)
@@ -693,12 +685,12 @@ struct NotchRoot: View {
                 ZStack {
                     EarIndicatorView(indicator: indicator,
                                      size: CGSize(width: NotchLayout.earWidth, height: notch.height),
-                                     // 外面已经把这一组的中心放在离右边 earCenterInset 处，这里以自身中心为准，不再偏一次
+                                     // Outer container positioned at earCenterInset from right; aligns to its own center here without double offset.
                                      center: CGPoint(x: NotchLayout.earWidth / 2, y: notch.height / 2),
                                      playing: mode == .closed)
                         .frame(width: NotchLayout.earWidth, height: notch.height)
                         .opacity(mode == .closed ? 1 : 0)
-                    // 徽章是出口守卫那一段的：关掉守卫就不画
+                    // Badge belongs to Egress Guard section: omitted when guard is disabled.
                     GuardBadge(presentation: state.presentation, size: c)
                         .opacity(open && guardOn ? 1 : 0)
                         .scaleEffect(open || reduceMotion ? 1 : 0.4)
@@ -711,7 +703,7 @@ struct NotchRoot: View {
             }
             .frame(width: size.width, height: size.height, alignment: .topLeading)
             .allowsHitTesting(false)
-            // 点一下面板里的 Pip 晕一会儿（docs/mascot.md §2）。只在面板上：收起时点刘海是展开，卡片上点了是打开卡片
+            // Poke Pip in panel to make it dizzy briefly (docs/mascot.md §2). In panel only: clicking retracted notch expands it; clicking cards executes card action.
             if open {
                 Circle().fill(.clear)
                     .contentShape(Circle())
@@ -731,7 +723,7 @@ struct NotchRoot: View {
             if let card = model.card {
                 NotchCardView(card: card, onDismiss: onDismiss, onAction: onOpenCard)
                     .fixedSize(horizontal: false, vertical: true)
-                    // 内容多高，形状就用弹簧长到多高：换卡、内容变了都平滑过渡
+                    // Shape grows to natural height of content via spring animation: transitions smoothly on card swaps or content updates.
                     // @see https://developer.apple.com/documentation/swiftui/view/ongeometrychange(for:of:action:)
                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { h in
                         withAnimation(NotchSpring.page) { model.cardContentHeight = h }
@@ -752,8 +744,8 @@ struct NotchRoot: View {
         }
     }
 
-    /// 内容在形状长开之后进场：模糊变清晰 + 从 0.96 放大 + 淡入，稍等 0.06s 让形状先走（DynamicNotchKit 的 blur + scale + opacity，
-    /// boring.notch 的 `.smooth(0.35)`）；退场只淡出、更快（docs/ui.md「原则」：进场稍慢、退场稍快）。减弱动态效果只淡入淡出
+    /// Content enters after the shape has expanded: blur clears up + scales up from 0.96 + fades in, waiting 0.06s for the shape to move first (DynamicNotchKit's blur + scale + opacity,
+    /// boring.notch's `.smooth(0.35)`); exit only fades out, faster (docs/ui.md "Principles": enter slightly slower, exit slightly faster). Reduce motion uses fade in / fade out only.
     static func contentTransition(_ reduceMotion: Bool) -> AnyTransition {
         let fadeOut = AnyTransition.opacity.animation(.easeIn(duration: 0.1))
         if reduceMotion { return .asymmetric(insertion: .opacity.animation(.easeOut(duration: 0.2)), removal: fadeOut) }
@@ -764,7 +756,7 @@ struct NotchRoot: View {
     }
 }
 
-/// 进场用：模糊 8pt、缩到 0.96（锚在顶部）、透明
+/// Entrance state: 8pt blur, scaled to 0.96 (top anchored), transparent.
 private struct Unfocus: ViewModifier {
     let amount: CGFloat
     func body(content: Content) -> some View {
@@ -775,8 +767,8 @@ private struct Unfocus: ViewModifier {
     }
 }
 
-/// 右上的出口状态徽章：和左上的 Pip 等大。颜色 + 图标 + 文案三者一起表达状态（docs/ui.md「原则」），
-/// 文案在刘海下方的标题
+/// Egress status badge at top-right: matches size of Pip at top-left. Color + icon + copy convey status together (docs/ui.md "Principles");
+/// title sits below physical notch.
 struct GuardBadge: View {
     let presentation: GuardPresentation
     let size: CGFloat
@@ -801,7 +793,7 @@ struct GuardBadge: View {
         Circle()
             .fill(c.opacity(0.16))
             .overlay(Image(systemName: symbol).font(.system(size: size * 0.42, weight: .semibold)).foregroundStyle(c)
-                // 状态变了图标原地替换（Apple「Displaying live data」：符号用 Replace）；减弱动态效果只淡入淡出
+                // Symbol replaces in-place on status change (Apple "Displaying live data": Replace symbol effect); fades with Reduce Motion.
                 .contentTransition(reduceMotion ? .opacity : .symbolEffect(.replace)))
             .animation(.smooth, value: symbol)
             .frame(width: size, height: size)
@@ -810,9 +802,9 @@ struct GuardBadge: View {
     }
 }
 
-/// 悬停展开的内容：刘海正下方出口守卫的状态、各插件的段、底栏的齿轮。左上的 Pip 和右上的徽章在 NotchRoot。
-/// 出口守卫那一段固定在顶上（状态区和徽章），关掉就不画；其余插件各一段，按设置里的顺序（docs/ui.md「面板布局」）。
-/// 只显示路径 / 状态 / 时间，不显示任何对话内容。
+/// Hover-expanded content: Egress Guard status below notch, plugin sections, and footer gear button. Pip top-left and badge top-right live in NotchRoot.
+/// Egress Guard pinned at top (status and badge), omitted if disabled; other plugins follow settings order (docs/ui.md "Panel Layout").
+/// Displays path / status / time only, never conversation contents.
 struct NotchDashboard: View {
     let state: AppState
     let panel: PanelShape
@@ -823,7 +815,7 @@ struct NotchDashboard: View {
         let p = state.presentation
         VStack(spacing: 0) {
             if panel.header {
-                // 刘海正下方（灵动岛的 center 区）：标题用中等以上字重（HIG Live Activities），圆体配圆润的 Pip（HIG Typography）
+                // Directly below notch (Dynamic Island center region): bold/semibold typography (HIG Live Activities), rounded font matching Pip (HIG Typography).
                 VStack(spacing: 2) {
                     Text(p.title)
                         .font(.system(size: 15, weight: .semibold, design: .rounded))
@@ -832,11 +824,11 @@ struct NotchDashboard: View {
                     Text(state.display.egressIP ?? "—")
                         .font(.system(size: 11, weight: .medium, design: .monospaced))
                         .foregroundStyle(p.ipColor)
-                        // 出口换 IP 时数字逐位滚过去（Apple「Displaying live data」）；减弱动态效果只淡入淡出
+                        // IP digits roll character-by-character on change (Apple "Displaying live data"); fades with Reduce Motion.
                         .contentTransition(reduceMotion ? .opacity : .numericText())
                         .animation(.smooth, value: state.display.egressIP)
                 }
-                // 两侧让开 Pip 和徽章
+                // Padding clears Pip and badge on sides.
                 .padding(.horizontal, NotchLayout.contentInset + NotchLayout.rowIcon / 2 + NotchLayout.dashCorner / 2 + 6)
                 .frame(height: NotchLayout.dashStatusHeight)
             }
@@ -847,12 +839,12 @@ struct NotchDashboard: View {
                     .padding(.horizontal, NotchLayout.dashMargin)
             }
 
-            // 底栏是全局的，只放齿轮：哪个插件都不是必须的，不放某个插件自己的东西（比如「出口检查于…」）。
-            // 守卫数据旧了由顶上的状态说（出口守卫没响应）
+            // Footer is global, containing only gear: plugins are optional, avoiding section-specific info (e.g. "Checked at...").
+            // Stale guard data is reflected in top status (Guard Not Responding).
             HStack {
                 Spacer()
                 NotchGearButton { onSettings(nil) }
-                    .padding(.trailing, -5) // 齿轮的点击框 24、图形约 14：让图形右缘落在右对齐线上
+                    .padding(.trailing, -5) // Gear hit box 24pt, glyph ~14pt: aligns glyph right edge with margin
             }
             .padding(.horizontal, NotchLayout.contentInset)
             .frame(height: NotchLayout.footerHeight)
@@ -860,8 +852,8 @@ struct NotchDashboard: View {
     }
 }
 
-/// 各插件的段：每段一个内嵌的圆角容器（HIG Live Activities：用内嵌圆角容器分隔内容），露 `PanelShape` 定的行数，多的在段里滚。
-/// 段都空着时一行占位；一个插件都没开时是「没有开启的插件」和「打开插件设置」
+/// Plugin sections: rounded inset containers (HIG Live Activities: inset rounded containers separate content), showing `PanelShape` row count, scrolling excess.
+/// Placeholder shown when all sections empty; "No plugins turned on" and "Open Plugin Settings" when none enabled.
 struct PanelList: View {
     let list: [PanelShape.Visible]
     let sections: [PanelSection]
@@ -874,7 +866,7 @@ struct PanelList: View {
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.white.opacity(NotchLayout.secondaryTextOpacity))
                 if sections.isEmpty {
-                    Button("打开插件设置", action: onSettings)
+                    Button("Open Plugin Settings", action: onSettings)
                         .buttonStyle(.plain)
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.white)
@@ -897,7 +889,7 @@ struct PanelList: View {
                         }
                     }
                     .scrollBounceBehavior(.basedOnSize)
-                    .environment(\.colorScheme, .dark) // 系统亮色、滚动条设成「始终」时，别在黑底上画浅色槽
+                    .environment(\.colorScheme, .dark) // Prevents light scrollbar track on dark background when scrollbar setting is "Always"
                     .frame(height: CGFloat(visible.rows) * NotchLayout.rowHeight)
                     .padding(NotchLayout.listInset)
                     .background(Self.container)
@@ -907,9 +899,9 @@ struct PanelList: View {
     }
 
     private var placeholder: String {
-        if sections.isEmpty { return String(localized: "没有开启的插件") }
-        if sections.map(\.plugin) == [PluginID.claudeCode] { return String(localized: "Claude Code 没在运行") }
-        return String(localized: "没有进行中的会话或活动")
+        if sections.isEmpty { return String(localized: "No plugins turned on") }
+        if sections.map(\.plugin) == [PluginID.claudeCode] { return String(localized: "Claude Code isn't running") }
+        return String(localized: "No sessions or activities in progress")
     }
 
     private static var container: some View {
@@ -917,7 +909,7 @@ struct PanelList: View {
     }
 }
 
-/// 面板底栏右边的设置入口。平时压暗不抢眼（白 0.55 在黑底上仍够 4.5:1），悬停时变亮、垫圆底、转一下，说明它能点
+/// Settings entry button at bottom-right of panel. Dimmed at rest (white 0.55 meets 4.5:1 contrast on black), brightens with circular backplate and rotation on hover.
 struct NotchGearButton: View {
     let action: () -> Void
     @State private var hover = false
@@ -935,18 +927,18 @@ struct NotchGearButton: View {
         }
         .buttonStyle(PressableStyle(pressedScale: 0.92))
         .onHover { h in withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) { hover = h } }
-        .help("设置")
-        .accessibilityLabel("设置")
+        .help("Settings")
+        .accessibilityLabel("Settings")
     }
 }
 
-/// 面板里的一行（`PanelRow`）：图标、标题和可选的副标题、状态指示、右侧距今多久或短值。已停止的会话图标和标题变暗，时间不暗（保住对比度）。
-/// 状态只用指示表达，不写字；状态名留给悬停提示和旁白
+/// Panel row (`PanelRow`): icon, title, optional subtitle, status indicator, relative time / short value on right. Stopped sessions dim icon and title, preserving timestamp contrast.
+/// Status conveyed via indicators only; names provided via hover tooltips and VoiceOver.
 struct PanelRowView: View {
     let row: PanelRow
     @State private var hover = false
 
-    /// 工作中、进行中和右耳一样是三蓝点；等你回答、批准用 Pip 这两个造型自己的装饰（带 ? 的气泡、举起的手），比一个点好认；进度是一圈环
+    /// Working and in-progress use three blue dots matching right ear; waiting for answer/approval use Pip decorations (speech bubble, raised hand); progress uses ring indicator.
     private var indicator: EarIndicator {
         switch row.indicator {
         case .none, .progress: return .none
@@ -958,13 +950,13 @@ struct PanelRowView: View {
     }
 
     private var stateTitle: String {
-        if row.dimmed { return String(localized: "已停止") }
+        if row.dimmed { return String(localized: "Stopped") }
         switch row.indicator {
         case .none: return ""
-        case .working: return row.icon == .claude ? String(localized: "工作中") : String(localized: "进行中")
-        case .question: return String(localized: "等你回答")
-        case .approval: return String(localized: "等你批准")
-        case .attention: return String(localized: "要你看")
+        case .working: return row.icon == .claude ? String(localized: "Working") : String(localized: "In Progress")
+        case .question: return String(localized: "Waiting for Answer")
+        case .approval: return String(localized: "Waiting for Approval")
+        case .attention: return String(localized: "Needs You")
         case .progress(let p): return p.formatted(.percent.precision(.fractionLength(0)))
         }
     }
@@ -1039,7 +1031,7 @@ struct PanelRowView: View {
     private var icon: some View {
         switch row.icon {
         case .claude:
-            // 是哪个 agent 只靠行首的厂商标志表示
+            // Agent brand indicated solely by leading logo.
             ClaudeMark()
                 .fill(ClaudeMark.color)
                 .frame(width: 15, height: 15)
@@ -1056,7 +1048,7 @@ struct PanelRowView: View {
     private var trailing: some View {
         switch row.trailing {
         case .since(let date):
-            // TimelineView 每秒重算一次 body，按当时的现在算
+            // TimelineView recalculates body every second against current wall clock time.
             TimelineView(.periodic(from: .now, by: 1)) { _ in
                 Text(AgoText.string(date))
             }
@@ -1067,9 +1059,9 @@ struct PanelRowView: View {
 
     private static func hint(_ action: Card.Action) -> String {
         switch action {
-        case .terminal: return String(localized: "在 Ghostty 中打开")
-        case .open: return String(localized: "打开链接")
-        case .activate: return String(localized: "切换 App")
+        case .terminal: return String(localized: "Open in Ghostty")
+        case .open: return String(localized: "Open Link")
+        case .activate: return String(localized: "Switch App")
         }
     }
 }
@@ -1077,13 +1069,13 @@ struct PanelRowView: View {
 struct NotchCardView: View {
     let card: Card
     let onDismiss: () -> Void
-    /// 点卡片（有 `action` 时）或按钮
+    /// Click card (when `action` exists) or button.
     let onAction: (Card.Action) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
-                // Pip 的位置：NotchRoot 里那只飞过来（docs/ui.md「卡片」7）
+                // Pip position: flies in from NotchRoot (docs/ui.md "Card" 7).
                 Color.clear.frame(width: NotchLayout.dashCorner, height: NotchLayout.dashCorner)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(card.title).font(.system(size: 14, weight: .semibold)).foregroundStyle(.white).lineLimit(1)
@@ -1125,18 +1117,18 @@ struct NotchCardView: View {
             }
         }
         .padding(.horizontal, NotchLayout.cardPadding)
-        // × 是按钮，自己先接住点击；其余地方点了去这张卡说的地方
+        // Close button catches clicks first; clicking remaining card area triggers action.
         .contentShape(Rectangle())
         .onTapGesture { card.action.map(onAction) }
         .accessibilityAddTraits(card.action == nil ? [] : .isButton)
     }
 
-    /// 外部插件的卡标明是谁发的（CLAUDE.md 硬规则「外部插件可信但受限」）
+    /// External plugin cards indicate source origin (CLAUDE.md hard rule "External plugins trusted but constrained").
     private var subtitle: some View {
         HStack(spacing: 4) {
             if case .plugin(_, let name, let symbol) = card.source {
                 Image(systemName: symbol)
-                Text(card.subtitle == nil ? name : "\(name) ·")
+                Text(card.subtitle == nil ? name : "\(name) -")
             }
             if let subtitle = card.subtitle { Text(subtitle) }
         }
@@ -1146,7 +1138,7 @@ struct NotchCardView: View {
     }
 }
 
-/// 卡片底部的内容块：按自然大小排，卡片量出高度后用弹簧长过去
+/// Card bottom content blocks: laid out at natural size, card expands to fit with spring animation.
 struct CardBlockView: View {
     let block: Card.Block
     let tint: Color
@@ -1155,7 +1147,7 @@ struct CardBlockView: View {
         content
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(8)
-            // 同心：卡片底角 28 − 下边距 16
+            // Concentric: card bottom radius 28 - bottom margin 16.
             .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(.white.opacity(0.06)))
     }
 
@@ -1163,13 +1155,13 @@ struct CardBlockView: View {
     private var content: some View {
         switch block {
         case .text(let t):
-            // 正文可以换行，整块最多露 3 行
+            // Body text wraps, showing up to 3 lines.
             Text(Self.markdown(t.joined(separator: "\n")))
                 .lineLimit(Card.maxLines)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.white.opacity(0.85))
         case .log(let l):
-            // 日志不换行：一行截一行
+            // Logs do not wrap: one line per entry.
             VStack(alignment: .leading, spacing: 2) {
                 ForEach(Array(l.enumerated()), id: \.offset) { _, line in Text(line).lineLimit(1) }
             }
@@ -1216,8 +1208,8 @@ struct CardBlockView: View {
         }
     }
 
-    /// 只认行内的粗体、斜体、代码（Adaptive Cards 的 Markdown 子集）。链接和图片去掉：点卡片和按钮才是动作，不能绕过 URL 白名单，也不收图片路径。
-    /// 解析不了的照原文显示：它是外部文字，不是我们的错
+    /// Recognizes inline bold, italic, code only (Adaptive Cards Markdown subset). Links and images stripped: actions route through cards/buttons only, never bypassing URL allowlist.
+    /// Displays raw text on parse errors (external content).
     /// @see https://learn.microsoft.com/en-us/adaptive-cards/authoring-cards/text-features
     static func markdown(_ line: String) -> AttributedString {
         guard var s = try? AttributedString(markdown: line, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) else {
@@ -1238,7 +1230,7 @@ struct CardBlockView: View {
         }
     }
 
-    /// 绿色只给出口正常：做完的用白，失败的用出错卡的浅橙
+    /// Green reserved for healthy egress: completed uses white, failed uses light orange.
     private static func color(_ state: Card.Check.State) -> Color {
         switch state {
         case .ok: return .white.opacity(0.85)

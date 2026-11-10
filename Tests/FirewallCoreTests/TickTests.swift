@@ -3,42 +3,42 @@ import Testing
 
 private let rules = FirewallRules(tunnel: "utun1024", directory: "/nk")!
 private let token = "1864012227745836441"
-/// 系统 pfd 的引用（macOS 26.5 上 pfd 进程退出后引用还留着，docs/firewall.md §6）
+/// System pfd reference (on macOS 26.5 reference persists after pfd exits, docs/firewall.md §6)
 private let pfdToken = "12184426722627826779"
 
-/// 此刻 pf 的样子：anchor 空不空、`pfctl -s References` 里有哪些 token
+/// Snapshot of pf state: whether anchor is empty, and tokens present in pfctl -s References
 private func pf(empty: Bool, tokens: Set<String>? = [pfdToken, token]) -> PFSnapshot {
     PFSnapshot(anchorEmpty: empty, tokens: tokens)
 }
 
 @Suite struct Tick {
-    /// 先装规则再拿引用：pf 本来是停着的话，启用那一刻规则已经在了
+    /// Load rules before obtaining reference: if pf was stopped, rules are already in place when enabled
     @Test func trialLoadsRulesThenEnablesPF() throws {
         var s = FirewallState(bootSession: boot)
         try s.enable(at: at(100))
         #expect(s.tick(at: at(101), pf: pf(empty: true, tokens: [pfdToken]), rules: rules) == [.load(rules), .enable])
     }
 
-    /// 装好、拿到引用之后什么都不做：每轮重装会让 Evaluations 归零（核对不了），每轮 -E 会让引用越涨越多
+    /// Does nothing once loaded and reference acquired: reloading every round resets Evaluations (breaking verification), re-running -E every round accumulates references
     @Test func steadyStateDoesNothing() {
         var s = steadyTrial()
         #expect(s.tick(at: at(111), pf: pf(empty: false), rules: rules) == [])
     }
 
-    /// 规则被别人清掉（root 进程 pfctl -F、主规则集被重载）就装回去，引用照旧
+    /// Reloads if rules were flushed by external action (root pfctl -F, main ruleset reloaded), keeping existing reference
     @Test func reloadsWhenAnchorWasEmptied() {
         var s = steadyTrial()
         #expect(s.tick(at: at(111), pf: pf(empty: true), rules: rules) == [.load(rules)])
     }
 
-    /// 隧道网卡名改了：换上新规则
+    /// Reloads with new rules if tunnel interface name changes
     @Test func reloadsWhenRulesChange() {
         var s = steadyTrial()
         let other = FirewallRules(tunnel: "utun7", directory: "/nk")!
         #expect(s.tick(at: at(111), pf: pf(empty: false), rules: other) == [.load(other)])
     }
 
-    /// 认不出 token 时不再 -E：引用已经拿到了，再 -E 每轮多一个
+    /// Do not re-run -E when token is unknown: reference is already held, extra -E would add duplicate tokens
     @Test func unknownTokenIsNotReEnabled() throws {
         var s = FirewallState(bootSession: boot)
         try s.enable(at: at(100))
@@ -49,7 +49,7 @@ private func pf(empty: Bool, tokens: Set<String>? = [pfdToken, token]) -> PFSnap
         #expect(s.tick(at: at(111), pf: pf(empty: false), rules: rules) == [])
     }
 
-    /// -E 之后列表读得出却没有这个 token（两边号码对不上）：当认不出，否则下一轮以为引用没了，每轮 -E 一个
+    /// If token missing from list immediately after -E (number mismatch between interfaces), treat as unknown; otherwise daemon would assume reference missing and run -E repeatedly
     @Test func tokenMissingFromTheListRightAfterEnableIsUnknown() throws {
         var s = FirewallState(bootSession: boot)
         try s.enable(at: at(100))
@@ -61,7 +61,7 @@ private func pf(empty: Bool, tokens: Set<String>? = [pfdToken, token]) -> PFSnap
         #expect(s.tick(at: at(111), pf: pf(empty: false, tokens: [pfdToken]), rules: rules) == [])
     }
 
-    /// -E 之后读不出列表：先信 -E 给的 token，下一轮照常核对
+    /// If reference list unreadable immediately after -E, trust token reported by -E for verification next round
     @Test func unreadableListRightAfterEnableKeepsTheToken() throws {
         var s = FirewallState(bootSession: boot)
         try s.enable(at: at(100))
@@ -70,23 +70,23 @@ private func pf(empty: Bool, tokens: Set<String>? = [pfdToken, token]) -> PFSnap
         #expect(s.reference == .held(token: token))
     }
 
-    /// 认不出号码的引用只能靠「pf 停了」知道它被 pfctl -d 作废了：停了就当没了，下一轮重新 -E，不卡在 pf 停着
+    /// An unknown token reference can only be detected as revoked via "pf stopped": once stopped, assume revoked and re-enable next round rather than remaining disabled
     @Test func unknownTokenIsDroppedWhenPFIsDisabled() throws {
         var s = FirewallState(bootSession: boot)
         s.reference = .unknownToken
         _ = s.check(mainRules: "", anchorRules: "", info: "", interfaces: "", tunnel: "utun1024")
-        #expect(s.reference == .unknownToken) // 读不出 info 不算停了
+        #expect(s.reference == .unknownToken) // Unreadable info does not count as stopped
         _ = s.check(mainRules: "", anchorRules: "", info: "Status: Disabled\n", interfaces: "", tunnel: "utun1024")
         #expect(s.reference == nil)
     }
 
-    /// 有人 pfctl -d 作废了所有引用（docs/firewall.md §6）：我们的 token 不在了就重新 -E，不卡在「以为还拿着」
+    /// If external pfctl -d revoked all references (docs/firewall.md §6): re-run -E once our token vanishes rather than assuming it's held
     @Test func reEnablesWhenOurReferenceIsGone() {
         var s = steadyTrial()
         #expect(s.tick(at: at(111), pf: pf(empty: false, tokens: []), rules: rules) == [.enable])
     }
 
-    /// 读不出引用列表时照旧：不能确定没了，就不 -E（宁可少一个引用，也不让引用越涨越多）
+    /// When references list is unreadable, preserve status: avoid -E unless certain it's gone (better to miss one than leak accumulating references)
     @Test func unreadableReferencesKeepsTheToken() {
         var s = steadyTrial()
         #expect(s.tick(at: at(111), pf: pf(empty: false, tokens: nil), rules: rules) == [])
@@ -95,7 +95,7 @@ private func pf(empty: Bool, tokens: Set<String>? = [pfdToken, token]) -> PFSnap
 }
 
 extension Tick {
-    /// 先清规则再放引用：放完引用 pf 可能停掉，规则得先清掉，免得下次谁启用 pf 时我们的规则又生效
+    /// Flush rules before releasing reference: releasing may stop pf, rules must be cleared first to prevent re-activation if someone else enables pf later
     @Test func offFlushesThenReleases() {
         var s = steadyTrial()
         s.disable()
@@ -105,7 +105,7 @@ extension Tick {
         #expect(s.tick(at: at(121), pf: pf(empty: true, tokens: [pfdToken]), rules: rules) == [])
     }
 
-    /// 只释放 pf 里还在的 token：作废了的号码可能已经分给了别人
+    /// Only release tokens still present in pf: revoked tokens may have been reassigned to other callers
     @Test func offDoesNotReleaseAGoneToken() {
         var s = steadyTrial()
         s.disable()
@@ -113,7 +113,7 @@ extension Tick {
         #expect(s.reference == nil)
     }
 
-    /// 读不出引用列表时这一轮先不释放，下一轮再看
+    /// Defer release to next round if reference list is unreadable
     @Test func offWaitsWhenReferencesAreUnreadable() {
         var s = steadyTrial()
         s.disable()
@@ -121,14 +121,14 @@ extension Tick {
         #expect(s.reference == .held(token: token))
     }
 
-    /// 到期必回滚，App 不在也照样
+    /// Expiry triggers rollback unconditionally, even without App running
     @Test func expiredTrialRollsBack() {
         var s = steadyTrial()
         #expect(s.tick(at: at(220), pf: pf(empty: false), rules: rules) == [.flush, .release(token: token)])
         #expect(s.mode == .off)
     }
 
-    /// 开机后内核里的规则和引用都没了：on 重新装、重新拿引用（旧 token 不在引用列表里，不会被拿去释放）
+    /// Kernel rules and references are gone across reboot: `on` reloads and re-acquires reference (old token not in list, so not released)
     @Test func onAfterBootReloadsAndReEnables() throws {
         var s = steadyTrial()
         try s.keep(at: at(110))
@@ -136,7 +136,7 @@ extension Tick {
         #expect(s.mode == .on)
     }
 
-    /// 开机时 trial 当 off，也不释放上一次开机的 token
+    /// `trial` becomes `off` across reboot, without attempting to release previous boot token
     @Test func trialAfterBootIsOffAndDoesNotReleaseTheOldToken() {
         var s = steadyTrial()
         #expect(s.tick(at: at(5, boot: "OTHER-BOOT"), pf: pf(empty: true, tokens: [pfdToken]), rules: rules) == [])
@@ -144,8 +144,7 @@ extension Tick {
         #expect(s.reference == nil)
     }
 
-    /// 读不出开机标识（sysctl 失败）：不知道换没换开机，试运行往安全方向当 off；引用和记下的开机标识都不动，
-    /// 免得把活着的引用丢了、或者把旧 token 配上错的开机标识
+    /// Unreadable boot ID (sysctl failed): uncertain if rebooted, trial safely defaults to off; preserves reference and recorded boot ID to avoid losing active reference or pairing old token with wrong boot ID
     @Test func unreadableBootSessionEndsTheTrialButKeepsTheReference() {
         var s = steadyTrial()
         #expect(s.tick(at: at(111, boot: nil), pf: pf(empty: false, tokens: nil), rules: rules) == [.flush])
@@ -154,7 +153,7 @@ extension Tick {
         #expect(s.bootSession == boot)
     }
 
-    /// 开机标识变了、引用却还在列表里（开机标识读错过）：不丢掉还活着的引用，否则 on 每误判一次就多 -E 一个
+    /// Boot ID changed but reference remains in list (false boot ID reading): retain active reference to avoid redundant -E runs on each misdetection
     @Test func spuriousBootChangeKeepsALiveReference() throws {
         var s = steadyTrial()
         try s.keep(at: at(110))
@@ -162,7 +161,7 @@ extension Tick {
         #expect(s.reference == .held(token: token))
     }
 
-    /// 认不出号码的引用核对不了还在不在：开机标识变了就作废，on 重新 -E
+    /// Unknown token cannot be verified in list: revoked if boot ID changes, re-running -E for on
     @Test func bootChangeDropsAnUnknownToken() throws {
         var s = steadyTrial()
         try s.keep(at: at(110))
@@ -170,7 +169,7 @@ extension Tick {
         #expect(s.tick(at: at(5, boot: "OTHER-BOOT"), pf: pf(empty: true), rules: rules) == [.load(rules), .enable])
     }
 
-    /// 开机后读不出引用列表：旧 token 不能配上新的开机标识留下（恢复脚本据开机标识认 token，会去 -X 上一次开机的号码），on 要重新 -E
+    /// Boot change with unreadable references: cannot keep old token with new boot ID (rescue script keys on boot ID and would -X previous boot token); on must re-acquire via -E
     @Test func bootChangeWithUnreadableReferencesDropsTheOldToken() throws {
         var s = steadyTrial()
         try s.keep(at: at(110))
@@ -178,7 +177,7 @@ extension Tick {
         #expect(s.reference == nil)
     }
 
-    /// 重装后计数从 0 数起：那一轮不拿来比，免得刚重装就报「计数不涨」
+    /// Evaluations counter starts from 0 after reload: reset baseline to avoid false "evaluations not growing" alert immediately after reload
     @Test func reloadResetsTheEvaluationBaseline() {
         var s = steadyTrial()
         let anchor = { (n: Int) in "pass all\n  [ Evaluations: \(n)  Packets: 0 ]\n" }
@@ -193,7 +192,7 @@ extension Tick {
     }
 }
 
-/// 试运行中，规则装好、引用拿到
+/// Steady state trial: rules loaded and reference acquired
 private func steadyTrial() -> FirewallState {
     var s = FirewallState(bootSession: boot)
     try! s.enable(at: at(100))

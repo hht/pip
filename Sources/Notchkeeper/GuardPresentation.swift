@@ -3,25 +3,24 @@ import SwiftUI
 import MascotCore
 import NotchCore
 
-/// 判定在 NotchCore；这里只管文案和颜色（docs/egress-guard.md「怎么画」）
+/// Evaluation lives in NotchCore; handles copy and colors here (docs/egress-guard.md "How It Renders").
 extension GuardPresentation {
     var title: String {
         switch status {
-        case .healthy: return String(localized: "出口正常")
-        case .mismatch: return String(localized: "出口 IP 不在允许列表里")
-        case .offline: return String(localized: "没有网络，暂时检查不了出口")
-        case .probeFailed: return String(localized: "暂时判断不了出口")
-        case .unresponsive: return String(localized: "出口守卫没响应")
+        case .checking: return String(localized: "Checking egress")
+        case .healthy: return String(localized: "Egress OK")
+        case .mismatch: return String(localized: "Unexpected egress IP")
+        case .offline: return String(localized: "Offline, can't check the egress")
+        case .probeFailed: return String(localized: "Can't verify the egress")
         case .violated: return Self.violatedTitle
-        case .violationUnconfirmed: return Alert.unresponsive.detail
         }
     }
 
-    static var violatedTitle: String { String(localized: "有流量没走代理") }
+    static var violatedTitle: String { String(localized: "Traffic is bypassing the proxy") }
 
     var color: Color { Color(nsColor: Self.nsColor(tone)) }
 
-    /// 跟着外观换：刘海窗口固定暗色外观，永远是暗色那套（和 Pip、右耳的配色一致）；设置窗口跟随系统
+    /// Adapts to appearance: notch window uses fixed dark appearance, always matching Pip and right ear colors; settings window follows system appearance.
     static func nsColor(_ tone: Tone) -> NSColor {
         let p = palette(tone)
         return NSColor(name: nil) { appearance in
@@ -30,7 +29,7 @@ extension GuardPresentation {
         }
     }
 
-    /// 亮色那套压暗：设置页白底上的状态点也要 3:1（WCAG 1.4.11，docs/ui.md「亮色与暗色」）
+    /// Darkened light palette: status dot against light background in settings pane achieves 3:1 contrast (WCAG 1.4.11, docs/ui.md "Light and Dark").
     static func palette(_ tone: Tone) -> (dark: RGB, light: RGB) {
         switch tone {
         case .healthy: (RGB(0x30D158), RGB(0x248A3D))
@@ -40,21 +39,11 @@ extension GuardPresentation {
         }
     }
 
-    /// 出口 IP 的字色：只有 mismatch 用琥珀（IP 本身就是问题），其余浅灰
+    /// Egress IP text color: amber for mismatch only (IP itself is the issue), otherwise light grey.
     var ipColor: Color { tone == .mismatch ? color : .white.opacity(0.6) }
 }
 
-extension GuardPresentation.Alert {
-    /// 红卡的副标题
-    var detail: String {
-        switch self {
-        case .violated: return String(localized: "去公网的路由没走 Clash 的隧道")
-        case .unresponsive: return String(localized: "守卫没响应，还不能确认恢复")
-        }
-    }
-}
-
-/// 状态点：unknown 是灰色空心环，其余是实心点
+/// Status dot: unknown uses hollow grey ring; other tones use solid circle.
 struct GuardDot: View {
     let presentation: GuardPresentation
     var size: CGFloat = 7

@@ -4,11 +4,11 @@ import PluginCore
 import PluginStore
 import SwiftUI
 
-/// 设置 › 插件里装、卸、新建外部插件：选文件夹或拖进来，先给人看登记了什么再装；卸掉的挪进备份。
-/// 文件操作和校验归 `PluginStore`，放到后台做：插件文件夹大、或者在慢盘上时界面不卡。不靠 config.json，配置文件解不开也能用
+/// Settings > Plugins: Install, uninstall, and create external plugins by picking a folder or dragging it in; inspects manifest before installing; uninstalled plugins move to backup.
+/// File operations and validation belong to `PluginStore`, run in background: UI never stalls on large plugin folders or slow disks. Does not rely on config.json, working even if config is unparseable.
 struct InstalledPluginsSection: View {
     let state: AppState
-    /// 拖到整页上的文件夹（`PluginsPane` 接）：来了就校验
+    /// Folder dropped onto the pane (handled by `PluginsPane`): validated upon arrival.
     @Binding var dropped: URL?
     @State private var pending: Pending?
     @State private var uninstalling: Manifest?
@@ -17,7 +17,7 @@ struct InstalledPluginsSection: View {
     @State private var working = false
     @State private var error: String?
 
-    /// 校验过、等用户点「安装」的文件夹
+    /// Validated folder awaiting user click on "Install".
     struct Pending: Identifiable {
         var source: URL
         var manifest: Manifest
@@ -34,8 +34,8 @@ struct InstalledPluginsSection: View {
                         Button { NSWorkspace.shared.activateFileViewerSelecting([PluginPaths.plugins.appendingPathComponent(m.id)]) } label: {
                             Image(systemName: "folder")
                         }
-                        .help("在 Finder 中显示")
-                        Button("卸载…") { uninstalling = m }
+                        .help("Show in Finder")
+                        Button("Uninstall…") { uninstalling = m }
                     }
                     .buttonStyle(.borderless)
                     .disabled(working)
@@ -44,25 +44,25 @@ struct InstalledPluginsSection: View {
                 }
             }
             HStack {
-                Button("安装插件…") { choosing = true }
-                Button("新建插件…") { creating = true }
+                Button("Install Plugin…") { choosing = true }
+                Button("New Plugin…") { creating = true }
                 Spacer()
                 if working { ProgressView().controlSize(.small) }
             }
             .disabled(working)
         } header: {
-            Text("已安装")
+            Text("Installed")
         } footer: {
             if let error {
                 Text(error).foregroundStyle(.red)
             } else {
-                Text("插件是一个含 manifest.json 的文件夹，也可以直接拖到这一页上安装。Pip 不运行插件里的任何文件；卸掉的插件挪进 ~/Library/Application Support/Notchkeeper/backup/plugins/，不会删除（自带的终端插件除外）。")
+                Text("A plugin is a folder containing manifest.json; you can also drag one onto this page to install it. Pip never runs any file in a plugin. Uninstalled plugins move to ~/Library/Application Support/Notchkeeper/backup/plugins/ and aren’t deleted (except the built-in terminal plugin).")
             }
         }
         .fileImporter(isPresented: $choosing, allowedContentTypes: [.folder]) { result in
             switch result {
             case .success(let url): inspect(url)
-            case .failure(let e): error = String(localized: "打不开这个文件夹：\(e.localizedDescription)")
+            case .failure(let e): error = String(localized: "Couldn’t open this folder: \(e.localizedDescription)")
             }
         }
         .sheet(item: $pending) { p in
@@ -71,13 +71,13 @@ struct InstalledPluginsSection: View {
         .sheet(isPresented: $creating) {
             NewPluginSheet { state.reloadManifests() }
         }
-        .confirmationDialog(uninstalling.map { String(localized: "卸载「\($0.name)」？") } ?? "", isPresented: Binding(
+        .confirmationDialog(uninstalling.map { String(localized: "Uninstall “\($0.name)”?") } ?? "", isPresented: Binding(
             get: { uninstalling != nil }, set: { if !$0 { uninstalling = nil } }), presenting: uninstalling) { m in
-            Button("卸载", role: .destructive) { uninstall(m) }
+            Button("Uninstall", role: .destructive) { uninstall(m) }
         } message: { m in
-            // 终端插件的目录归 App、每次启动都换新，里面没有用户写的东西：直接删
-            Text(m.id == PluginID.terminal ? String(localized: "删掉终端插件的脚本，~/.zshrc 里那一行留着也不报错。之后终端发来的卡片都会丢掉。")
-                                           : String(localized: "插件文件夹挪进备份，不会删除。之后它发来的卡片和活动都会丢掉。"))
+            // Terminal plugin directory is managed by App and refreshed on launch, containing no user data: delete directly.
+            Text(m.id == PluginID.terminal ? String(localized: "Deletes the terminal plugin’s script; the line in ~/.zshrc can stay without errors. Cards from the terminal will be dropped after this.")
+                                           : String(localized: "The plugin folder moves to the backup folder and isn’t deleted. Cards and activities it sends afterwards are discarded."))
         }
         .onChange(of: dropped) {
             guard let url = dropped else { return }
@@ -99,7 +99,7 @@ struct InstalledPluginsSection: View {
         run { store in
             try store.install(url, symbolExists: InboxWatcher.symbolExists, now: Date())
         } then: { result in
-            Log.write("插件：已安装 \(result.manifest.id)\(result.replaced == nil ? "" : "，旧版挪进备份")")
+            Log.write("Plugin: installed \(result.manifest.id)\(result.replaced == nil ? "" : ", previous version moved to backup")")
         }
     }
 
@@ -107,11 +107,11 @@ struct InstalledPluginsSection: View {
         run { store in
             if m.id == PluginID.terminal { try TerminalPlugin.uninstall() } else { _ = try store.uninstall(m.id, now: Date()) }
         } then: { _ in
-            Log.write("插件：已卸载 \(m.id)")
+            Log.write("Plugin: uninstalled \(m.id)")
         }
     }
 
-    /// 后台做文件操作，回主线程更新界面、重读登记。错误只显示在本页，不往外抛
+    /// Background file operations, returning to main thread to update UI and reload manifests. Errors surface locally on page.
     private func run<T: Sendable>(_ work: @escaping @Sendable (PluginStore) throws -> T, then: @escaping @MainActor (T) -> Void) {
         working = true
         error = nil
@@ -127,26 +127,26 @@ struct InstalledPluginsSection: View {
     }
 }
 
-/// 设置页上显示的原因。和 `pipctl plugin` 的说法一致（`PluginCommand.describe`）；改一边，两边一起改
+/// Explanations displayed in settings pane. Aligns with `pipctl plugin` output (`PluginCommand.describe`).
 extension PluginStore.Problem: LocalizedError {
     public var errorDescription: String? {
         switch self {
-        case .noManifest: return String(localized: "文件夹里没有 manifest.json")
-        case .manifest(.malformed): return String(localized: "manifest.json 不是 JSON，或缺 id、name、symbol")
-        case .manifest(.badID): return String(localized: "id 只能用小写字母、数字和连字符，至多 32 个字符")
-        case .manifest(.reservedID): return String(localized: "id 是内置插件的（guard、claude），换一个")
-        case .manifest(.missingField): return String(localized: "名字（name）和图标（symbol）不能是空的")
-        case .manifest(.tooLong): return String(localized: "名字至多 \(Card.maxValue) 个字，图标名至多 \(Manifest.maxSymbol) 个字符")
-        case .unknownSymbol(let s): return String(localized: "系统里没有叫 \(s) 的 SF Symbol（名字可以在「SF Symbols」App 里查）")
-        case .bundled: return String(localized: "terminal 是自带的终端插件，在设置 › 终端里装卸")
-        case .alreadyInstalled: return String(localized: "这个文件夹就是已经装着的那份")
-        case .notInstalled: return String(localized: "没装这个插件")
-        case .exists: return String(localized: "同 id 的插件已经装着")
+        case .noManifest: return String(localized: "The folder has no manifest.json")
+        case .manifest(.malformed): return String(localized: "manifest.json isn’t valid JSON, or is missing id, name, or symbol")
+        case .manifest(.badID): return String(localized: "The id may only contain lowercase letters, digits, and hyphens, up to 32 characters")
+        case .manifest(.reservedID): return String(localized: "That id belongs to a built-in plugin (guard, claude); choose another")
+        case .manifest(.missingField): return String(localized: "Name (name) and icon (symbol) can’t be empty")
+        case .manifest(.tooLong): return String(localized: "Name can be at most \(Card.maxValue) characters, icon name at most \(Manifest.maxSymbol)")
+        case .unknownSymbol(let s): return String(localized: "There’s no SF Symbol named \(s) (look up names in the SF Symbols app)")
+        case .bundled: return String(localized: "terminal is the bundled Terminal plugin; install or uninstall it in Settings › Terminal")
+        case .alreadyInstalled: return String(localized: "This folder is the installed copy itself")
+        case .notInstalled: return String(localized: "This plugin isn’t installed")
+        case .exists: return String(localized: "A plugin with this id is already installed")
         }
     }
 }
 
-/// 装之前给人看：登记了什么名字、图标、id，会不会替换已装的
+/// Inspection sheet prior to installation: displays registered name, icon, id, and replacement warning.
 struct InstallPluginSheet: View {
     let pending: InstalledPluginsSection.Pending
     let onInstall: () -> Void
@@ -158,20 +158,20 @@ struct InstallPluginSheet: View {
             HStack(spacing: 12) {
                 PluginIcon(symbol: m.symbol, size: 40)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("安装「\(m.name)」？").font(.headline)
+                    Text("Install “\(m.name)”").font(.headline)
                     Text(m.id).font(.caption).monospaced().foregroundStyle(.secondary)
                 }
             }
             Text(pending.source.path(percentEncoded: false)).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
             if pending.replacing {
-                Label("已经装着同 id 的插件：旧版挪进备份，不会删除。", systemImage: "arrow.triangle.2.circlepath")
+                Label("A plugin with the same id is installed: the old version moves to the backup folder and isn’t deleted.", systemImage: "arrow.triangle.2.circlepath")
             }
-            Text("Pip 只读它的 manifest.json，不运行里面的任何文件。装上后它发来的卡片会标明来源。")
+            Text("Pip only reads its manifest.json and never runs any file inside. Cards it sends will show where they came from.")
                 .foregroundStyle(.secondary)
             HStack {
                 Spacer()
-                Button("取消", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
-                Button(pending.replacing ? "替换" : "安装") {
+                Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
+                Button(pending.replacing ? "Replace" : "Install") {
                     dismiss()
                     onInstall()
                 }
@@ -183,7 +183,7 @@ struct InstallPluginSheet: View {
     }
 }
 
-/// 新建一个只有 manifest.json 的插件，建好后给出一条能直接跑的 pipctl 命令
+/// Creates a new plugin with manifest.json only, providing a runnable pipctl command on completion.
 struct NewPluginSheet: View {
     let onCreated: () -> Void
     @Environment(\.dismiss) private var dismiss
@@ -203,29 +203,29 @@ struct NewPluginSheet: View {
     private var form: some View {
         VStack(spacing: 0) {
             Form {
-                TextField("名字", text: $name, prompt: Text("卡上标明来源用，例如「备份」"))
+                TextField("Name", text: $name, prompt: Text("Shown on its cards, e.g. “Backup”"))
                 VStack(alignment: .leading, spacing: 4) {
-                    TextField("id", text: $id, prompt: Text("例如 backup"))
+                    TextField("id", text: $id, prompt: Text("e.g. backup"))
                     if let idProblem { Text(idProblem).font(.caption).foregroundStyle(.red) }
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     LabeledContent {
                         HStack {
-                            TextField("图标", text: $symbol, prompt: Text("SF Symbol 名，例如 externaldrive")).labelsHidden()
+                            TextField("Icon", text: $symbol, prompt: Text("SF Symbol name, e.g. externaldrive")).labelsHidden()
                             PluginIcon(symbol: symbolValid ? symbol : "questionmark", size: 22)
                         }
                     } label: {
-                        Text("图标")
+                        Text("Icon")
                     }
-                    if !symbol.isEmpty, !symbolValid { Text("系统里没有这个图标，名字可以在「SF Symbols」App 里查").font(.caption).foregroundStyle(.red) }
+                    if !symbol.isEmpty, !symbolValid { Text("No such icon; look up names in the SF Symbols app").font(.caption).foregroundStyle(.red) }
                 }
                 if let error { Text(error).foregroundStyle(.red) }
             }
             .formStyle(.grouped)
             HStack {
                 Spacer()
-                Button("取消", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("新建", action: create)
+                Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Create", action: create)
                     .keyboardShortcut(.defaultAction)
                     .disabled(name.allSatisfy(\.isWhitespace) || id.isEmpty || idProblem != nil || !symbolValid)
             }
@@ -234,25 +234,25 @@ struct NewPluginSheet: View {
     }
 
     private func done(_ m: Manifest) -> some View {
-        let command = "pipctl notify --plugin \(m.id) --title \"你好\""
+        let command = "pipctl notify --plugin \(m.id) --title \"Hello\""
         return VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 12) {
                 PluginIcon(symbol: m.symbol, size: 40)
-                Text("已新建「\(m.name)」").font(.headline)
+                Text("Created “\(m.name)”").font(.headline)
             }
-            Text("在终端里跑下面这行，刘海会弹一张卡：")
+            Text("Run this in Terminal and a card will pop out of the notch:")
             HStack {
                 Text(command).monospaced().textSelection(.enabled)
                 Spacer()
-                Button("拷贝") {
+                Button("Copy") {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(command, forType: .string)
                 }
             }
             HStack {
-                Button("在 Finder 中显示") { NSWorkspace.shared.activateFileViewerSelecting([PluginPaths.plugins.appendingPathComponent(m.id)]) }
+                Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([PluginPaths.plugins.appendingPathComponent(m.id)]) }
                 Spacer()
-                Button("完成") { dismiss() }.keyboardShortcut(.defaultAction)
+                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
             }
         }
         .padding(20)
@@ -260,12 +260,12 @@ struct NewPluginSheet: View {
 
     private var symbolValid: Bool { !symbol.isEmpty && InboxWatcher.symbolExists(symbol) }
 
-    /// 边输边查：格式、保留的 id、已经装着的
+    /// Live validation: format, reserved IDs, already installed.
     private var idProblem: String? {
         guard !id.isEmpty else { return nil }
-        guard Message.isPluginID(id) else { return String(localized: "只能用小写字母、数字和连字符，至多 32 个字符") }
-        guard !PluginID.builtIn.contains(id), id != PluginID.terminal else { return String(localized: "这个 id 留给内置插件，换一个") }
-        guard !FileManager.default.fileExists(atPath: PluginPaths.plugins.appendingPathComponent(id).path) else { return String(localized: "同 id 的插件已经装着") }
+        guard Message.isPluginID(id) else { return String(localized: "Only lowercase letters, digits, and hyphens, up to 32 characters") }
+        guard !PluginID.builtIn.contains(id), id != PluginID.terminal else { return String(localized: "This id is reserved for a built-in plugin; choose another") }
+        guard !FileManager.default.fileExists(atPath: PluginPaths.plugins.appendingPathComponent(id).path) else { return String(localized: "A plugin with this id is already installed") }
         return nil
     }
 
@@ -273,7 +273,7 @@ struct NewPluginSheet: View {
         error = nil
         do {
             created = try PluginStore().create(id: id, name: name, symbol: symbol, symbolExists: InboxWatcher.symbolExists)
-            Log.write("插件：已新建 \(id)")
+            Log.write("Plugin: created \(id)")
             onCreated()
         } catch {
             self.error = error.localizedDescription
@@ -281,7 +281,7 @@ struct NewPluginSheet: View {
     }
 }
 
-/// 外部插件的图标：和设置页侧栏一样的圆角底，大小可调
+/// External plugin icon: rounded background matching settings sidebar, scalable.
 struct PluginIcon: View {
     let symbol: String
     let size: CGFloat

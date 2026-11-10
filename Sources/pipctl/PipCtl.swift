@@ -2,8 +2,9 @@ import Darwin
 import Foundation
 import PluginCore
 
-/// 回答：外部插件怎么给刘海发一张卡、报一个活动（`plugin` 子命令见 `PluginCommand`）。`pipctl notify …`、`pipctl activity …` 校验后写进收件箱：先写 `tmp/<id>.json`，再 rename 到 `new/`（同一个文件系统里 rename 是原子的）。
-/// 不等 App 读、不知道插件登没登记（App 判）。App 没启动过时收件箱不在，报错退出
+/// Answers: how external plugins send a card or report an activity to Notchkeeper (`plugin` subcommand see `PluginCommand`).
+/// `pipctl notify …`, `pipctl activity …` validate and write into inbox: write `tmp/<id>.json` first, then rename to `new/` (atomic across same filesystem).
+/// Does not wait for App to read, agnostic of plugin registration (App validates). If App was never launched and inbox directory does not exist, errors and exits.
 @main
 enum PipCtl {
     static func main() {
@@ -26,7 +27,7 @@ enum PipCtl {
         let data: Data
         do {
             if args.first == "send" {
-                // 读到 maxBytes + 1 就够判超了，不把一个无尽的管道读完
+                // Reading up to maxBytes + 1 is sufficient to detect oversized payload without draining infinite pipe
                 let input = FileHandle.standardInput.readData(ofLength: Message.maxBytes + 1)
                 data = try Notify.send(input, id: id, now: Date())
             } else {
@@ -34,8 +35,8 @@ enum PipCtl {
             }
         } catch {
             switch error {
-            case .usage(let why): fail("pipctl：\(why)\n\(Notify.usage)", status: EX_USAGE)
-            case .invalid(let error): fail("pipctl：消息不合规（\(error)）", status: EX_DATAERR)
+            case .usage(let why): fail("pipctl: \(why)\n\(Notify.usage)", status: EX_USAGE)
+            case .invalid(let error): fail("pipctl: invalid message (\(error))", status: EX_DATAERR)
             }
         }
         let name = id.uuidString + ".json"
@@ -43,12 +44,12 @@ enum PipCtl {
         do {
             try data.write(to: tmp)
         } catch {
-            fail("pipctl：写不进收件箱（\(PluginPaths.tmp.path)），Pip 启动过吗？\(error.localizedDescription)", status: EX_CANTCREAT)
+            fail("pipctl: cannot write to inbox (\(PluginPaths.tmp.path)), has Pip been launched? \(error.localizedDescription)", status: EX_CANTCREAT)
         }
         guard rename(tmp.path, PluginPaths.new.appendingPathComponent(name).path) == 0 else {
             let why = String(cString: strerror(errno))
             unlink(tmp.path)
-            fail("pipctl：放不进收件箱（\(why)）", status: EX_CANTCREAT)
+            fail("pipctl: cannot deliver to inbox (\(why))", status: EX_CANTCREAT)
         }
     }
 

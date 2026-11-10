@@ -61,7 +61,6 @@ Plugin architecture verified on real device 10-31: Settings › Plugins page (to
 
 ## Known Issues
 
-- Settings › General: the footer under "Quit Pip…" and the quit confirmation message (`Settings.swift`) still say the background Egress Guard keeps running after quitting and point to an uninstall script: stale since guardd was removed; the guard stops with the App. Needs new English text, Chinese translation, and `scripts/strings.sh`.
 - **Done card while Claude keeps working** (user saw it in a live session, 11-07): unexplained. Ruled out: mid-turn user message (Claude Code 2.1.316 folds it into the same turn), external plugins (only the unsourced terminal plugin is installed). Card display itself is not logged, so pops can't be matched to sources: log card source/outcome in `Notch.present` (no text) and have the user report times.
 - `swift test` writes "pipctl: symlinked / removed symlink" into the real `~/Library/Logs/Notchkeeper/notchkeeper.log`: `CommandLineTool` tests inject paths but not the log.
 - `Look.stale` (guard not responding, hourglass) has no event source after guard merged into App, temporarily unwired, kept awaiting user decision to delete or keep.

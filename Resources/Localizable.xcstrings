@@ -1700,12 +1700,12 @@
         }
       }
     },
-    "Quitting stops the notch and pop-up cards; the background Egress Guard continues running. To stop the guard, run the uninstall script.": {
+    "Quitting stops the notch, cards, and the Egress Guard. If the firewall is on, it keeps blocking.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "退出后刘海和卡片都会停止，后台的出口守卫照常运行；要停止守卫，请运行卸载脚本。"
+            "value": "退出后刘海、卡片和出口守卫都会停止。防火墙如果开着，会继续拦截。"
           }
         }
       }

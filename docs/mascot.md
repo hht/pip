@@ -59,7 +59,7 @@ Each look consists of body gradient, eye paths (§3), resting head orientation, 
 | mismatch | Egress IP not in allowed list | Frontal | sign: ▲! | Sign icon |
 | stale | Unwired (no "stale" after guard merged into App) | Listless | sign: hourglass | Sign icon |
 | danger | Egress violated | Frontal | sign: !! | Sign icon |
-| shielded | Egress violated, but blocked by firewall (`docs/egress-guard.md`; Step 5) | Composed | sign: lock | Sign icon |
+| shielded | Egress violated, but blocked by firewall (`docs/egress-guard.md`; not yet wired) | Composed | sign: lock | Sign icon |
 
 "Unwired" looks remain implemented and switchable in Status Test page, ready to connect when event sources appear (user decision).
 

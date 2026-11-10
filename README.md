@@ -1,67 +1,111 @@
 # Pip
 
-Haitao's personal notch app for macOS (SwiftPM, macOS 14+), without a menu bar icon. App display name is Pip, sharing the same name as the mascot; the repository, Claude Code plugin, and terminal plugin script are `pip`; package, bundle ID, configuration directory, and labels remain notchkeeper. Developed locally with ad-hoc signing, requiring no paid developer account.
+> **Lost connection after turning on Pip's firewall?** Run `sudo /Applications/Pip.app/Contents/Resources/firewall/firewall-rescue.sh` (or `sudo scripts/firewall-rescue.sh` in this repository). Details in [Firewall Emergency Rescue](#lost-connection-firewall-emergency-rescue).
 
-Currently undergoing a rewrite: the App layer and Pip animations will be completely redone, along with a new one-click firewall toggle. Progress and todos are in `HANDOFF.md`.
+A macOS notch app with an original mascot, Pip. It sits in the MacBook notch and does four things:
+
+- **Egress guard**: while Pip is running, checks every 5 seconds that your traffic only leaves through the Clash tunnel. A red card stays on the notch while traffic bypasses Clash; once it is back (and your egress IP is in the allowed list), a green card replaces it. It only watches, it never blocks.
+- **Firewall** (optional, needs an administrator password): one toggle that drops outbound traffic not going through the Clash tunnel, except the local network, the addresses Clash itself connects to (proxy nodes, DNS upstreams), and mainland China IP ranges. When Clash goes down you can still reach domestic sites, but nothing leaks abroad. Exact scope in the [user guide](docs/user-guide.md#firewall).
+- **Alert cards**: a card drops from the notch when a Claude Code turn finishes, fails, or waits for your answer or approval. Your own scripts can pop cards too, through external plugins and the `pipctl` command.
+- **Pip**: the mascot in the left ear of the notch, showing status through its expressions.
+
+No menu bar icon; Pip appears in the Dock only while Settings is open. UI in English and Simplified Chinese, following the system language.
 
 ## Lost Connection? Firewall Emergency Rescue
 
-Try in this order:
+Only relevant if you installed the firewall. Try in this order:
 
-1. Do nothing: if "Keep" is not clicked within 2 minutes after enabling, it will automatically roll back.
-2. Settings › Firewall: turn off the toggle, or click "Uninstall" (runs the rescue script from step 3 below). Both require administrator password, no network needed.
-3. In terminal execute **`cd ~/Documents/Projects/pip && sudo scripts/firewall-rescue.sh`**: uninstalls firewall daemon, rules, and files; requires no network or App; repeated execution is safe and idempotent.
-4. If still unresolved: `sudo scripts/firewall-rescue.sh --disable-pf`, stopping the entire pf subsystem (AirDrop, Internet Sharing, and other pf-dependent features will need to be re-enabled).
+1. Do nothing: if "Keep" was not clicked within 2 minutes of turning the firewall on, it rolls back by itself.
+2. Settings › Firewall: turn the toggle off, or click "Uninstall…". Both ask for the administrator password and need no network.
+3. In Terminal run the rescue script. It removes the firewall daemon, rules, and files, needs neither network nor Pip, and is safe to run repeatedly:
 
-If "Keep" was already clicked, rebooting will not rescue you (rules will reload on startup); run step 3 first.
+   ```bash
+   sudo /Applications/Pip.app/Contents/Resources/firewall/firewall-rescue.sh
+   # or, from the cloned repository:
+   sudo scripts/firewall-rescue.sh
+   ```
 
-## Currently Working
+4. Still offline: add `--disable-pf` to stop the whole pf subsystem (AirDrop, Internet Sharing, and other pf-based features must then be turned back on).
 
-- **Egress guard (monitoring only)**: while App is running, checks Clash, utun routes, and egress IP every 5 seconds: shows a red card on the notch when egress is violated, pops a green recovery card when recovered. Stopped when App exits (`docs/egress-guard.md` "When to check").
-- **State change alerts**: pops a card under the notch with sound when a Claude Code turn ends or needs your intervention in terminal, auto-collapsing after a few seconds; multiple cards queue up; alert cards layer over resident red card and return to red card when done (`docs/ui.md` "Cards").
-- **External plugins**: a plugin folder containing `manifest.json`, installed, created, or uninstalled in Settings › Plugins (or `pipctl plugin install|uninstall|list`); scripts pop cards and report activities via `pipctl notify`, `pipctl activity`, `pipctl send`. Instructions in `docs/user-guide.md` "Plugins". Includes a built-in terminal plugin: after Settings › Terminal "Install", add the provided `source …` line to `~/.zshrc` to pop cards when commands running over 10 seconds finish in zsh.
-- **Plugin settings** (Settings › Plugins): toggle for each plugin (disables alerts, not verdicts), panel section order and max rows, resident plugin when collapsed, link whitelist.
-- **Session list**: hovering over the notch expands the panel, showing egress IP and running Claude Code terminal sessions (scrollable when exceeding 5).
-- **Pip**: mascot in notch, cards, and settings page, whose expression changes with guard state. Animations handled by Core Animation: breathing, blinking, small idle motions, and gaze tracking mouse (toggleable in settings).
+If "Keep" was already clicked, rebooting does not help (the rules load again at startup); run step 3.
 
-## Not Yet Implemented
+## Requirements
 
-- **Firewall**: design in `docs/firewall.md`, usage in `docs/user-guide.md` "Firewall". Installed, uninstalled, toggled, and kept in Settings › Firewall (all require admin password; inspect full install content before installing). Terminal installation:
-  - `scripts/install-firewall.sh [--tunnel <interface>] --dry-run`: compiles, prints hashes of helper, LaunchDaemon, and rules verbatim without modifying anything;
-  - `sudo scripts/install-firewall.sh [--tunnel <interface>]`: prints same content, requires typing `yes` to proceed;
-  - Add `--test-rules --test-address <IPv4>` to install test rules (only blocks traffic to this address, others routed as usual);
-  - Uninstall before upgrade ("Uninstall" in settings, or `sudo scripts/firewall-rescue.sh`); `sudo scripts/firewall-drill.sh` installs a dummy firewall that blocks nothing to practice the rescue script.
+- macOS 14 or later. Designed for MacBooks with a notch. On a display without one, nothing shows at rest (no Pip, no status); cards and the panel still drop from the top center.
+- Xcode 16 or later, selected with `xcode-select`: the build calls `xcrun xcstringstool` and `iconutil`.
+- Per feature:
 
-## Running
+| Feature | Needs |
+|---|---|
+| Egress guard, firewall | [Clash Verge Rev](https://github.com/clash-verge-rev/clash-verge-rev) with TUN mode on |
+| Claude Code cards | Claude Code (tested with 2.1.316) run as `claude` in a terminal, installed in `~/.local/bin`, `/opt/homebrew/bin`, or `/usr/local/bin` |
+| Click a card or session to jump back to the terminal | [Ghostty](https://ghostty.org) 1.3 or later (other terminals: Pip only brings Ghostty forward) |
+| Cards for long-running shell commands | zsh |
 
-```bash
-./scripts/run.sh            # Release build, packages Pip.app with ad-hoc signing, terminates old instance, installs into /Applications and launches
-CONFIG=debug ./scripts/run.sh   # Debug build: only this listens to demo.sh
-./scripts/demo.sh done      # Demo: done card (also failed, question, approval) attached to latest Claude Code session, clicking jumps to Ghostty
-./scripts/demo.sh alert     # Demo: red card (also blocks: 5 content blocks; settings: opens settings, steals focus)
-```
+**Not using Clash?** Turn off "Egress Guard" in Settings › Plugins right after the first launch. Otherwise the guard sees traffic bypassing the tunnel and shows a red card. This turns off its alerts; the checks themselves keep running while Pip is open (see "Privacy").
 
-- **Single instance**: only one instance runs at a time; second launch exits immediately. If UI hangs, terminate with `pkill -x Notchkeeper`.
-- **Access points**:
-  - Hover or click notch to expand panel;
-  - Right-click on notch: "Settings… / Copy Egress IP / Quit";
-  - Opening the App again while already running brings up Settings;
-  - ⌘, opens Settings, ⌘Q quits.
-- **Configuration**: `~/Library/Application Support/Notchkeeper/config.json`. Auto hot-reloads on change, missing fields fall back to defaults; if file cannot be decoded (syntax error, wrong type), falls back to defaults without overwriting file, automatically taking effect once repaired. **Allowed list defaults to empty**, where guard reports unknown until you add your egress IP in Settings.
-- **Logs**: `~/Library/Logs/Notchkeeper/notchkeeper.log`, using local time; never logs IP or conversation contents.
+## Install
 
-## Modules
-
-Which problem each target solves is described in comments in `Package.swift`.
-
-## Testing
+There are no prebuilt releases; build from source. The app is signed ad hoc on your machine, so no developer account is needed.
 
 ```bash
-swift build                 # Must have zero warnings
-swift test                  # Must be all green
-NOTCHKEEPER_LIVE_PROBES=1 swift test --filter LiveProbes   # Real-device read-only smoke test, no IP printed
+git clone https://github.com/hht/pip.git
+cd pip
+./scripts/run.sh
 ```
+
+`run.sh` builds a release, packages `Pip.app`, installs it into `/Applications`, and launches it. Run it again to update; it quits the old instance first. Updating does not touch an installed firewall: if you use it, click "Uninstall…" and "Install…" in Settings › Firewall after updating.
+
+## First Steps
+
+1. **Egress guard**: Settings › Egress Guard, add the egress IP of your proxy node(s) to the allowed list. Until you do, the guard can only say "Can't verify the egress" (gray), and a red card does not clear by itself once it appears.
+2. **Claude Code**: Settings › Claude Code › "Install". This installs a small Claude Code plugin through `claude plugin`; restart sessions that were already running.
+3. **Long shell commands** (optional): Settings › Terminal › "Install", then add the `source …` line it shows to `~/.zshrc`. Commands running longer than 10 seconds pop a card when they finish.
+4. **Open at login** (optional): Settings › General › "Open at Login".
+5. **Firewall** (optional): read "Firewall" in the [user guide](docs/user-guide.md#firewall) first: it explains exactly what gets blocked.
+
+## Everyday Use
+
+- Hover over or click the notch to open the panel: egress IP, running Claude Code sessions, plugin activities. Click a session to jump to its terminal.
+- Cards collapse by themselves after a few seconds; several cards queue up. Click a card to go where it points (terminal, browser, app).
+- Right-click the notch: Settings…, Copy Egress IP, Quit Pip. Opening Pip again while it is running also opens Settings.
+- Pop cards from your own scripts:
+
+  ```bash
+  pipctl notify --plugin backup --title "Backup complete" --outcome done
+  ```
+
+  `pipctl` works by that name after Settings › Plugins › "Link to ~/.local/bin" (with `~/.local/bin` on your `PATH`). See "Plugins" in the [user guide](docs/user-guide.md#plugins) for creating a plugin, content blocks, buttons, and progress activities.
+
+## Privacy
+
+- **Network**: the guard asks public IP echo services (`api.ipify.org`, `ipinfo.io`, `ifconfig.me`) for your egress IP, about every 5 seconds while Pip is open, even when the guard's alerts are turned off. It never contacts Claude or Anthropic domains. There is no telemetry.
+- **Claude Code**: Pip reads only session metadata (state, working directory, how a turn ended), never conversation contents, prompts, or tool output.
+- **Logs** (`~/Library/Logs/Notchkeeper/`) never record IP addresses or conversation contents.
+- Outside its own folders Pip changes only what you install from Settings: the Claude Code plugin (an entry in `~/.claude/settings.json`), the login item, the `pipctl` link, and the firewall (with your administrator password). It never edits your shell config or network settings.
+
+## Uninstall
+
+1. In Settings: Firewall › "Uninstall…" (if installed), Claude Code › "Uninstall", Terminal › "Uninstall" (then delete the `source …` line from `~/.zshrc`), General › turn off "Open at Login", Plugins › "Remove Symlink" (if you linked `pipctl`).
+2. Quit Pip and delete `/Applications/Pip.app`, `~/Library/Application Support/Notchkeeper/`, `~/Library/Logs/Notchkeeper/`, and `~/Library/Preferences/local.hht.notchkeeper.plist`.
+3. Optional: remove Pip from System Settings › Privacy & Security › Automation (Ghostty access).
 
 ## Documentation
 
-Usage (including plugin authoring, firewall blocking scope) in `docs/user-guide.md`; rules and when to read each document in `CLAUDE.md`; next tasks in `HANDOFF.md`.
+- [User guide](docs/user-guide.md): colors and cards, firewall scope, writing plugins, file locations.
+- Design notes: [egress guard](docs/egress-guard.md), [firewall](docs/firewall.md), [Claude Code integration](docs/agent-integration.md), [UI](docs/ui.md), [Pip](docs/mascot.md), [terms](docs/ubiquitous-language.md).
+
+## Development
+
+```bash
+CONFIG=debug ./scripts/run.sh   # Debug build; only this build listens to demo.sh
+./scripts/demo.sh done          # Demo cards: done, failed, question, approval, alert, blocks; settings opens Settings
+swift build                     # Must have zero warnings
+swift test                      # Must be all green
+NOTCHKEEPER_LIVE_PROBES=1 swift test --filter LiveProbes   # Read-only probe smoke test on this machine, prints no IP
+```
+
+- Internal names: the package, executable, bundle ID, config directory, and log directory are still `Notchkeeper`; the app, mascot, repository, Claude Code plugin, and terminal script are `pip`.
+- Each target's responsibility is described in `Package.swift`; project rules in `CLAUDE.md`; open work in `HANDOFF.md`.
+- Only one instance runs at a time. If the UI hangs: `pkill -x Notchkeeper`.
+- Config `~/Library/Application Support/Notchkeeper/config.json` hot-reloads; missing fields use defaults, and a file that cannot be decoded is left untouched while defaults apply until it is fixed.

@@ -7,7 +7,7 @@ Pip lives on the MacBook notch, performing four functions:
 - **Alert cards**: pops cards when Claude Code finishes, hits an error, or waits for your answer. Your own scripts can also pop cards (see "Plugins").
 - **Pip**: the small mascot on the left of the notch, conveying status through facial expressions.
 
-If you lose internet connection, check "Firewall Emergency Rescue" at the very top of README.
+If you lose internet connection, see "Lost Connection? Firewall Emergency Rescue" near the top of README.
 
 ## Daily Use
 
@@ -17,6 +17,8 @@ If you lose internet connection, check "Firewall Emergency Rescue" at the very t
 - Logs are located at `~/Library/Logs/Notchkeeper/notchkeeper.log`, never logging IP or conversation contents.
 
 ## Egress Guard
+
+The guard and firewall expect [Clash Verge Rev](https://github.com/clash-verge-rev/clash-verge-rev) with TUN mode on. Without Clash, traffic always bypasses the tunnel and the guard shows a red card: turn off "Egress Guard" in Settings › Plugins.
 
 Add your egress IP in Settings › Egress Guard first (allowed list defaults to empty). Without adding it, the guard cannot evaluate green or amber: when Clash is healthy, it displays gray "Unknown"; however, if any route bypasses Clash, it evaluates red and pops a red card regardless of the allowed list.
 
@@ -49,7 +51,7 @@ Thus, when Clash disconnects, the machine can only access domestic and local net
 
 **Install and Uninstall**: Settings › Firewall.
 
-- Click "Install", confirm, and enter administrator password.
+- Click "Install…", confirm, and enter administrator password.
 - "Tunnel Interface" specifies Clash's TUN interface name, accepting only `utun` plus numbers (Clash Verge defaults to `utun1024`). Filling in a non-existent interface blocks all external network traffic upon enabling.
 - Installed in off state, blocking nothing.
 - Uninstalling cleans daemon, rules, and files. If firewall is on, uninstalling releases blocking immediately, usable during network disconnects.

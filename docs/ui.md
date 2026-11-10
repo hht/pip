@@ -86,7 +86,7 @@ Notch UI follows iPhone Dynamic Island principles. Apple has not yet published M
 | 6 | Springs default to bounce 0, not exceeding ~0.4; collapse without outward momentum uses 100% damping (WWDC23 10158, WWDC18 803) | Expand and card pop use same spring configuration (user decision) with subtle bounce; collapse has minimal bounce (`NotchSpring`) |
 | 7 | Alert only for critical events; expand and play sound on alert; emphasize triggering item (HIG, WWDC23 10194) | Card title states who experienced what, Pip morphs into card look; card right side omits duplicate status cues or extra icons |
 | 8 | Only one expanded at a time; low-priority dismisses itself (HIG) | One card at a time, temporary cards auto-collapse, red card stays resident |
-| 9 | Tapping opens related location in App; expanded state aims for single primary interaction (HIG) | Clicking card jumps to Ghostty session; only button on card is × |
+| 9 | Tapping opens related location in App; expanded state aims for single primary interaction (HIG) | Clicking a card goes to its target (Claude Code cards jump to the Ghostty session); besides ×, only external plugin cards carry buttons, at most two |
 | 10 | Collapsed state balanced symmetrically around camera (HIG compact) | Right ear indicator centered in visible ear area, symmetrical with left ear Pip; does not shrink with content (three dots pulsing on/off with shifting width is distracting) |
 | 11 | Typography uses medium weight or heavier, minimal small text; ≤ 17pt contrast ratio at least 4.5:1; macOS minimum font size 10pt (HIG, HIG Accessibility, HIG Typography) | Small text uses medium weight, white ≥ 0.5; × at 10pt touches lower bound |
 | 12 | Reduce Motion: replace translation and scaling with fade in/out, remove blur transitions, tighten springs (HIG Accessibility) | Content, Pip, badge fade in/out; black shape springs tightened to eliminate overshoot (`NotchSpring`) |
@@ -100,7 +100,6 @@ Intentional Deviations:
 - Egress IP displayed in full (user decision, on hover panel only); card subtitle displays full path without shortening to project name (user decision).
 - Pip and right-ear indicators maintain persistent loops (stars spinning, !! jumping, 3 blue dots): Pip is a character, not a one-off animation.
 - Collapsed ears do not tightly hug camera: ear widths are fixed, indicators centered in visible region.
-- Session row vendor logos include a subtle background pill (HIG recommends logos without containers).
 - Meteor is an extra animation not in Dynamic Island alerts (user requested, single run).
 - Expands on hover rather than click as Apple does on Mac: no false triggers observed; tune delay based on measurement if issues arise.
 

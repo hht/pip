@@ -41,7 +41,7 @@ Decided in `GuardPresentation` and `ViolationAlert` in `NotchCore`; text and col
 | egressMismatch | Solid amber |
 | unknown (offline, probe timeout, first round incomplete) | Gray hollow ring |
 | violated | Red card, plays Basso |
-| violated with firewall enabled, status fresh, check passed (Step 5, `docs/firewall.md`) | Red card, lock icon, silent: "Proxy disconnected, firewall blocked external network" |
+| violated with firewall enabled, status fresh, check passed (`docs/firewall.md`; not yet wired, see `HANDOFF.md` Step 5) | Red card, lock icon, silent: "Proxy disconnected, firewall blocked external network" |
 
 What appears on the right ear when collapsed is determined by Pip look (`docs/mascot.md` §2).
 
